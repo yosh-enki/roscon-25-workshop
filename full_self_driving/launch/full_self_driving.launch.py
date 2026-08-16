@@ -29,6 +29,9 @@ def launch_setup(context, *args, **kwargs):
     headless_arg = LaunchConfiguration("headless").perform(context).lower()
     config_path = LaunchConfiguration("engineering_config").perform(context)
     test_fault_child = LaunchConfiguration("test_fault_child").perform(context)
+    replay_fixture = LaunchConfiguration("replay_fixture").perform(context).lower()
+    dictionary_name = LaunchConfiguration("dictionary").perform(context)
+    marker_size_val = float(LaunchConfiguration("marker_size").perform(context))
 
     simulation = simulation_arg in ["true", "1", "yes"]
     headless = headless_arg in ["true", "1", "yes"]
@@ -253,6 +256,23 @@ def launch_setup(context, *args, **kwargs):
         }],
     )
 
+    fsd_perception_node = Node(
+        package="full_self_driving",
+        executable="fsd_perception",
+        name="fsd_perception",
+        output="screen",
+        parameters=[{
+            "use_sim_time": True,
+            "camera_frame": camera_frame,
+            "map_id": world_name,
+            "scenario_id": "default_scenario",
+            "target_namespace": "aavc2026",
+            "dictionary": dictionary_name,
+            "marker_size": marker_size_val,
+            "autostart": True,
+        }],
+    )
+
     entities = [
         gz_process,
         px4_process,
@@ -264,7 +284,22 @@ def launch_setup(context, *args, **kwargs):
         foxglove_bridge_node,
         tf_container,
         launch_probe_node,
+        fsd_perception_node,
     ]
+
+    if replay_fixture == "aruco":
+        replay_publisher_node = Node(
+            package="full_self_driving",
+            executable="fsd_replay_fixture_publisher",
+            name="fsd_replay_fixture_publisher",
+            output="screen",
+            parameters=[{
+                "fixture_name": "aruco",
+                "rate_hz": 10.0,
+                "use_sim_time": True,
+            }],
+        )
+        entities.append(replay_publisher_node)
 
     # Supervise child exits: if gz or px4 or dds agent exits, initiate shutdown
     entities.append(
@@ -315,6 +350,21 @@ def generate_launch_description():
             "engineering_config",
             default_value="",
             description="Path to authoritative engineering configuration file",
+        ),
+        DeclareLaunchArgument(
+            "replay_fixture",
+            default_value="none",
+            description="Replay fixture test mode ('none', 'aruco')",
+        ),
+        DeclareLaunchArgument(
+            "dictionary",
+            default_value="DICT_4X4_50",
+            description="ArUco marker dictionary name (e.g. DICT_4X4_50, DICT_4X4_250)",
+        ),
+        DeclareLaunchArgument(
+            "marker_size",
+            default_value="0.4",
+            description="Marker side length in meters",
         ),
         DeclareLaunchArgument(
             "test_fault_child",
