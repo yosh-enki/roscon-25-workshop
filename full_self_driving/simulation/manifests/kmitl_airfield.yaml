@@ -1,0 +1,15 @@
+world_name: "kmitl_airfield"
+world_sdf: "simulation/worlds/kmitl_airfield.sdf"
+source_provenance:
+  source_path: "gazebo_models/worlds/kmitl_airfield.sdf"
+  version: "1.0.0"
+  hash: "bd806e45a0f66fc5407889ab2b58cd04674b7b482ff381c44c7245b51f7662d8"
+origin:
+  latitude_deg: 13.730322
+  longitude_deg: 100.787446
+  elevation_m: 2.0
+vehicle:
+  model_name: "x500_mono_cam_down_0"
+  airframe: 4014
+  camera_frame: "camera_frame"
+  model_camera_frame: "x500_mono_cam_down_0/camera_link/imager"

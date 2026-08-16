@@ -1,0 +1,16 @@
+static_transforms:
+  map_to_odom:
+    frame_id: "map"
+    child_frame_id: "odom"
+    translation: [0.0, 0.0, 0.24]
+    rotation: [0.0, 0.0, 0.0, 1.0]
+  base_link_to_camera:
+    frame_id: "base_link"
+    child_frame_id: "{model_name}/camera_link/imager"
+    translation: [0.0, 0.0, 0.0]
+    rotation: [-0.7071068, 0.7071068, 0.0, 0.0]
+  camera_to_camera_frame:
+    frame_id: "{model_name}/camera_link/imager"
+    child_frame_id: "{camera_frame}"
+    translation: [0.0, 0.0, 0.0]
+    rotation: [0.0, 0.0, 0.0, 1.0]

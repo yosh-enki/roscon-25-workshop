@@ -1,0 +1,18 @@
+profile: simulation
+version: "1.0.0"
+description: "Integrated Gazebo Harmonic and PX4 SITL simulation profile for Full Self-Driving"
+px4_sitl:
+  executable: "/home/ubuntu/px4_sitl/bin/px4"
+  working_dir: "/home/ubuntu/px4_sitl/romfs"
+  autostart_id: 4014
+  model_default: "x500_mono_cam_down"
+  dds_agent_port: 8888
+gazebo:
+  server_config_path: "/home/ubuntu/PX4-gazebo-models/server.config"
+  model_store: "/home/ubuntu/PX4-gazebo-models/models"
+allowed_worlds:
+  - kmitl_airfield
+bridges:
+  clock: "simulation/bridges/clock.yaml"
+  camera: "simulation/bridges/camera.yaml"
+  tf: "simulation/bridges/tf.yaml"

@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EngineeringConfiguration",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "deployment_id",
+    "profile",
+    "simulation",
+    "safety",
+    "routes",
+    "adapters"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0.0"]
+    },
+    "deployment_id": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["simulation", "hardware"]
+    },
+    "simulation": {
+      "type": "object",
+      "properties": {
+        "world": { "type": "string" },
+        "headless": { "type": "boolean" },
+        "use_sim_time": { "type": "boolean" }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "properties": {
+        "max_altitude_m": { "type": "number", "minimum": 1.0 },
+        "min_battery_percentage": { "type": "number", "minimum": 0.0, "maximum": 100.0 },
+        "target_loss_timeout_s": { "type": "number", "minimum": 0.1 }
+      }
+    },
+    "routes": {
+      "type": "object",
+      "properties": {
+        "transit_in_speed_m_s": { "type": "number", "minimum": 0.5 },
+        "transit_out_speed_m_s": { "type": "number", "minimum": 0.5 }
+      }
+    },
+    "adapters": {
+      "type": "object",
+      "properties": {
+        "px4_transport": { "type": "string" },
+        "camera_adapter": { "type": "string" },
+        "payload_adapter": { "type": "string" }
+      }
+    }
+  }
+}
