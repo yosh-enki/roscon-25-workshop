@@ -123,8 +123,8 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Run 2.2 live-camera smoke, all foundation tests, and the dependency/offboard scan.
     - **Requirements:** 3.2, 3.4, 7.1; design Property 7 as a separation prerequisite.
 
-- [ ] 3. Add selected-target live-lock qualification and map/scenario-scoped registry
-  - [ ] 3.1 Implement production target identity, live-lock qualification, and a test-only selection provider
+- [x] 3. Add selected-target live-lock qualification and map/scenario-scoped registry
+  - [x] 3.1 Implement production target identity, live-lock qualification, and a test-only selection provider
     - **Prerequisites:** 2.2. The standard runtime will receive the selected identity from `MissionContext` later; this task may add only a test-only typed selection provider for exercising the slice before Task 4.3.
     - **Production files/components:** Add `src/domain/target_identity.cpp`, `src/domain/live_target_lock.cpp`, `src/perception/target_coordinator.cpp`, `msg/LiveTargetLock.msg`, and `test/fixtures/target_selection_provider.cpp`.
     - **Implementation:** Consume all-ID observations and qualify only the selected marker ID, dictionary, and namespace after scope, frame/TF, calibration, freshness, quality, covariance, consecutive-observation, and spatial-consistency gates. Publish candidate/qualified/stale/lost lock data; never call a mode switch, arm, takeoff, or executor API from perception.
@@ -134,7 +134,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat the live camera and ArUco parity launch, and verify no legacy `/target_pose` or prototype contract is present.
     - **Requirements:** 3.2, 3.7, 3.8, 4.5, 5.2, 7.1.
 
-  - [ ] 3.2 Implement the map/scenario-scoped pad registry lifecycle node
+  - [x] 3.2 Implement the map/scenario-scoped pad registry lifecycle node
     - **Prerequisites:** 3.1. Registry records must use production `TargetIdentity` and all-ID observations, not the old `aruco_database` messages/services.
     - **Production files/components:** Add `msg/PadRecord.msg`, `msg/PadRegistrySnapshot.msg`, `msg/PadRegistryStatus.msg`, `src/registry/pad_registry.hpp/.cpp`, `src/registry/pad_registry_node.cpp`, and the production registry service endpoint stub needed for later clear/backup wiring.
     - **Implementation:** Key records by map, scenario, namespace, dictionary, and marker ID. Apply timestamp, transform, calibration, quality, covariance, outlier, and scope checks; publish complete active-scope snapshots/status with revision and durability placeholders. Keep registry existence separate from `LiveTargetLock`; expose a deterministic test injection path only under a test launch argument.
@@ -144,7 +144,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat all camera, TF, all-ID, and live-lock checks; run CTest and scan for old database contracts.
     - **Requirements:** 3.1, 3.4, 3.5, 3.8, 7.1, 7.4.
 
-  - [ ]* 3.3 Add the map/scenario registry-isolation property test
+  - [x] 3.3 Add the map/scenario registry-isolation property test
     - **Prerequisites:** 3.2. Use a C++ property generator for identities, scopes, record ages, quality, covariance, and revisions.
     - **Production files/components:** Add `test/property/property_6_registry_isolation.cpp` and register a named CTest `fsd_property_6_registry_isolation`.
     - **Implementation:** Exercise lookup, observation acceptance, clear preconditions, backup state, and scope changes; assert that no record crosses map/scenario/namespace/dictionary/ID boundaries and that clear remains revisioned/disarmed-only.
@@ -154,7 +154,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Run 3.2 scoped registry smoke and all earlier perception tests.
     - **Requirements:** 3.1, 3.5, 3.6; **Property 6: Map/scenario registry isolation**.
 
-  - [ ]* 3.4 Add the all-ID/live-lock separation property test
+  - [x] 3.4 Add the all-ID/live-lock separation property test
     - **Prerequisites:** 3.1 and 3.2.
     - **Production files/components:** Add `test/property/property_7_all_id_live_lock.cpp` and register `fsd_property_7_all_id_live_lock`.
     - **Implementation:** Generate accepted/rejected all-ID observations and selected identities; assert registry updates may occur for valid all-ID data, but a qualified lock requires exact identity, scope, freshness, quality, covariance, transform, consecutive, and spatial gates.

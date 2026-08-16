@@ -185,6 +185,18 @@
       "foxglovePanelTitle": "Drone estimated altitude (NED)",
       "xAxisLabel": "t [s]",
       "yAxisLabel": "z [m]"
+    },
+    "ImageView!fsd_annotated": {
+      "cameraTopic": "/full_self_driving/perception/annotated_image",
+      "transformMarkers": false,
+      "synchronize": false,
+      "mode": "fit",
+      "pan": {
+        "x": 0,
+        "y": 0
+      },
+      "zoom": 1,
+      "foxglovePanelTitle": "ArUco Annotated Feed (2D Static)"
     }
   },
   "globalVariables": {},
@@ -193,12 +205,16 @@
     "speed": 1
   },
   "layout": {
-    "first": "3D!3c6twjg",
+    "first": {
+      "first": "ImageView!fsd_annotated",
+      "second": "3D!3c6twjg",
+      "direction": "row"
+    },
     "second": {
       "first": "Plot!2kas0az",
       "second": "Plot!1jjgtat",
       "direction": "column"
     },
-    "direction": "row"
+    "direction": "column"
   }
 }

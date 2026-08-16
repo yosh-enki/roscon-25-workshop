@@ -1,0 +1,20 @@
+uint8 DURABILITY_UNKNOWN=0
+uint8 DURABILITY_SYNCED=1
+uint8 DURABILITY_DIRTY=2
+uint8 DURABILITY_FAILED=3
+uint8 BACKUP_UNKNOWN=0
+uint8 BACKUP_READY=1
+uint8 BACKUP_FAILED=2
+
+MessageHeader header
+string<=64 map_id
+string<=64 scenario_id
+uint64 revision
+uint32 record_count
+uint32 stale_record_count
+float32 minimum_quality
+uint64 oldest_record_age_ms
+uint8 durability_state
+uint8 backup_state
+bool clear_allowed
+ComponentHealth component_health

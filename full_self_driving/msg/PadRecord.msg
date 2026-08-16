@@ -1,0 +1,16 @@
+MessageHeader header
+TargetIdentity identity
+string<=64 map_id
+string<=64 scenario_id
+float64 latitude_deg
+float64 longitude_deg
+float64 altitude_m
+float64 uncertainty_m
+float32 quality
+uint64 observation_count
+builtin_interfaces/Time first_observed_at
+builtin_interfaces/Time last_observed_at
+uint64 last_observed_monotonic_ns
+uint64 registry_revision
+string<=64 calibration_sha256
+string<=64 origin_session_id

@@ -184,6 +184,14 @@ def launch_setup(context, *args, **kwargs):
         parameters=[{"use_sim_time": True}],
     )
 
+    px4_tf_node = Node(
+        package="px4_tf",
+        executable="px4_tf_publisher",
+        name="px4_tf_publisher",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+    )
+
     tf_container = ComposableNodeContainer(
         name="static_tf_container",
         package="rclcpp_components",
@@ -256,6 +264,23 @@ def launch_setup(context, *args, **kwargs):
         }],
     )
 
+    test_selection = LaunchConfiguration("test_selection").perform(context).strip()
+    property_fixture = LaunchConfiguration("property_fixture").perform(context).strip().lower()
+
+    selected_marker_id = -1
+    selected_dict = dictionary_name
+    selected_ns = "aavc2026"
+    if test_selection and test_selection.lower() != "none":
+        parts = test_selection.split(":")
+        try:
+            selected_marker_id = int(parts[0])
+            if len(parts) > 1 and parts[1]:
+                selected_dict = parts[1]
+            if len(parts) > 2 and parts[2]:
+                selected_ns = parts[2]
+        except ValueError:
+            pass
+
     fsd_perception_node = Node(
         package="full_self_driving",
         executable="fsd_perception",
@@ -269,6 +294,22 @@ def launch_setup(context, *args, **kwargs):
             "target_namespace": "aavc2026",
             "dictionary": dictionary_name,
             "marker_size": marker_size_val,
+            "selected_marker_id": selected_marker_id,
+            "selected_dictionary": selected_dict,
+            "selected_namespace": selected_ns,
+            "autostart": True,
+        }],
+    )
+
+    fsd_pad_registry_node = Node(
+        package="full_self_driving",
+        executable="fsd_pad_registry",
+        name="fsd_pad_registry",
+        output="screen",
+        parameters=[{
+            "use_sim_time": True,
+            "map_id": world_name,
+            "scenario_id": "default_scenario",
             "autostart": True,
         }],
     )
@@ -281,11 +322,30 @@ def launch_setup(context, *args, **kwargs):
         camera_bridge_node,
         image_bridge_node,
         robot_state_publisher_node,
+        px4_tf_node,
         foxglove_bridge_node,
         tf_container,
         launch_probe_node,
         fsd_perception_node,
+        fsd_pad_registry_node,
     ]
+
+    if test_selection and test_selection.lower() != "none" and selected_marker_id >= 0:
+        selection_provider_node = Node(
+            package="full_self_driving",
+            executable="fsd_target_selection_provider",
+            name="fsd_target_selection_provider",
+            output="screen",
+            parameters=[{
+                "marker_id": selected_marker_id,
+                "dictionary": selected_dict,
+                "target_namespace": selected_ns,
+                "rate_hz": 1.0,
+                "periodic": True,
+                "use_sim_time": True,
+            }],
+        )
+        entities.append(selection_provider_node)
 
     if replay_fixture == "aruco":
         replay_publisher_node = Node(
@@ -355,6 +415,16 @@ def generate_launch_description():
             "replay_fixture",
             default_value="none",
             description="Replay fixture test mode ('none', 'aruco')",
+        ),
+        DeclareLaunchArgument(
+            "test_selection",
+            default_value="none",
+            description="Test-only target selection fixture (e.g. '0', '7', '0:DICT_4X4_50:aavc2026')",
+        ),
+        DeclareLaunchArgument(
+            "property_fixture",
+            default_value="none",
+            description="Property test fixture mode ('none', 'registry_isolation', 'all_id_live_lock')",
         ),
         DeclareLaunchArgument(
             "dictionary",

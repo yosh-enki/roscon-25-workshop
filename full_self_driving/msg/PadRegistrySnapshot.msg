@@ -1,0 +1,22 @@
+uint8 ORIGIN_UNKNOWN=0
+uint8 ORIGIN_CONFIGURED=1
+uint8 ORIGIN_LEARNED=2
+uint8 ORIGIN_IMPORTED=3
+uint8 DURABILITY_UNKNOWN=0
+uint8 DURABILITY_SYNCED=1
+uint8 DURABILITY_DIRTY=2
+uint8 DURABILITY_FAILED=3
+uint8 BACKUP_UNKNOWN=0
+uint8 BACKUP_READY=1
+uint8 BACKUP_FAILED=2
+
+MessageHeader header
+string<=64 map_id
+string<=64 scenario_id
+uint64 revision
+PadRecord[<=1024] records
+uint8 origin_state
+uint8 durability_state
+uint8 backup_state
+builtin_interfaces/Time updated_at
+uint64 updated_monotonic_ns

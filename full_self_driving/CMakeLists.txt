@@ -36,12 +36,35 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/AllIdObservation.msg"
   "msg/AllIdObservationBatch.msg"
   "msg/ComponentHealth.msg"
+  "msg/LiveTargetLock.msg"
+  "msg/PadRecord.msg"
+  "msg/PadRegistrySnapshot.msg"
+  "msg/PadRegistryStatus.msg"
   DEPENDENCIES builtin_interfaces geometry_msgs
 )
+
+# Domain Core Library
+add_library(fsd_domain_core
+  src/domain/target_identity.cpp
+  src/domain/live_target_lock.cpp
+)
+target_include_directories(fsd_domain_core PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(fsd_domain_core
+  rclcpp
+  geometry_msgs
+  builtin_interfaces
+)
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(fsd_domain_core "${cpp_typesupport_target}")
 
 # Perception Core Library
 add_library(fsd_perception_core
   src/perception/aruco_detector.cpp
+  src/perception/target_coordinator.cpp
 )
 target_include_directories(fsd_perception_core PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -50,8 +73,10 @@ target_include_directories(fsd_perception_core PUBLIC
   ${OpenCV_INCLUDE_DIRS}
 )
 target_link_libraries(fsd_perception_core
+  fsd_domain_core
   ${OpenCV_LIBS}
   OpenSSL::Crypto
+  "${cpp_typesupport_target}"
 )
 ament_target_dependencies(fsd_perception_core
   rclcpp
@@ -60,8 +85,26 @@ ament_target_dependencies(fsd_perception_core
   geometry_msgs
   builtin_interfaces
 )
-rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
-target_link_libraries(fsd_perception_core "${cpp_typesupport_target}")
+
+# Registry Core Library
+add_library(fsd_registry_core
+  src/registry/pad_registry.cpp
+)
+target_include_directories(fsd_registry_core PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(fsd_registry_core
+  fsd_domain_core
+  "${cpp_typesupport_target}"
+)
+ament_target_dependencies(fsd_registry_core
+  rclcpp
+  rclcpp_lifecycle
+  geometry_msgs
+  builtin_interfaces
+)
 
 # Executables
 add_executable(fsd_launch_probe
@@ -88,6 +131,7 @@ target_include_directories(fsd_perception PRIVATE
 )
 target_link_libraries(fsd_perception
   fsd_perception_core
+  fsd_domain_core
   ${OpenCV_LIBS}
   OpenSSL::Crypto
   "${cpp_typesupport_target}"
@@ -99,6 +143,25 @@ ament_target_dependencies(fsd_perception
   sensor_msgs
   geometry_msgs
   cv_bridge
+)
+
+add_executable(fsd_pad_registry
+  src/registry/pad_registry_node.cpp
+)
+target_include_directories(fsd_pad_registry PRIVATE
+  include
+  src
+)
+target_link_libraries(fsd_pad_registry
+  fsd_registry_core
+  fsd_domain_core
+  "${cpp_typesupport_target}"
+)
+ament_target_dependencies(fsd_pad_registry
+  rclcpp
+  rclcpp_lifecycle
+  lifecycle_msgs
+  geometry_msgs
 )
 
 add_executable(fsd_replay_fixture_publisher
@@ -120,12 +183,32 @@ ament_target_dependencies(fsd_replay_fixture_publisher
   ament_index_cpp
 )
 
+add_executable(fsd_target_selection_provider
+  test/fixtures/target_selection_provider.cpp
+)
+target_include_directories(fsd_target_selection_provider PRIVATE
+  include
+  src
+  test
+)
+target_link_libraries(fsd_target_selection_provider
+  fsd_domain_core
+  "${cpp_typesupport_target}"
+)
+ament_target_dependencies(fsd_target_selection_provider
+  rclcpp
+)
+
 # Install rules
 install(TARGETS
+  fsd_domain_core
   fsd_perception_core
+  fsd_registry_core
   fsd_launch_probe
   fsd_perception
+  fsd_pad_registry
   fsd_replay_fixture_publisher
+  fsd_target_selection_provider
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
@@ -167,6 +250,7 @@ if(BUILD_TESTING)
   )
   target_link_libraries(aruco_replay_test
     fsd_perception_core
+    fsd_domain_core
     ${OpenCV_LIBS}
     yaml-cpp
     "${cpp_typesupport_target}"
@@ -176,6 +260,44 @@ if(BUILD_TESTING)
     sensor_msgs
     geometry_msgs
     ament_index_cpp
+  )
+
+  ament_add_gtest(fsd_property_6_registry_isolation
+    test/property/property_6_registry_isolation.cpp
+  )
+  target_include_directories(fsd_property_6_registry_isolation PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_6_registry_isolation
+    fsd_registry_core
+    fsd_domain_core
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_6_registry_isolation
+    rclcpp
+    geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_7_all_id_live_lock
+    test/property/property_7_all_id_live_lock.cpp
+  )
+  target_include_directories(fsd_property_7_all_id_live_lock PRIVATE
+    include
+    src
+    ${OpenCV_INCLUDE_DIRS}
+  )
+  target_link_libraries(fsd_property_7_all_id_live_lock
+    fsd_perception_core
+    fsd_registry_core
+    fsd_domain_core
+    ${OpenCV_LIBS}
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_7_all_id_live_lock
+    rclcpp
+    geometry_msgs
+    sensor_msgs
   )
 
   ament_add_pytest_test(forbidden_dependency_scan
@@ -188,7 +310,7 @@ if(BUILD_TESTING)
 endif()
 
 ament_export_include_directories(include)
-ament_export_libraries(fsd_perception_core)
+ament_export_libraries(fsd_domain_core fsd_perception_core fsd_registry_core)
 ament_export_dependencies(
   rosidl_default_runtime
   rclcpp

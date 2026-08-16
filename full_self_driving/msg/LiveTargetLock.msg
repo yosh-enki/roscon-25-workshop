@@ -1,0 +1,19 @@
+uint8 STATE_NONE=0
+uint8 STATE_CANDIDATE=1
+uint8 STATE_QUALIFIED=2
+uint8 STATE_STALE=3
+uint8 STATE_LOST=4
+
+MessageHeader header
+TargetIdentity identity
+string<=64 map_id
+string<=64 scenario_id
+string<=64 pose_frame
+geometry_msgs/Pose pose
+float64[36] covariance
+float32 quality
+uint32 consecutive_observations
+builtin_interfaces/Time image_time
+uint64 received_monotonic_ns
+uint8 lock_state
+uint64 lock_sequence

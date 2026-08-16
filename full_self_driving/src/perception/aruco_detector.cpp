@@ -304,20 +304,20 @@ DetectionResult ArucoDetector::process_image(
     obs.calibration_sha256 = calibration_sha256_;
     obs.observation_state = full_self_driving::msg::AllIdObservation::QUALITY_ACCEPTED;
 
-    // Overlay text matching prototype format: "ID <id> X: <x> Y: <y> Z: <z>"
-    std::ostringstream ss;
-    ss << std::fixed << std::setprecision(2);
-    ss << "ID " << ids[i] << " X: " << tvec[0] << " Y: " << tvec[1] << " Z: " << tvec[2];
-    std::string text_xyz = ss.str();
+    // Overlay text matching prototype format: "X: <x> Y: <y> Z: <z>"
+    if (i == 0) {
+      std::ostringstream ss;
+      ss << std::fixed << std::setprecision(2);
+      ss << "X: " << tvec[0] << " Y: " << tvec[1] << " Z: " << tvec[2];
+      std::string text_xyz = ss.str();
 
-    int fontFace = cv::FONT_HERSHEY_SIMPLEX;
-    double fontScale = 0.7;
-    int thickness = 2;
-    int baseline = 0;
-    cv::Size textSize = cv::getTextSize(text_xyz, fontFace, fontScale, thickness, &baseline);
-    int y_pos = result.annotated_image.rows - 15 - static_cast<int>(result.batch.observations.size() * (textSize.height + 12));
-    if (y_pos > 25) {
-      cv::Point textOrg(result.annotated_image.cols - textSize.width - 15, y_pos);
+      int fontFace = cv::FONT_HERSHEY_SIMPLEX;
+      double fontScale = 1.0;
+      int thickness = 2;
+      int baseline = 0;
+      cv::Size textSize = cv::getTextSize(text_xyz, fontFace, fontScale, thickness, &baseline);
+      baseline += thickness;
+      cv::Point textOrg((result.annotated_image.cols - textSize.width - 10), (result.annotated_image.rows - 10));
       cv::putText(
         result.annotated_image, text_xyz, textOrg, fontFace, fontScale,
         cv::Scalar(0, 255, 255), thickness, 8);
