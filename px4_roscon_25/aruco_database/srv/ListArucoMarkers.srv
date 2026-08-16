@@ -1,0 +1,7 @@
+---
+bool success
+string error_message
+uint64 revision
+bool origin_ready
+bool database_dirty
+ArucoMarker[] markers

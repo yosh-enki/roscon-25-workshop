@@ -1,0 +1,11 @@
+bool confirm
+bool backup
+bool use_expected_revision
+uint64 expected_revision
+---
+bool success
+string error_message
+uint64 revision
+uint32 marker_count
+bool persisted
+string backup_file

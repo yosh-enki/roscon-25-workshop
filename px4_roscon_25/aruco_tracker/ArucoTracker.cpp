@@ -3,6 +3,7 @@
 // ============================================================================
 #include "ArucoTracker.hpp"
 #include <sstream>
+#include <utility>
 
 ArucoTrackerNode::ArucoTrackerNode()
 	: Node("aruco_tracker_node")
@@ -29,6 +30,7 @@ ArucoTrackerNode::ArucoTrackerNode()
 	// Publishers
 	_image_pub = create_publisher<sensor_msgs::msg::Image>("/image_proc", qos);
 	_target_pose_pub = create_publisher<geometry_msgs::msg::PoseStamped>("/target_pose", qos);
+	_detections_pub = create_publisher<aruco_database::msg::ArucoDetectionArray>("/aruco/detections", qos);
 }
 
 void ArucoTrackerNode::loadParameters()
@@ -36,10 +38,12 @@ void ArucoTrackerNode::loadParameters()
 	declare_parameter<int>("aruco_id", 0);
 	declare_parameter<int>("dictionary", 2); // DICT_4X4_250
 	declare_parameter<double>("marker_size", 0.5);
+	declare_parameter<std::string>("camera_frame", "camera_frame");
 
 	get_parameter("aruco_id", _param_aruco_id);
 	get_parameter("dictionary", _param_dictionary);
 	get_parameter("marker_size", _param_marker_size);
+	get_parameter("camera_frame", _param_camera_frame);
 }
 
 void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr msg)
@@ -48,68 +52,81 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 		// Convert ROS image message to OpenCV image
 		cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
 
-		// Detect markers
+		// Detect all markers in the image. The database receives every valid pose,
+		// while PrecisionLand keeps receiving the configured target only.
 		std::vector<int> ids;
 		std::vector<std::vector<cv::Point2f>> corners;
 		_detector->detectMarkers(cv_ptr->image, corners, ids);
 		cv::aruco::drawDetectedMarkers(cv_ptr->image, corners, ids);
 
 		if (!_camera_matrix.empty() && !_dist_coeffs.empty()) {
-
 			std::vector<std::vector<cv::Point2f>> undistortedCorners;
+			undistortedCorners.reserve(corners.size());
 
-			for (const auto& corner : corners) {
+			for (const auto & corner : corners) {
 				std::vector<cv::Point2f> undistortedCorner;
-				cv::undistortPoints(corner, undistortedCorner, _camera_matrix, _dist_coeffs, cv::noArray(), _camera_matrix);
-				undistortedCorners.push_back(undistortedCorner);
+				cv::undistortPoints(
+					corner, undistortedCorner, _camera_matrix, _dist_coeffs,
+					cv::noArray(), _camera_matrix);
+				undistortedCorners.push_back(std::move(undistortedCorner));
 			}
 
-			for (size_t i = 0; i < ids.size(); i++) {
-				if (ids[i] != _param_aruco_id) {
-					continue;
-				}
+			aruco_database::msg::ArucoDetectionArray detections_msg;
+			detections_msg.header.stamp = msg->header.stamp;
+			detections_msg.header.frame_id = _param_camera_frame;
+		bool target_pose_published = false;
 
-				// Calculate marker size from camera intrinsics
-				float half_size = _param_marker_size / 2.0f;
-				std::vector<cv::Point3f> objectPoints = {
+			for (size_t i = 0; i < ids.size(); ++i) {
+				const float half_size = static_cast<float>(_param_marker_size / 2.0);
+				const std::vector<cv::Point3f> objectPoints = {
 					cv::Point3f(-half_size,  half_size, 0),  // top left
 					cv::Point3f(half_size,  half_size, 0),   // top right
 					cv::Point3f(half_size, -half_size, 0),   // bottom right
 					cv::Point3f(-half_size, -half_size, 0)   // bottom left
 				};
 
-				// Use PnP solver to estimate pose
 				cv::Vec3d rvec, tvec;
-				cv::solvePnP(objectPoints, undistortedCorners[i], _camera_matrix, cv::noArray(), rvec, tvec);
-				// Annotate the image
-				cv::drawFrameAxes(cv_ptr->image, _camera_matrix, cv::noArray(), rvec, tvec, _param_marker_size);
+				if (!cv::solvePnP(
+						objectPoints, undistortedCorners[i], _camera_matrix,
+						cv::noArray(), rvec, tvec)) {
+					RCLCPP_WARN(get_logger(), "solvePnP failed for ArUco ID %d", ids[i]);
+					continue;
+				}
 
-				// Quaternion from rotation matrix
 				cv::Mat rot_mat;
 				cv::Rodrigues(rvec, rot_mat);
-				cv::Quatd quat = cv::Quatd::createFromRotMat(rot_mat).normalize();
+				const cv::Quatd quat = cv::Quatd::createFromRotMat(rot_mat).normalize();
 
-				// Publish target pose
-				geometry_msgs::msg::PoseStamped pose_msg;
-				pose_msg.header.stamp = msg->header.stamp;
-				pose_msg.header.frame_id = "camera_frame";
-				pose_msg.pose.position.x = tvec[0];
-				pose_msg.pose.position.y = tvec[1];
-				pose_msg.pose.position.z = tvec[2];
-				pose_msg.pose.orientation.x = quat.x;
-				pose_msg.pose.orientation.y = quat.y;
-				pose_msg.pose.orientation.z = quat.z;
-				pose_msg.pose.orientation.w = quat.w;
+				geometry_msgs::msg::Pose pose;
+				pose.position.x = tvec[0];
+				pose.position.y = tvec[1];
+				pose.position.z = tvec[2];
+				pose.orientation.x = quat.x;
+				pose.orientation.y = quat.y;
+				pose.orientation.z = quat.z;
+				pose.orientation.w = quat.w;
 
-				_target_pose_pub->publish(pose_msg);
+				aruco_database::msg::ArucoDetection detection;
+				detection.id = ids[i];
+				detection.pose = pose;
+				detections_msg.detections.push_back(detection);
 
-				// Annotate the image
-				annotate_image(cv_ptr, tvec);
+				if (ids[i] == _param_aruco_id && !target_pose_published) {
+					cv::drawFrameAxes(
+						cv_ptr->image, _camera_matrix, cv::noArray(), rvec, tvec,
+						_param_marker_size);
 
-				// NOTE: we break here, meaning we only publish the pose of the first target we see
-				break;
+					geometry_msgs::msg::PoseStamped pose_msg;
+					pose_msg.header = detections_msg.header;
+					pose_msg.pose = pose;
+					_target_pose_pub->publish(pose_msg);
+
+					annotate_image(cv_ptr, tvec);
+					target_pose_published = true;
+				}
 			}
 
+			_detections_pub->publish(detections_msg);
 		} else {
 			RCLCPP_ERROR(get_logger(), "Missing camera calibration");
 		}
@@ -123,6 +140,8 @@ void ArucoTrackerNode::image_callback(const sensor_msgs::msg::Image::SharedPtr m
 
 	} catch (const cv_bridge::Exception& e) {
 		RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
+	} catch (const cv::Exception& e) {
+		RCLCPP_ERROR(get_logger(), "OpenCV exception: %s", e.what());
 	}
 }
 

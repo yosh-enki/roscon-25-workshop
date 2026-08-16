@@ -1,0 +1,377 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <world name="kmitl_airfield">
+    <physics name="1ms" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <!-- WGS84 Spherical Coordinates (Point 1 Origin) -->
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <latitude_deg>13.730322</latitude_deg>
+      <longitude_deg>100.787446</longitude_deg>
+      <elevation>2.0</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+
+    <!-- Scene Lighting & Skybox -->
+    <scene>
+      <ambient>0.65 0.65 0.65 1</ambient>
+
+      <background>0.6 0.8 1.0 1</background>
+      <shadows>true</shadows>
+      <sky>
+        <time>12</time>
+        <sunrise>6</sunrise>
+        <sunset>18</sunset>
+        <clouds>
+          <speed>12</speed>
+        </clouds>
+      </sky>
+    </scene>
+
+
+    <!-- Sun directional light -->
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 50 0 0 0</pose>
+      <diffuse>1.0 1.0 0.95 1</diffuse>
+      <specular>0.4 0.4 0.4 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.4 0.2 -0.9</direction>
+    </light>
+
+    <!-- Controlled Airspace Floor Polygon (Matcha Green) -->
+    <!-- PDF 4 Corners: NW(-29.3, 109.6), NE(267.5, 114.8), SE(259.4, -36.3), SW(-23.6, -57.1) -->
+    <model name="controlled_airspace_ground">
+      <static>true</static>
+      <pose>0 0 0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <polyline>
+              <point>-29.3 109.6</point>
+              <point>-23.6 -57.1</point>
+              <point>259.4 -36.3</point>
+              <point>267.5 114.8</point>
+              <height>0.01</height>
+            </polyline>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <polyline>
+              <point>-29.3 109.6</point>
+              <point>-23.6 -57.1</point>
+              <point>259.4 -36.3</point>
+              <point>267.5 114.8</point>
+              <height>0.01</height>
+            </polyline>
+          </geometry>
+          <material>
+            <ambient>0.45 0.66 0.38 1</ambient>
+            <diffuse>0.45 0.66 0.38 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Search Area Polygon (Pastel Yellow) -->
+    <!-- PDF 4 Corners: NW(40.9, 101.4), NE(267.5, 114.8), SE(252.3, 42.1), SW(42.6, 44.3) -->
+    <model name="search_area">
+      <static>true</static>
+      <pose>0 0 0.005 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <polyline>
+              <point>40.9 101.4</point>
+              <point>42.6 44.3</point>
+              <point>252.3 42.1</point>
+              <point>267.5 114.8</point>
+              <height>0.01</height>
+            </polyline>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <polyline>
+              <point>40.9 101.4</point>
+              <point>42.6 44.3</point>
+              <point>252.3 42.1</point>
+              <point>267.5 114.8</point>
+              <height>0.01</height>
+            </polyline>
+          </geometry>
+          <material>
+            <ambient>0.95 0.90 0.67 1</ambient>
+            <diffuse>0.95 0.90 0.67 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Colored Waypoint Checkpoint Discs -->
+    <!-- Point 1 (Cyan/Pastel Blue): radius 3.0m at (0, 0, 0.015) -->
+    <model name="checkpoint_point_1">
+      <static>true</static>
+      <pose>0 0 0.015 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>3.0</radius>
+              <length>0.02</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>3.0</radius>
+              <length>0.02</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.35 0.75 0.9 1</ambient>
+            <diffuse>0.35 0.75 0.9 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Point 2 (Pastel Orange): radius 3.0m at (135.2, 8.3, 0.015) -->
+    <model name="checkpoint_point_2">
+      <static>true</static>
+      <pose>135.2 8.3 0.015 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>3.0</radius>
+              <length>0.02</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>3.0</radius>
+              <length>0.02</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.95 0.65 0.35 1</ambient>
+            <diffuse>0.95 0.65 0.35 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Point 3 (Pastel Purple): radius 3.0m at (141.8, 43.1, 0.015) -->
+    <model name="checkpoint_point_3">
+      <static>true</static>
+      <pose>141.8 43.1 0.015 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>3.0</radius>
+              <length>0.02</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>3.0</radius>
+              <length>0.02</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.75 0.55 0.85 1</ambient>
+            <diffuse>0.75 0.55 0.85 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Elevated 3D Landing Pads (1000x1000x50 mm) with PBR Albedo Textures -->
+    <!-- aruco_pad_home: at (0, 0, 0.025), PBR Albedo aruco_5.png -->
+    <model name="aruco_pad_home">
+      <static>true</static>
+      <pose>0 0 0.025 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>1.0 1.0 0.05</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.0 1.0 0.05</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>materials/textures/aruco_5.png</albedo_map>
+                <roughness>0.3</roughness>
+                <metalness>0.0</metalness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- aruco_pad_1: at (90, 85, 0.025), PBR Albedo aruco_1.png -->
+    <model name="aruco_pad_1">
+      <static>true</static>
+      <pose>90 85 0.025 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>1.0 1.0 0.05</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.0 1.0 0.05</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>materials/textures/aruco_1.png</albedo_map>
+                <roughness>0.3</roughness>
+                <metalness>0.0</metalness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- aruco_pad_2: at (210, 85, 0.025), PBR Albedo aruco_2.png -->
+    <model name="aruco_pad_2">
+      <static>true</static>
+      <pose>210 85 0.025 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>1.0 1.0 0.05</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.0 1.0 0.05</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>materials/textures/aruco_2.png</albedo_map>
+                <roughness>0.3</roughness>
+                <metalness>0.0</metalness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- aruco_pad_3: at (90, 55, 0.025), PBR Albedo aruco_3.png -->
+    <model name="aruco_pad_3">
+      <static>true</static>
+      <pose>90 55 0.025 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>1.0 1.0 0.05</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.0 1.0 0.05</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>materials/textures/aruco_3.png</albedo_map>
+                <roughness>0.3</roughness>
+                <metalness>0.0</metalness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- aruco_pad_4: at (210, 55, 0.025), PBR Albedo aruco_4.png -->
+    <model name="aruco_pad_4">
+      <static>true</static>
+      <pose>210 55 0.025 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>1.0 1.0 0.05</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.0 1.0 0.05</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <pbr>
+              <metal>
+                <albedo_map>materials/textures/aruco_4.png</albedo_map>
+                <roughness>0.3</roughness>
+                <metalness>0.0</metalness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

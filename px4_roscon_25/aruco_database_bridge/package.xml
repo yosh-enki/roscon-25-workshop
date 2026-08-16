@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>aruco_database_bridge</name>
+  <version>0.0.1</version>
+  <description>ROS 2 to MQTT bridge for the ArUco database and Node-RED management.</description>
+
+  <maintainer email="roscon-workshop@example.com">ROSCon workshop</maintainer>
+  <license>CC-BY-SA-4.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>pkg-config</build_depend>
+  <build_depend>libmosquitto-dev</build_depend>
+  <exec_depend>libmosquitto1</exec_depend>
+
+  <depend>aruco_database</depend>
+  <depend>rclcpp</depend>
+
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

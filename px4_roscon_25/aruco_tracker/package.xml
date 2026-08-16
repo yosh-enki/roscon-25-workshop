@@ -23,6 +23,7 @@
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>cv_bridge</depend>
+  <depend>aruco_database</depend>
   <depend>OpenCV</depend>
 
   <exec_depend>tf2_ros</exec_depend>

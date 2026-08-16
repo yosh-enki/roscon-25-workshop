@@ -1,0 +1,44 @@
+# Search and search_bridge parameters.
+#
+# Empty plan-directory parameters resolve to the installed package share:
+#   <prefix>/share/search/plans/manual
+#   <prefix>/share/search/plans/working
+#
+# SearchPlanner never overwrites a working copy. It creates a filename such as
+#   20260813T143012Z_aavc2026_mission.plan
+# when no valid working copy exists, when reset_working_plan is true, or when
+# search_bridge receives a disarmed reset_working_plan command.
+search:
+  ros__parameters:
+    manual_plan_directory: ""
+    working_plan_directory: ""
+    default_manual_plan: "aavc2026_mission.plan"
+    reset_working_plan: false
+    search_altitude_m: 15.0
+    max_horizontal_speed_m_s: 5.0
+    waypoint_reach_radius_m: 4.0
+    max_yaw_rate_rad_s: 2.0
+
+search_bridge:
+  ros__parameters:
+    manual_plan_directory: ""
+    working_plan_directory: ""
+    default_manual_plan: "aavc2026_mission.plan"
+    reset_working_plan: false
+
+    # HiveMQ Cloud Serverless connection. Keep mqtt_username and
+    # mqtt_password empty here; use HIVEMQ_MQTT_USERNAME and
+    # HIVEMQ_MQTT_PASSWORD environment variables instead.
+    mqtt_host: "e12fae1fb0044123a8d14fd5df19371c.s1.eu.hivemq.cloud"
+    mqtt_port: 8883
+    mqtt_username: ""
+    mqtt_password: ""
+    mqtt_client_id: "search_bridge"
+    mqtt_topic_prefix: "search"
+    mqtt_tls_ca_file: ""
+
+    # Commands are accepted only with a fresh VehicleStatus whose arming_state
+    # is DISARMED (PX4 constant 1).
+    px4_status_timeout_s: 2.0
+    status_publish_period_ms: 500
+    planner_publish_period_ms: 2000

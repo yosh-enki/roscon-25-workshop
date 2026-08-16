@@ -3,6 +3,7 @@
 // ============================================================================
 #pragma once
 #include <memory>
+#include <string>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
@@ -11,6 +12,7 @@
 #include <opencv2/aruco.hpp>
 #include <opencv2/core/quaternion.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <aruco_database/msg/aruco_detection_array.hpp>
 
 class ArucoTrackerNode : public rclcpp::Node
 {
@@ -28,6 +30,7 @@ private:
 	rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr _camera_info_sub;
 	rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr _image_pub;
 	rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr _target_pose_pub;
+	rclcpp::Publisher<aruco_database::msg::ArucoDetectionArray>::SharedPtr _detections_pub;
 
 	std::unique_ptr<cv::aruco::ArucoDetector> _detector;
 	cv::Mat _camera_matrix;
@@ -36,6 +39,7 @@ private:
 	int _param_aruco_id {};
 	int _param_dictionary {};
 	double _param_marker_size {};
+	std::string _param_camera_frame {"camera_frame"};
 };
 // // ============================================================================
 // // ALTERNATIVE VERSION - For exercises

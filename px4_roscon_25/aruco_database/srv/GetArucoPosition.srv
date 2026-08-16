@@ -1,0 +1,6 @@
+int32 aruco_id
+---
+bool found
+float64 latitude_deg
+float64 longitude_deg
+string error_message
