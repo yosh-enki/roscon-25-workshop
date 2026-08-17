@@ -1,0 +1,10 @@
+MessageHeader header
+TargetIdentity target_identity
+string<=64 frame_id
+geometry_msgs/Pose target_pose
+float64 target_latitude_deg
+float64 target_longitude_deg
+float64 target_altitude_m
+float32 target_quality
+bool live_lock_qualified
+uint64 setpoint_monotonic_ns

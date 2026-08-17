@@ -1,0 +1,20 @@
+uint8 CMD_NONE=0
+uint8 CMD_CONFIGURE=1
+uint8 CMD_VALIDATE=2
+uint8 CMD_COMMIT=3
+uint8 CMD_RESET=4
+uint8 CMD_HOLD=5
+uint8 CMD_RESUME=6
+uint8 CMD_ABORT=7
+
+string<=64 request_id
+uint8 command
+string<=64 map_id
+string<=64 scenario_id
+TargetIdentity target
+uint64 expected_revision
+---
+bool accepted
+string<=64 message
+uint64 current_revision
+uint8 config_state

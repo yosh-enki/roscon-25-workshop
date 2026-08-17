@@ -1,0 +1,7 @@
+string<=64 request_id
+string<=64 reason
+string<=64 confirmation_token
+---
+bool success
+string<=64 message
+uint64 stop_monotonic_ns

@@ -1,0 +1,12 @@
+string<=64 request_id
+string<=64 map_id
+string<=64 scenario_id
+uint64 expected_registry_revision
+string<=64 confirmation
+---
+bool accepted
+uint64 new_registry_revision
+bool has_backup_reference
+string<=128 backup_reference
+bool has_error
+string<=256 error_message

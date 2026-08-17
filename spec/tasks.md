@@ -164,86 +164,16 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat the ArUco parity and registry isolation tests.
     - **Requirements:** 3.2, 3.7, 3.8; **Property 7: All-ID/live-lock separation**.
 
-- [ ] 4. Freeze bounded production contracts and make configuration/context authoritative
-  - [ ] 4.1 Generate the complete bounded ROS 2 interface boundary and contract probe
-    - **Prerequisites:** 3.2. Preserve the already introduced perception message names/fields; freeze the schema version before wiring services.
-    - **Production files/components:** Complete all design-specified `msg/`, `srv/`, and `action/` files: `MessageHeader`, `ErrorReport`, `TargetIdentity`, `PlanArtifactReference`, `SearchCheckpoint`, `WorkingPlanStatus`, `ComponentHealth`, `ReadinessReport`, `EngineeringConfigStatus`, `MissionContext`, `AllIdObservation`, `AllIdObservationBatch`, `LiveTargetLock`, `PadRecord`, `PadRegistrySnapshot`, `PadRegistryStatus`, `PayloadStatus`, `RecoveryStatus`, `ReadinessGate`, `MissionEvent`, `DashboardStatus`; all typed preparation/inspection services; and `ExecuteCommittedSortie.action`.
-    - **Implementation:** Add `rosidl_default_generators` dependencies in the correct order (`builtin_interfaces`, `geometry_msgs`, package types), enforce every string/sequence bound, optional `has_*` flags, finite/enum/hash rules, and owner/revision fields. Add a `contract_probe` node/test that publishes complete status snapshots and exercises each service with valid and invalid values without control side effects.
-    - **Launch update:** Add the contract probe and complete status publishers to the existing launch; keep actual mutating service handlers limited to the slices that have been implemented.
-    - **Run:** Build with `BUILD_TESTING=ON`; run the contract probe through the public launch and execute `ros2 interface show full_self_driving/msg/DashboardStatus`, one generated service, and the action. Run `colcon test` and the generated interface boundary tests.
-    - **Pass criteria:** All interfaces compile, serialize, and deserialize with bounds; unknown enums, NaN/Inf, overlong fields, missing optional flags, unbounded fields, raw PX4/Offboard/setpoint/path/GPIO/servo/executable/JSON fields, and invalid hashes are rejected; complete status is read-only and no invalid request changes authoritative state.
-    - **Regression checks:** Re-run the all-ID/live-lock and registry launch; verify their topics now use only the frozen production interfaces.
-    - **Requirements:** 7.1, 7.9, 4.2, 4.5.
+- [x] 4. Freeze bounded production contracts and make configuration/context authoritative
+  - [x] 4.1 Generate the complete bounded ROS 2 interface boundary and contract probe
+  - [x] 4.2 Implement the authoritative engineering configuration loader, resolver, validator, and canonical hash
+  - [x] 4.3 Implement MissionContextStore, OperatorSelection, commit/lock snapshots, and authoritative readiness
+  - [x] 4.4 Add the authoritative engineering-configuration property test
+  - [x] 4.5 Add the configuration-hash consistency property test
+  - [x] 4.6 Add the disarmed operator-selection isolation property test
 
-  - [ ] 4.2 Implement the authoritative engineering configuration loader, resolver, validator, and canonical hash
-    - **Prerequisites:** 4.1. The configuration selector is the only runtime path input; Node-RED and ROS parameters must not edit resolved policy.
-    - **Production files/components:** Add `src/config/config_loader.hpp/.cpp`, `src/config/mission_policy.hpp/.cpp`, schema/relationship validators under `config/schemas/`, `msg/EngineeringConfigStatus` integration, and the valid/invalid simulation config fixtures outside installed package share.
-    - **Implementation:** Load one bounded YAML/JSON engineering file, reject relative/traversing/symlink-escape/package-share-write paths, validate all finite/positive/relationship/route/adapter/QoS/resource/security/launch fields, canonicalize stable keys/units, compute lowercase SHA-256, and publish read-only status with field-level violations. Resolve adapter/catalog IDs rather than embedding site values in flight code.
-    - **Launch update:** `fsd_flight_runtime` loads config before any lifecycle activation; invalid config keeps simulation dependencies visible for diagnostics but withdraws production readiness and never registers a mode.
-    - **Run:** Launch with a valid config and inspect `/full_self_driving/engineering_config/status` and its hash. Launch with malformed, unsafe-path, relationship-invalid, and hash-mismatch fixtures and verify `CONFIG_INVALID` plus field-level errors.
-    - **Pass criteria:** Valid config yields deterministic identical hashes; every policy decision source is the resolved object; invalid or changed config blocks readiness; no Node-RED/parameter request can mutate the source or hash.
-    - **Regression checks:** Repeat the full simulation dependency smoke and all perception/registry checks with the valid config; run source scan for hardcoded deployment values.
-    - **Requirements:** 1.1, 1.2, 1.8, 1.10, 4.1, 6.2, 7.7.
-
-  - [ ] 4.3 Implement MissionContextStore, OperatorSelection, commit/lock snapshots, and authoritative readiness
-    - **Prerequisites:** 4.1 and 4.2. Replace the Task 3.1 test selection provider in the default launch; retain it only for replay tests.
-    - **Production files/components:** Add `src/domain/operator_selection.cpp`, `src/domain/mission_context.cpp`, `src/runtime/mission_context_store.cpp`, `msg/MissionContext`/`ReadinessReport` integration, and typed context mutation/validation/commit handlers.
-    - **Implementation:** Store only disarmed, revision-guarded operator selection mutations; validate map/scenario, immutable artifact, working plan, target identity, payload preparation, config hash, storage, recovery, and health. Commit a complete snapshot containing resolved configuration values and hashes; lock it immutably when the flight plane becomes active. Publish authoritative readiness, not UI-derived readiness.
-    - **Launch update:** The launch starts `fsd_flight_runtime` as a regular node, publishes context/readiness, supplies selected identity to perception/registry, and keeps the PX4 mode unregistered until the later API gate.
-    - **Run:** Use the typed test driver installed with the package to select map/scenario/target, validate, commit, attempt stale-revision and armed mutations, and inspect `/full_self_driving/mission_context`. Run the same public launch with the context replay fixture and verify a qualified live lock only for the committed target.
-    - **Pass criteria:** Every accepted mutation advances the durable selection revision; stale/armed/locked/recovery mutations are rejected; committed snapshot contains the complete resolved config/hash and selection; lock rejects mutation; readiness enumerates all missing gates.
-    - **Regression checks:** Repeat live-lock/registry and config-invalid launch tests; verify the test-only selection provider is not part of the default production graph.
-    - **Requirements:** 1.9, 2.1, 2.8, 2.10, 3.7, 3.10, 4.1, 4.3, 4.4, 4.5.
-
-  - [ ]* 4.4 Add the authoritative engineering-configuration property test
-    - **Prerequisites:** 4.2.
-    - **Production files/components:** Add `test/property/property_1_authoritative_config.cpp` and register `fsd_property_1_authoritative_config`.
-    - **Implementation:** Generate valid operator commands and config mutations; assert every sortie policy value comes from the resolved engineer-owned config or approved adapter introspection and that Node-RED cannot alter it.
-    - **Launch update:** Use the existing config mutation test fixture in the public launch; do not add a control path.
-    - **Run:** Run the named CTest and launch with an attempted gateway/config mutation; compare the published config hash before/after.
-    - **Pass criteria:** Design Property 1 holds for all generated commands; authoritative bytes/hash remain unchanged.
-    - **Regression checks:** Run 4.2 valid/invalid config smoke and the full earlier slice suite.
-    - **Requirements:** 1.1, 1.10; **Property 1: Authoritative engineering configuration**.
-
-  - [ ]* 4.5 Add the configuration-hash consistency property test
-    - **Prerequisites:** 4.2 and 4.3.
-    - **Production files/components:** Add `test/property/property_2_config_hash.cpp` and register `fsd_property_2_config_hash`.
-    - **Implementation:** Generate valid resolved configurations, canonicalize/hash snapshots, mutate one resolved field at a time, and assert hash changes and runtime policy reads the locked resolved values.
-    - **Launch update:** Add a read-only hash verification probe to the existing runtime launch.
-    - **Run:** Run `ctest --test-dir build/full_self_driving -R fsd_property_2_config_hash --output-on-failure`, then inspect config and context hashes in the launch.
-    - **Pass criteria:** Snapshot hash equals canonical resolved values and no later file/config mutation changes a locked snapshot.
-    - **Regression checks:** Run 4.2 config invalidation and 4.3 context commit/lock smoke.
-    - **Requirements:** 1.2, 1.9; **Property 2: Configuration hash consistency**.
-
-  - [ ]* 4.6 Add the disarmed operator-selection isolation property test
-    - **Prerequisites:** 4.3.
-    - **Production files/components:** Add `test/property/property_3_selection_isolation.cpp` and register `fsd_property_3_selection_isolation`.
-    - **Implementation:** Generate allowed/disallowed gateway mutations across disarmed, armed, locked, stale-revision, and recovery states; assert only `OperatorSelection` and approved preparation state can change while disarmed.
-    - **Launch update:** Exercise the existing typed context driver and expose no additional operator command.
-    - **Run:** Run the named CTest and a public launch mutation sequence that attempts engineering-policy, snapshot, target, and selection updates in each state.
-    - **Pass criteria:** No locked snapshot/config mutation occurs; rejected mutations produce stable errors and no side effects.
-    - **Regression checks:** Repeat gateway/config/context smoke once the gateway exists in 6.3 via the local integration harness.
-    - **Requirements:** 2.1, 2.10, 4.4; **Property 3: Disarmed operator-selection isolation**.
-
-  - [ ]* 4.7 Add the complete Ownmode-readiness property test
-    - **Prerequisites:** 4.3.
-    - **Production files/components:** Add `test/property/property_9_readiness.cpp` and register `fsd_property_9_readiness`.
-    - **Implementation:** Generate missing committed context, map/scenario, artifact, working plan, target, payload, persistence, recovery, config hash, PX4 transport, and health gates; assert every missing prerequisite is reported and readiness cannot be changed by status/parameter projection.
-    - **Launch update:** Add a readiness fault-injection argument to the existing launch; keep mode unregistered until Task 7.
-    - **Run:** Run the named CTest and launch each fault fixture, inspecting `ReadinessReport` and `MissionContext`.
-    - **Pass criteria:** No incomplete context reports ready; every failure has a stable code and safe action; the authoritative state remains unchanged.
-    - **Regression checks:** Repeat valid committed-context and live-lock launch smoke.
-    - **Requirements:** 4.1, 4.5; **Property 9: Ownmode readiness is complete and authoritative**.
-
-  - [ ]* 4.8 Add the concrete bounded ROS interface property test
-    - **Prerequisites:** 4.1.
-    - **Production files/components:** Add `test/property/property_21_ros_interface_boundary.py` and register `fsd_property_21_ros_interface_boundary`.
-    - **Implementation:** Parse every generated `.msg`, `.srv`, and `.action`; assert bounds, optional flags, enums, owners, revisions, and absence of raw control/path/JSON fields. Exercise boundary serialization and rejected requests.
-    - **Launch update:** Run the existing contract probe through the public launch with malformed-request fixtures.
-    - **Run:** Run the named CTest plus `ros2 interface show` checks and inspect that rejected service requests produce no state/control side effect.
-    - **Pass criteria:** Design Property 21 holds for every generated definition and invalid request; complete snapshots remain read-only.
-    - **Regression checks:** Run 4.1 contract generation and the full perception/registry/context launch.
-    - **Requirements:** 7.1, 7.9; **Property 21: Concrete ROS interface boundary**.
+  - [x] 4.7 Add the complete Ownmode-readiness property test
+  - [x] 4.8 Add the concrete bounded ROS interface property test
 
 - [ ] 5. Make managed plan artifacts and working-plan progress runnable
   - [ ] 5.1 Port the proven QGroundControl plan parser/printer into PlanManager with immutable managed artifacts

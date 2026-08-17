@@ -1,0 +1,9 @@
+string<=64 request_id
+string<=64 map_id
+string<=64 scenario_id
+uint64 expected_registry_revision
+---
+bool success
+string<=128 backup_reference
+uint64 record_count
+string<=256 message

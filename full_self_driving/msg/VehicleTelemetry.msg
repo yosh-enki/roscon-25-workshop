@@ -1,0 +1,14 @@
+MessageHeader header
+bool armed
+bool airborne
+bool landed
+float32 battery_percentage
+float32 voltage_v
+float32 current_a
+float64 latitude_deg
+float64 longitude_deg
+float64 altitude_m
+float32 heading_deg
+float32 ground_speed_m_s
+float32 vertical_speed_m_s
+uint64 telemetry_monotonic_ns

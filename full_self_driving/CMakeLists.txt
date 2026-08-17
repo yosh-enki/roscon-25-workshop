@@ -40,6 +40,14 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/PadRecord.msg"
   "msg/PadRegistrySnapshot.msg"
   "msg/PadRegistryStatus.msg"
+  "msg/FullSelfDrivingState.msg"
+  "msg/VehicleTelemetry.msg"
+  "msg/LandingTargetSetpoint.msg"
+  "msg/FlightSafetyStatus.msg"
+  "srv/FullSelfDrivingCommand.srv"
+  "srv/EmergencyStop.srv"
+  "srv/ClearPadRegistry.srv"
+  "srv/BackupPadRegistry.srv"
   DEPENDENCIES builtin_interfaces geometry_msgs
 )
 
@@ -47,6 +55,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 add_library(fsd_domain_core
   src/domain/target_identity.cpp
   src/domain/live_target_lock.cpp
+  src/domain/engineering_config.cpp
+  src/domain/mission_context.cpp
 )
 target_include_directories(fsd_domain_core PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -59,7 +69,11 @@ ament_target_dependencies(fsd_domain_core
   builtin_interfaces
 )
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
-target_link_libraries(fsd_domain_core "${cpp_typesupport_target}")
+target_link_libraries(fsd_domain_core
+  OpenSSL::Crypto
+  yaml-cpp
+  "${cpp_typesupport_target}"
+)
 
 # Perception Core Library
 add_library(fsd_perception_core
@@ -298,6 +312,82 @@ if(BUILD_TESTING)
     rclcpp
     geometry_msgs
     sensor_msgs
+  )
+
+  ament_add_gtest(fsd_property_1_authoritative_config
+    test/property/property_1_authoritative_config.cpp
+  )
+  target_include_directories(fsd_property_1_authoritative_config PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_1_authoritative_config
+    fsd_domain_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_1_authoritative_config
+    rclcpp
+    geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_2_armed_immutability
+    test/property/property_2_armed_immutability.cpp
+  )
+  target_include_directories(fsd_property_2_armed_immutability PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_2_armed_immutability
+    fsd_domain_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_2_armed_immutability
+    rclcpp
+    geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_3_scope_isolation
+    test/property/property_3_scope_isolation.cpp
+  )
+  target_include_directories(fsd_property_3_scope_isolation PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_3_scope_isolation
+    fsd_domain_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_3_scope_isolation
+    rclcpp
+    geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_9_readiness
+    test/property/property_9_readiness.cpp
+  )
+  target_include_directories(fsd_property_9_readiness PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_9_readiness
+    fsd_domain_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_9_readiness
+    rclcpp
+    geometry_msgs
+  )
+
+  ament_add_pytest_test(fsd_property_21_ros_interface_boundary
+    test/property/property_21_ros_interface_boundary.py
   )
 
   ament_add_pytest_test(forbidden_dependency_scan
