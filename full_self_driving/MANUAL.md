@@ -734,9 +734,86 @@ ctest --test-dir build/full_self_driving -R fsd_property_18_snapshot_commit --ou
 
 ---
 
-## 8. Subsequent Task Sections (To Be Extended by Other Tasks)
+---
 
-* **Section 7: Flight Runtime & PX4 Mode Executor (Task 7)** — `fsd_flight_runtime`, `FullSelfDrivingMode`, `FullSelfDrivingModeExecutor`.
+## 8. Section 7: PX4 API Probe, Single Mode Authority & Flight Runtime (Task 7)
+
+### 8.1 Overview & Architecture
+
+Task 7 establishes the single registered-mode authority path with PX4 Autopilot via `px4_ros2_cpp`:
+
+1. **Pinned API Manifest & Capabilities Probe (`Px4ApiCapabilities`, `pinned_api_manifest.yaml`)**:
+   - Compares compile-time traits, method signatures, and message definitions against `config/pinned_api_manifest.yaml`.
+   - Explicitly checks `px4_ros2_cpp` version (0.0.1) and `px4_msgs` version (2.0.1).
+   - Validates that `FullSelfDrivingMode` and `FullSelfDrivingModeExecutor` strictly follow library-managed setpoints without fallback controllers or raw topic publishers.
+
+2. **Single Registered Mode & Executor (`FullSelfDrivingMode`, `FullSelfDrivingModeExecutor`)**:
+   - Exactly **one** mode named `"Full Self-Driving"` derived from `px4_ros2::ModeBase`.
+   - Exactly **one** mode executor derived from `px4_ros2::ModeExecutorBase` (`Activation::ActivateAlways`).
+   - Arming check reporter evaluates comprehensive preflight readiness (lifecycle, recovery, config, transport).
+   - Instant RC / QGC takeover handling: when PX4 or QGroundControl switches away from the mode, `onDeactivate` triggers immediate yield and sets takeover hold without fighting the operator.
+
+3. **Coordinator-Owned Transitions (`MissionCoordinator`, `InternalStrategy`)**:
+   - Enforces **Property 12**: all flight phase transitions are strictly owned and decided by `MissionCoordinator`.
+   - Perception callbacks publish data/decisions only; they are strictly forbidden from directly commanding mode changes or setpoints.
+
+4. **Safety Authority & Lifecycle Registration Precedence (`FlightRuntimeNode`)**:
+   - Enforces **Property 20**: stronger safety authority always supersedes autonomous requests; RC/QGC takeover locks out autonomous setpoint overrides.
+   - Enforces **Property 22**: all required lifecycle nodes (`fsd_pad_registry`, `fsd_perception`, `fsd_evidence`, `fsd_gateway`), storage recovery, configuration hash, and PX4 transport must be fully active and healthy *before* mode registration is permitted.
+
+### 8.2 Production Components Added
+
+1. **API Manifest & Adapters (`config/`, `src/adapters/`)**:
+   - [`config/pinned_api_manifest.yaml`](file:///home/yosh/roscon-25-workshop/full_self_driving/config/pinned_api_manifest.yaml): Versioned PX4 ROS 2 C++ API manifest.
+   - [`src/adapters/px4_api_capabilities.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/adapters/px4_api_capabilities.hpp): Compile-time trait validation and manifest verification. Built into `fsd_adapters_core`.
+   - [`src/adapters/px4_state_cache.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/adapters/px4_state_cache.hpp): Thread-safe PX4 vehicle state, odometry, home, land detection, and freshness timeouts. Built into `fsd_adapters_core`.
+
+2. **Flight Core & Domain (`src/flight/`, `src/domain/`)**:
+   - [`src/flight/internal_strategy.hpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/internal_strategy.hpp): Internal strategy interface for internal flight behaviors.
+   - [`src/flight/full_self_driving_mode.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/full_self_driving_mode.hpp): `FullSelfDrivingMode` implementation with goto setpoints and arming check reporters. Built into `fsd_flight_core`.
+   - [`src/flight/full_self_driving_mode_executor.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/full_self_driving_mode_executor.hpp): `FullSelfDrivingModeExecutor` implementation with takeover callbacks. Built into `fsd_flight_core`.
+   - [`src/domain/mission_coordinator.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/domain/mission_coordinator.hpp): Coordinator state machine for internal strategies and takeover management. Built into `fsd_flight_core`.
+
+3. **Runtime Executable (`src/runtime/`)**:
+   - [`src/runtime/flight_runtime_node.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/runtime/flight_runtime_node.hpp): `fsd_flight_runtime` executable orchestrating readiness evaluation, single mode registration, and telemetry publishing.
+
+4. **Integration & Property Test Suites (`test/`)**:
+   - [`test/px4_api_probe/px4_api_probe_test.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/px4_api_probe/px4_api_probe_test.cpp): GTest suite validating compile-time traits, method signatures, and manifest loading (`px4_api_probe_test`).
+   - [`test/integration/registered_mode_authority_smoke.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/integration/registered_mode_authority_smoke.cpp): Integration test verifying registration, arming checks, takeover, and deactivation (`registered_mode_authority_smoke`).
+   - [`test/property/property_12_coordinator_transitions.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/property/property_12_coordinator_transitions.cpp): Property 12 test suite (`fsd_property_12_coordinator_transitions`).
+   - [`test/property/property_20_authority.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/property/property_20_authority.cpp): Property 20 test suite (`fsd_property_20_authority`).
+   - [`test/property/property_22_lifecycle_registration.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/property/property_22_lifecycle_registration.cpp): Property 22 test suite (`fsd_property_22_lifecycle_registration`).
+
+### 8.3 How to Run and Verify (Task 7)
+
+```bash
+cd /home/ubuntu/roscon-25-workshop_ws
+source /opt/ros/humble/setup.bash
+source /home/ubuntu/px4_ros_ws/install/setup.bash
+
+# 1. Build package
+colcon build --packages-select full_self_driving --symlink-install \
+  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+
+# 2. Source workspace
+source install/setup.bash
+
+# 3. Run all 24 test suites (163 tests total)
+colcon test --packages-select full_self_driving --event-handlers console_direct+
+colcon test-result --verbose
+
+# 4. Run individual Task 7 test suites
+ctest --test-dir build/full_self_driving -R px4_api_probe_test --output-on-failure
+ctest --test-dir build/full_self_driving -R registered_mode_authority_smoke --output-on-failure
+ctest --test-dir build/full_self_driving -R fsd_property_12_coordinator_transitions --output-on-failure
+ctest --test-dir build/full_self_driving -R fsd_property_20_authority --output-on-failure
+ctest --test-dir build/full_self_driving -R fsd_property_22_lifecycle_registration --output-on-failure
+```
+
+---
+
+## 9. Subsequent Task Sections (To Be Extended by Other Tasks)
+
 * **Section 8: Internal Flight Strategies (Tasks 8, 9, 10, 11, 12)** — Takeoff, TransitIn, Search, Direct, PrecisionLand, Payload, TransitOut, Land.
 * **Section 9: Security & End-to-End Verification (Tasks 13, 14, 15)** — Multi-machine security, full mission rehearsal, documentation.
 

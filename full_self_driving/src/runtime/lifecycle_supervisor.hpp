@@ -47,6 +47,7 @@ public:
   bool shutdown_node(const std::string & node_name, std::string * out_error = nullptr);
 
   bool is_all_active() const;
+  void set_node_state(const std::string & node_name, LifecycleState state);
   LifecycleState get_node_state(const std::string & node_name) const;
   std::vector<std::string> get_activation_order() const;
   std::vector<std::string> get_shutdown_order() const;

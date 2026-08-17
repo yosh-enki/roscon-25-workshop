@@ -297,8 +297,8 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat gateway/context/plan commit and restart smoke.
     - **Requirements:** 6.1, 6.2, 6.3; **Property 18: Snapshot commit and recovery ordering**.
 
-- [ ] 7. Verify the actual PX4 API and establish the single registered-mode authority path
-  - [ ] 7.1 Create the pinned/version-matched `px4_ros2_cpp`/`px4_msgs` API verification gate
+- [x] 7. Verify the actual PX4 API and establish the single registered-mode authority path
+  - [x] 7.1 Create the pinned/version-matched `px4_ros2_cpp`/`px4_msgs` API verification gate
     - **Prerequisites:** 6.2. Use the versions actually installed by the workshop overlay (documented baseline is ROS 2 Humble/PX4 1.16-era tooling) but record exact package/repository commit IDs from the build environment.
     - **Production files/components:** Add `config/pinned_api_manifest.yaml`, `test/px4_api_probe/`, `src/adapters/px4_api_capabilities.cpp`, and CMake configure/compile checks. Do not write guessed `ModeBase`/`ModeExecutorBase` signatures.
     - **Implementation:** Inspect and compile against the actual headers for `ModeBase`, `ModeExecutorBase`, registration, mode requirements, arming checks, watchdog, activation/deactivation, library-managed setpoint types, and documented takeoff/land/RTL/result APIs. Record constructor/hook/result names and verify message compatibility. Fail configuration if the installed API does not match the manifest; do not substitute `MissionExecutor`, `ActionInterface`, Offboard, or another library.
@@ -308,7 +308,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Run all non-flight slices with mode registration disabled and the source/dependency scan.
     - **Requirements:** 5.2, 5.6, 5.7; implementation gate for design Open Decision 1.
 
-  - [ ] 7.2 Implement one `FullSelfDrivingMode`, one `FullSelfDrivingModeExecutor`, and shared PX4 state/odometry adapters
+  - [x] 7.2 Implement one `FullSelfDrivingMode`, one `FullSelfDrivingModeExecutor`, and shared PX4 state/odometry adapters
     - **Prerequisites:** 7.1 and 6.1/6.2. Use only signatures proven in 7.1.
     - **Production files/components:** Add `src/flight/full_self_driving_mode.hpp/.cpp`, `src/flight/full_self_driving_mode_executor.hpp/.cpp`, `src/adapters/px4_state_cache.hpp/.cpp`, `src/flight/internal_strategy.hpp`, and the production regular runtime integration.
     - **Implementation:** Construct exactly one registered mode named `Full Self-Driving` and exactly one owning executor. Port the useful shared prototype handling into the production adapter: global/local odometry validity, home position, land detection freshness, heading from velocity/attitude, monotonic data timeout, and safe deactivation checkpoint. Keep the mode in `WAITING_FOR_MODE` with no mission action; internal strategy selection is a domain decision, not a second scheduler.
@@ -318,7 +318,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat lifecycle/config/recovery and all perception/registry/plan/gateway tests with the registered mode inactive.
     - **Requirements:** 4.1, 5.2, 5.6, 5.7, 5.12, 6.4, 6.6.
 
-  - [ ] 7.3 Run the minimal registered-mode and authority smoke through QGroundControl/PX4
+  - [x] 7.3 Run the minimal registered-mode and authority smoke through QGroundControl/PX4
     - **Prerequisites:** 7.2. QGroundControl/PX4/RC remain the authority; Node-RED is not used to select or arm the mode.
     - **Production files/components:** Add `test/integration/registered_mode_authority_smoke.cpp`, PX4 status/readiness adapters, and an operator-safe diagnostic for active authority/takeover/deactivation.
     - **Implementation:** Verify dynamic `Full Self-Driving` visibility, mode requirements/arming checks, activation/deactivation, watchdog handling, and authority loss. The mode must perform no takeoff or setpoint mission action in this slice; it reports `WAITING_FOR_MODE` and yields immediately on PX4/QGC/RC takeover.
@@ -328,7 +328,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 7.2 registration count, lifecycle order, recovery, and full preflight preparation tests.
     - **Requirements:** 4.1, 4.2, 4.3, 5.2, 5.12, 7.3.
 
-  - [ ]* 7.4 Add the coordinator-owned transition property test
+  - [x] 7.4 Add the coordinator-owned transition property test
     - **Prerequisites:** 7.2 and 7.3.
     - **Production files/components:** Add `test/property/property_12_coordinator_transitions.cpp` and register `fsd_property_12_coordinator_transitions`.
     - **Implementation:** Generate perception observations, qualified/lost locks, health changes, and strategy decisions; assert perception emits data/events only and every transition is decided by `MissionCoordinator` and applied through the one mode/executor.
@@ -338,7 +338,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat registered-mode authority smoke and live-lock/registry tests.
     - **Requirements:** 5.2; **Property 12: Coordinator-owned mode transitions**.
 
-  - [ ]* 7.5 Add the stronger-authority-wins property test
+  - [x] 7.5 Add the stronger-authority-wins property test
     - **Prerequisites:** 7.3.
     - **Production files/components:** Add `test/property/property_20_authority.cpp` and register `fsd_property_20_authority`.
     - **Implementation:** Generate PX4/QGC/RC/failsafe takeover and lower-priority gateway/UI/status events; assert the higher-priority authority wins, mode work stops, and status/evidence expose the true state.
@@ -348,7 +348,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 7.3 authority smoke and persistence checkpoint verification.
     - **Requirements:** 4.2, 5.12, 7.3; **Property 20: Stronger safety authority wins**.
 
-  - [ ]* 7.6 Add the lifecycle-before-registration property test
+  - [x] 7.6 Add the lifecycle-before-registration property test
     - **Prerequisites:** 6.2 and 7.2.
     - **Production files/components:** Add `test/property/property_22_lifecycle_registration.cpp` and register `fsd_property_22_lifecycle_registration`.
     - **Implementation:** Generate lifecycle/transport/storage/recovery/health startup traces; assert all required lifecycle nodes are active and healthy before registration, and every transition failure withdraws readiness without a competing mode.
@@ -679,10 +679,10 @@ Every task's regression check includes the previously completed slices, `colcon 
 
 ## Checkpoints
 
-- [ ] Checkpoint A — After Task 1: ensure the standalone package builds, the single launch starts the manifest-driven simulation dependencies, readiness is explicit, and no prototype/runtime boundary violation exists.
-- [ ] Checkpoint B — After Task 3: ensure live camera input produces all-ID observations, selected-target qualification is separate, registry scopes are isolated, and no flight behavior depends on an unqualified record.
-- [ ] Checkpoint C — After Task 6: ensure config/context/plan/gateway mutations are typed, revisioned, disarmed-only, durable, lifecycle-supervised, and recover safely before any mode registration.
-- [ ] Checkpoint D — After Task 7: ensure the actual pinned PX4 APIs compile, exactly one registered mode/executor exists, QGC/PX4 authority is observable, and no flight behavior uses Offboard/raw control.
+- [x] Checkpoint A — After Task 1: ensure the standalone package builds, the single launch starts the manifest-driven simulation dependencies, readiness is explicit, and no prototype/runtime boundary violation exists.
+- [x] Checkpoint B — After Task 3: ensure live camera input produces all-ID observations, selected-target qualification is separate, registry scopes are isolated, and no flight behavior depends on an unqualified record.
+- [x] Checkpoint C — After Task 6: ensure config/context/plan/gateway mutations are typed, revisioned, disarmed-only, durable, lifecycle-supervised, and recover safely before any mode registration.
+- [x] Checkpoint D — After Task 7: ensure the actual pinned PX4 APIs compile, exactly one registered mode/executor exists, QGC/PX4 authority is observable, and no flight behavior uses Offboard/raw control.
 - [ ] Checkpoint E — After Task 11: ensure takeoff/TransitIn/Search/Direct/PrecisionLand are internal strategies, live-lock gates descent, and all earlier camera/plan/persistence/authority slices still pass.
 - [ ] Checkpoint F — After Task 12: ensure payload unknown/failure behavior is non-retrying, second takeoff/TransitOut/ReturnStrategy are explicit, and the complete sequence is durably ordered.
 - [ ] Checkpoint G — After Task 15: run the exact acceptance command, full regression/security/source scans, clean-install test, and confirm only the production package is in the runtime graph.

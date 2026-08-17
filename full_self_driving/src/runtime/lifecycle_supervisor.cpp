@@ -72,6 +72,15 @@ LifecycleState LifecycleSupervisor::get_node_state(const std::string & node_name
   return LifecycleState::ERROR;
 }
 
+void LifecycleSupervisor::set_node_state(const std::string & node_name, LifecycleState state)
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto it = nodes_.find(node_name);
+  if (it != nodes_.end()) {
+    it->second.state = state;
+  }
+}
+
 bool LifecycleSupervisor::is_all_active() const
 {
   std::lock_guard<std::mutex> lock(mutex_);

@@ -337,6 +337,19 @@ def launch_setup(context, *args, **kwargs):
         }],
     )
 
+    fsd_flight_runtime_node = Node(
+        package="full_self_driving",
+        executable="fsd_flight_runtime",
+        name="fsd_flight_runtime",
+        output="screen",
+        parameters=[{
+            "use_sim_time": True,
+            "engineering_config": config_path,
+            "simulation": True,
+            "world": world_name,
+        }],
+    )
+
     entities = [
         gz_process,
         px4_process,
@@ -353,6 +366,7 @@ def launch_setup(context, *args, **kwargs):
         fsd_perception_node,
         fsd_evidence_node,
         fsd_gateway_node,
+        fsd_flight_runtime_node,
     ]
 
     if test_selection and test_selection.lower() != "none" and selected_marker_id >= 0:

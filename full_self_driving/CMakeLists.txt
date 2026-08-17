@@ -23,6 +23,21 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(px4_msgs REQUIRED)
 find_package(px4_ros2_cpp REQUIRED)
+
+# Auto-patch upstream px4_ros2_cpp header typo if installed version has it
+set(_potential_inc_dirs ${px4_ros2_cpp_INCLUDE_DIRS} "/home/ubuntu/px4_ros_ws/install/px4_ros2_cpp/include")
+foreach(_inc_dir ${_potential_inc_dirs})
+  set(_home_pos_h "${_inc_dir}/px4_ros2/vehicle_state/home_position.hpp")
+  if(EXISTS "${_home_pos_h}")
+    file(READ "${_home_pos_h}" _hp_content)
+    if(_hp_content MATCHES "\\+ \\+px4_ros2::getMessageNameVersion")
+      string(REPLACE "+ +px4_ros2::getMessageNameVersion" "+ px4_ros2::getMessageNameVersion" _hp_fixed "${_hp_content}")
+      file(WRITE "${_home_pos_h}" "${_hp_fixed}")
+      message(STATUS "[FSD] Auto-patched upstream typo in: ${_home_pos_h}")
+    endif()
+  endif()
+endforeach()
+
 find_package(cv_bridge REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(OpenSSL REQUIRED)
@@ -205,6 +220,52 @@ ament_target_dependencies(fsd_runtime_core
   builtin_interfaces
 )
 
+# Adapters Core Library
+add_library(fsd_adapters_core
+  src/adapters/px4_api_capabilities.cpp
+  src/adapters/px4_state_cache.cpp
+)
+target_include_directories(fsd_adapters_core PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(fsd_adapters_core
+  yaml-cpp
+  "${cpp_typesupport_target}"
+)
+ament_target_dependencies(fsd_adapters_core
+  rclcpp
+  px4_ros2_cpp
+  px4_msgs
+  geometry_msgs
+  builtin_interfaces
+)
+
+# Flight Core Library
+add_library(fsd_flight_core
+  src/flight/full_self_driving_mode.cpp
+  src/flight/full_self_driving_mode_executor.cpp
+  src/domain/mission_coordinator.cpp
+)
+target_include_directories(fsd_flight_core PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(fsd_flight_core
+  fsd_domain_core
+  fsd_adapters_core
+  "${cpp_typesupport_target}"
+)
+ament_target_dependencies(fsd_flight_core
+  rclcpp
+  px4_ros2_cpp
+  px4_msgs
+  geometry_msgs
+  builtin_interfaces
+)
+
 # Executables
 add_executable(fsd_launch_probe
   src/runtime/launch_probe.cpp
@@ -337,6 +398,31 @@ ament_target_dependencies(fsd_target_selection_provider
   rclcpp
 )
 
+add_executable(fsd_flight_runtime
+  src/runtime/flight_runtime_node.cpp
+)
+target_include_directories(fsd_flight_runtime PRIVATE
+  include
+  src
+)
+target_link_libraries(fsd_flight_runtime
+  fsd_flight_core
+  fsd_adapters_core
+  fsd_runtime_core
+  fsd_persistence_core
+  fsd_domain_core
+  yaml-cpp
+  "${cpp_typesupport_target}"
+)
+ament_target_dependencies(fsd_flight_runtime
+  rclcpp
+  px4_ros2_cpp
+  px4_msgs
+  geometry_msgs
+  builtin_interfaces
+  ament_index_cpp
+)
+
 # Install rules
 install(TARGETS
   fsd_domain_core
@@ -345,11 +431,14 @@ install(TARGETS
   fsd_registry_core
   fsd_gateway_core
   fsd_runtime_core
+  fsd_adapters_core
+  fsd_flight_core
   fsd_launch_probe
   fsd_perception
   fsd_pad_registry
   fsd_evidence
   fsd_gateway
+  fsd_flight_runtime
   fsd_replay_fixture_publisher
   fsd_target_selection_provider
   ARCHIVE DESTINATION lib
@@ -666,6 +755,109 @@ if(BUILD_TESTING)
     geometry_msgs
   )
 
+  ament_add_gtest(px4_api_probe_test
+    test/px4_api_probe/px4_api_probe_test.cpp
+  )
+  target_include_directories(px4_api_probe_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(px4_api_probe_test
+    fsd_adapters_core
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(px4_api_probe_test
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    ament_index_cpp
+  )
+
+  ament_add_gtest(registered_mode_authority_smoke
+    test/integration/registered_mode_authority_smoke.cpp
+  )
+  target_include_directories(registered_mode_authority_smoke PRIVATE
+    include
+    src
+  )
+  target_link_libraries(registered_mode_authority_smoke
+    fsd_flight_core
+    fsd_adapters_core
+    fsd_domain_core
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(registered_mode_authority_smoke
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_12_coordinator_transitions
+    test/property/property_12_coordinator_transitions.cpp
+  )
+  target_include_directories(fsd_property_12_coordinator_transitions PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_12_coordinator_transitions
+    fsd_flight_core
+    fsd_adapters_core
+    fsd_domain_core
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_12_coordinator_transitions
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_20_authority
+    test/property/property_20_authority.cpp
+  )
+  target_include_directories(fsd_property_20_authority PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_20_authority
+    fsd_flight_core
+    fsd_adapters_core
+    fsd_domain_core
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_20_authority
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_22_lifecycle_registration
+    test/property/property_22_lifecycle_registration.cpp
+  )
+  target_include_directories(fsd_property_22_lifecycle_registration PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_22_lifecycle_registration
+    fsd_runtime_core
+    fsd_persistence_core
+    fsd_domain_core
+    fsd_adapters_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_22_lifecycle_registration
+    rclcpp
+    rclcpp_lifecycle
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+  )
+
   ament_add_pytest_test(fsd_property_21_ros_interface_boundary
     test/property/property_21_ros_interface_boundary.py
   )
@@ -687,11 +879,15 @@ ament_export_libraries(
   fsd_registry_core
   fsd_gateway_core
   fsd_runtime_core
+  fsd_adapters_core
+  fsd_flight_core
 )
 ament_export_dependencies(
   rosidl_default_runtime
   rclcpp
   rclcpp_lifecycle
+  px4_ros2_cpp
+  px4_msgs
   sensor_msgs
   geometry_msgs
 )

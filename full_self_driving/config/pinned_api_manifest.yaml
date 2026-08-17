@@ -1,0 +1,82 @@
+schema_version: "1.0"
+manifest_id: "px4_ros2_pinned_api_manifest"
+created_at: "2026-08-17"
+description: "Authoritative pinned API manifest for px4_ros2_cpp and px4_msgs verified against container installation"
+
+px4_ros2_cpp:
+  package_version: "0.0.1"
+  maintainer: "beat-kueng@gmx.net"
+  license: "BSD-3-Clause"
+  install_prefix: "/home/ubuntu/px4_ros_ws/install/px4_ros2_cpp"
+  headers:
+    mode_base: "px4_ros2/components/mode.hpp"
+    mode_executor_base: "px4_ros2/components/mode_executor.hpp"
+    health_and_arming_checks: "px4_ros2/components/health_and_arming_checks.hpp"
+    requirement_flags: "px4_ros2/common/requirement_flags.hpp"
+    context: "px4_ros2/common/context.hpp"
+    events: "px4_ros2/components/events.hpp"
+    message_compatibility: "px4_ros2/components/message_compatibility_check.hpp"
+    setpoint_goto: "px4_ros2/control/setpoint_types/goto.hpp"
+    odometry_local: "px4_ros2/odometry/local_position.hpp"
+    odometry_global: "px4_ros2/odometry/global_position.hpp"
+    home_position: "px4_ros2/vehicle_state/home_position.hpp"
+    land_detected: "px4_ros2/vehicle_state/land_detected.hpp"
+    vehicle_status: "px4_ros2/vehicle_state/vehicle_status.hpp"
+  classes:
+    ModeBase:
+      base: "px4_ros2::Context"
+      abstract: true
+      constructor: "(rclcpp::Node&, ModeBase::Settings, const std::string&)"
+      virtual_hooks:
+        - "virtual void onActivate() = 0"
+        - "virtual void onDeactivate() = 0"
+        - "virtual void updateSetpoint(float dt_s)"
+        - "virtual void checkArmingAndRunConditions(HealthAndArmingCheckReporter & reporter)"
+      methods:
+        - "bool doRegister()"
+        - "void completed(Result result)"
+        - "ModeID id() const"
+        - "bool isArmed() const"
+        - "bool isActive() const"
+        - "ConfigOverrides & configOverrides()"
+        - "RequirementFlags & modeRequirements()"
+    ModeExecutorBase:
+      abstract: true
+      constructor: "(rclcpp::Node&, const ModeExecutorBase::Settings&, ModeBase&, const std::string&)"
+      virtual_hooks:
+        - "virtual void onActivate() = 0"
+        - "virtual void onDeactivate(DeactivateReason reason) = 0"
+        - "virtual void onFailsafeDeferred()"
+      methods:
+        - "bool doRegister()"
+        - "void scheduleMode(ModeBase::ModeID mode_id, const CompletedCallback & on_completed, bool forced = false)"
+        - "void takeoff(const CompletedCallback & on_completed, float altitude = NAN, float heading = NAN)"
+        - "void land(const CompletedCallback & on_completed)"
+        - "void rtl(const CompletedCallback & on_completed)"
+        - "void arm(const CompletedCallback & on_completed, bool run_preflight_checks = true)"
+        - "void disarm(const CompletedCallback & on_completed, bool forced = false)"
+        - "void waitReadyToArm(const CompletedCallback & on_completed)"
+        - "void waitUntilDisarmed(const CompletedCallback & on_completed)"
+        - "bool isInCharge() const"
+        - "bool isArmed() const"
+        - "ModeBase & ownedMode()"
+        - "int id() const"
+        - "bool deferFailsafesSync(bool enabled, int timeout_s = 0)"
+
+px4_msgs:
+  package_version: "2.0.1"
+  maintainer: "nuno.marques@dronesolutions.io"
+  license: "BSD-3-Clause"
+  install_prefix: "/home/ubuntu/px4_ros_ws/install/px4_msgs"
+  required_messages:
+    - "VehicleStatus"
+    - "VehicleCommand"
+    - "VehicleCommandAck"
+    - "ModeCompleted"
+    - "ArmingCheckRequest"
+    - "ArmingCheckReply"
+    - "HomePosition"
+    - "VehicleLandDetected"
+    - "VehicleLocalPosition"
+    - "VehicleGlobalPosition"
+    - "GotoSetpoint"
