@@ -8,8 +8,10 @@
 #include "domain/mission_context.hpp"
 #include "domain/live_target_lock.hpp"
 #include "domain/route.hpp"
+#include "domain/working_plan.hpp"
 #include "flight/internal_strategy.hpp"
 #include "flight/full_self_driving_mode_executor.hpp"
+#include "runtime/plan_manager.hpp"
 
 namespace full_self_driving::domain
 {
@@ -22,6 +24,9 @@ public:
 
   void bind_executor(std::shared_ptr<flight::FullSelfDrivingModeExecutor> executor,
                      std::shared_ptr<flight::FullSelfDrivingMode> mode);
+
+  void set_plan_manager(std::shared_ptr<runtime::PlanManager> pm);
+  std::shared_ptr<runtime::PlanManager> get_plan_manager() const;
 
   void handle_target_lock_update(const LiveTargetLock & lock);
   void handle_takeover(flight::FullSelfDrivingModeExecutor::DeactivateReason reason);
@@ -40,9 +45,14 @@ public:
   void set_custom_transit_in_route(const Route & route);
   void reset_custom_transit_in_route();
 
+  void set_custom_search_route(const CanonicalSearchRoute & route);
+  void set_custom_search_plan(const WorkingPlan & wp);
+  void reset_custom_search();
+
 private:
   mutable std::mutex mutex_;
   std::shared_ptr<MissionContext> context_;
+  std::shared_ptr<runtime::PlanManager> plan_manager_;
   std::shared_ptr<flight::FullSelfDrivingModeExecutor> executor_;
   std::shared_ptr<flight::FullSelfDrivingMode> mode_;
 
@@ -52,6 +62,11 @@ private:
 
   Route custom_transit_in_route_;
   bool has_custom_transit_in_route_{false};
+
+  WorkingPlan custom_search_plan_;
+  CanonicalSearchRoute custom_search_route_;
+  bool has_custom_search_plan_{false};
+  bool has_custom_search_route_{false};
 
   std::vector<std::string> transition_trace_;
 };

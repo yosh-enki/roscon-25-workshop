@@ -379,8 +379,8 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat the manual QGC takeoff/TransitIn smoke and all preflight/status tests.
     - **Requirements:** 5.1, 5.8, 6.7.
 
-- [ ] 9. Port Search as the checkpointed internal acquisition strategy
-  - [ ] 9.1 Integrate the production Search strategy with WorkingPlan route/checkpoint behavior
+- [x] 9. Port Search as the checkpointed internal acquisition strategy
+  - [x] 9.1 Integrate the production Search strategy with WorkingPlan route/checkpoint behavior
     - **Prerequisites:** 5.1, 5.2, and 8.1. Read-only behavior baseline: `search/src/SearchMode.cpp`, `SearchPlanner.cpp`, and `PlanParser.cpp`.
     - **Production files/components:** Add `src/flight/strategies/search_strategy.hpp/.cpp`, production route/map-projection adapter, and coordinator branch `ACQUIRE_TARGET` → `SEARCH` when Direct is unavailable or disabled.
     - **Implementation:** Port Search's working-plan load/refresh, checkpoint entry point, next-source-index calculation, local map projection, climb-to-search-altitude behavior, waypoint progression/heading/speed limits, final hold, and safe deactivation checkpoint. Use the production `PlanManager` and snapshot values; do not read arbitrary plan paths or use the prototype `SearchMode`/MQTT bridge. Search publishes progress and remains data-only with respect to target lock.
@@ -390,7 +390,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 8.1 takeoff/TransitIn, all-ID/live-lock/registry, plan reset, lifecycle, and authority takeover tests.
     - **Requirements:** 2.3, 2.7, 5.1, 5.2, 5.9, 6.7.
 
-  - [ ]* 9.2 Add Search replay/parity tests against the proven prototype planner
+  - [x]* 9.2 Add Search replay/parity tests against the proven prototype planner
     - **Prerequisites:** 9.1. Use the checked-in plan fixture and copied expected route/checkpoint traces.
     - **Production files/components:** Add `test/fixtures/prototype_behavior/search/`, Search entries in `prototype_behavior_map.yaml`, `test/flight/search_parity_test.cpp`, and fake map/odometry adapters.
     - **Implementation:** Compare nested route extraction, entry-point insertion, next-source-index behavior, altitude fallback, waypoint progression, final hold, reset/resume, and deactivation update. Cover malformed plan and invalid global position failure behavior.

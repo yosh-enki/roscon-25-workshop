@@ -249,6 +249,7 @@ add_library(fsd_flight_core
   src/flight/full_self_driving_mode_executor.cpp
   src/flight/strategies/takeoff_strategy.cpp
   src/flight/strategies/transit_in_strategy.cpp
+  src/flight/strategies/search_strategy.cpp
   src/domain/mission_coordinator.cpp
 )
 target_include_directories(fsd_flight_core PUBLIC
@@ -879,6 +880,30 @@ if(BUILD_TESTING)
     "${cpp_typesupport_target}"
   )
   ament_target_dependencies(transit_in_parity_test
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+    ament_index_cpp
+  )
+
+  ament_add_gtest(search_parity_test
+    test/flight/search_parity_test.cpp
+  )
+  target_include_directories(search_parity_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(search_parity_test
+    fsd_flight_core
+    fsd_adapters_core
+    fsd_domain_core
+    fsd_persistence_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(search_parity_test
     rclcpp
     px4_ros2_cpp
     px4_msgs

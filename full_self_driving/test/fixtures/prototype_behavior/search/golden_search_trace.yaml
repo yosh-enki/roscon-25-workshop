@@ -1,0 +1,97 @@
+version: "1.0.0"
+fixture_name: "search_planner_and_mode_baseline"
+source_provenance:
+  description: "Prototype SearchMode and SearchPlanner configuration and waypoint baseline"
+  source_files:
+    - "search/src/SearchMode.cpp"
+    - "search/src/SearchPlanner.cpp"
+    - "search/plans/aavc2026_mission.plan"
+
+search_altitude_m: 15.0
+max_horizontal_speed_m_s: 5.0
+waypoint_reach_radius_m: 4.0
+max_yaw_rate_rad_s: 2.0
+default_manual_plan: "aavc2026_mission.plan"
+
+total_waypoints: 10
+waypoints:
+  - index: 0
+    latitude_deg: 13.731328451896626
+    longitude_deg: 100.78990948056993
+    altitude_m: 15.0
+  - index: 1
+    latitude_deg: 13.731328455754555
+    longitude_deg: 100.78938348265243
+    altitude_m: 15.0
+  - index: 2
+    latitude_deg: 13.73119371335564
+    longitude_deg: 100.78782540423985
+    altitude_m: 15.0
+  - index: 3
+    latitude_deg: 13.731058970956728
+    longitude_deg: 100.78782540423985
+    altitude_m: 15.0
+  - index: 4
+    latitude_deg: 13.731058974814656
+    longitude_deg: 100.78938348265243
+    altitude_m: 15.0
+  - index: 5
+    latitude_deg: 13.730924232415742
+    longitude_deg: 100.78938348265243
+    altitude_m: 15.0
+  - index: 6
+    latitude_deg: 13.730924228557813
+    longitude_deg: 100.78783793887287
+    altitude_m: 15.0
+  - index: 7
+    latitude_deg: 13.7307894861589
+    longitude_deg: 100.78783793887287
+    altitude_m: 15.0
+  - index: 8
+    latitude_deg: 13.73078949001683
+    longitude_deg: 100.78938348265243
+    altitude_m: 15.0
+  - index: 9
+    latitude_deg: 13.7307894714774
+    longitude_deg: 100.78783793887287
+    altitude_m: 15.0
+
+checkpoint_test_traces:
+  fresh_start:
+    generation: 1
+    next_source_index: 0
+    completed_waypoints: 0
+    progress_percent: 0.0
+    has_checkpoint_position: false
+    expected_route_size: 10
+  after_waypoint_4:
+    generation: 1
+    next_source_index: 5
+    completed_waypoints: 5
+    progress_percent: 50.0
+    has_checkpoint_position: false
+    expected_route_size: 5
+  interrupted_flying_to_waypoint_4:
+    generation: 1
+    next_source_index: 4
+    completed_waypoints: 4
+    progress_percent: 40.0
+    has_checkpoint_position: true
+    checkpoint_latitude_deg: 13.7311
+    checkpoint_longitude_deg: 100.7888
+    checkpoint_altitude_m: 15.0
+    expected_resumed_route_size: 7  # 1 entry point + 6 remaining waypoints (4..9)
+  after_completion:
+    generation: 1
+    next_source_index: 10
+    completed_waypoints: 10
+    progress_percent: 100.0
+    has_checkpoint_position: false
+    expected_route_size: 1  # holds at final waypoint
+  after_reset:
+    generation: 2
+    next_source_index: 0
+    completed_waypoints: 0
+    progress_percent: 0.0
+    has_checkpoint_position: false
+    expected_route_size: 10

@@ -911,13 +911,80 @@ graph TD
 
 ---
 
-## 10. Subsequent Task Sections (To Be Extended by Other Tasks)
+## 10. Section 9: Search & Checkpointed Acquisition Strategy (Task 9)
 
-* **Section 9: Search & Target Acquisition Strategies (Tasks 9, 10)** — Working plan waypoint following, visual target qualification, direct flight.
-* **Section 10: Precision Landing & Delivery Strategies (Tasks 11, 12)** — Visual descent, payload release, transit out, auto land.
-* **Section 11: Security & End-to-End Mission Rehearsal (Tasks 13, 14, 15)** — Multi-machine security, full mission rehearsal, final verification.
+### 10.1 Overview & Architecture
 
+Task 9 ports the prototype `SearchMode` and `SearchPlanner` algorithms into the production `full_self_driving` architecture as an internal acquisition strategy (`SearchStrategy`), fully integrated with the authoritative `WorkingPlan` and durable `SearchCheckpoint` lifecycle:
 
+1. **Search Strategy (`SearchStrategy`)**:
+   - Implemented in [`src/flight/strategies/search_strategy.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/strategies/search_strategy.hpp) as an internal strategy of `FullSelfDrivingMode`.
+   - **Climb to Search Altitude**: Upon activation, evaluates the vehicle altitude against target search altitude ($AMS\text{L} = \text{Home AMSL} + \text{Configured Relative Alt}$). If below tolerance, climbs in place (preserving current XY position and heading) before advancing waypoints.
+   - **Checkpointed Route Traversal**: Follows the active `CanonicalSearchRoute` from `WorkingPlan`. If resuming from a previous interruption (`has_checkpoint_position == true`), the resumed route begins with the entry point coordinate before continuing along the remaining source waypoints.
+   - **Exact Checkpoint Index Arithmetic**:
+     $$next\_source\_idx = starts\_with\_entry\_point\_ ? (first\_plan\_idx + (curr\_idx > 0 ? curr\_idx - 1 : 0)) : curr\_idx + 1$$
+   - **Progress & Durability**:
+     $$\text{Progress \%} = \left(\frac{\text{completed\_waypoints}}{\text{total\_waypoints}}\right) \times 100.0\%$$
+     Updates are committed to `PlanManager` with reason `"WAYPOINT_SETTLED"` and journaled in `PersistenceManager`.
+   - **Final Waypoint Hold**: Once all waypoints in the canonical route are completed, the strategy holds station above the final waypoint (`mode_finished_ = true`) and signals completion to the mode and coordinator.
+   - **Safe Deactivation Checkpoint**: On strategy deactivation or manual takeover (`on_exit()`), if the vehicle has valid global position telemetry, a checkpoint is saved with `has_checkpoint_position = true` and the current vehicle coordinates, enabling seamless resumption in subsequent sorties.
 
+2. **Integration with `FlightRuntimeNode` & `MissionCoordinator`**:
+   - `FlightRuntimeNode` owns `std::shared_ptr<PlanManager>` and publishes `full_self_driving::msg::WorkingPlanStatus` at 10Hz on `/full_self_driving/working_plan/status`.
+   - `MissionCoordinator` branches `TRANSIT_IN` completion $\rightarrow$ `ACQUIRE_TARGET` $\rightarrow$ `SEARCH` (fallback path when Direct navigation is unselected or unavailable).
 
+```mermaid
+stateDiagram-v2
+    [*] --> TAKEOFF
+    TAKEOFF --> TRANSIT_IN: Takeoff complete
+    TRANSIT_IN --> ACQUIRE_TARGET: TransitIn complete
+    ACQUIRE_TARGET --> SEARCH: Direct unselected / fallback
+    SEARCH --> SEARCH_HOLD: All search waypoints complete (100%)
+    SEARCH --> HOLD: RC / QGC Manual Takeover (Safe Checkpoint Saved)
+```
 
+### 10.2 Production Components & Files Added
+
+1. **Strategy Implementation**:
+   - [`src/flight/strategies/search_strategy.hpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/strategies/search_strategy.hpp): Header definition of `SearchStrategy` internal strategy.
+   - [`src/flight/strategies/search_strategy.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/strategies/search_strategy.cpp): Waypoint following, climb gate, checkpoint progression, and safe deactivation.
+   - Built directly into the `fsd_flight_core` library.
+
+2. **Domain & Runtime Integration**:
+   - [`src/domain/mission_coordinator.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/domain/mission_coordinator.hpp): Added `set_plan_manager`, custom search route/plan setters, and `ACQUIRE_TARGET -> SEARCH` strategy instantiation.
+   - [`src/runtime/flight_runtime_node.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/runtime/flight_runtime_node.hpp): `WorkingPlanStatus` publisher on `/full_self_driving/working_plan/status`, default mission plan pre-loading, and Search strategy completion logging.
+
+3. **Fixtures & Tests**:
+   - [`test/fixtures/prototype_behavior/search/golden_search_trace.yaml`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/fixtures/prototype_behavior/search/golden_search_trace.yaml): Golden search waypoints and checkpoint trace fixture.
+   - [`test/fixtures/prototype_behavior_map.yaml`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/fixtures/prototype_behavior_map.yaml): Updated mapping with safety change IDs (`CHG_SEARCH_001` through `CHG_SEARCH_004`).
+   - [`test/flight/search_parity_test.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/flight/search_parity_test.cpp): 7-part parity and replay test suite (`search_parity_test`).
+
+### 10.3 How to Run and Verify (Task 9)
+
+```bash
+cd /home/ubuntu/roscon-25-workshop_ws
+source /opt/ros/humble/setup.bash
+source /home/ubuntu/px4_ros_ws/install/setup.bash
+
+# 1. Build package
+colcon build --packages-select full_self_driving --symlink-install \
+  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+
+# 2. Source workspace
+source install/setup.bash
+
+# 3. Run all 26 test suites (177 tests total)
+colcon test --packages-select full_self_driving --event-handlers console_direct+
+colcon test-result --all --verbose
+
+# 4. Run Search parity test directly
+ctest --test-dir build/full_self_driving -R search_parity_test --output-on-failure
+```
+
+---
+
+## 11. Subsequent Task Sections (To Be Extended by Other Tasks)
+
+* **Section 10: Direct Target Acquisition Strategy (Task 10)** — Direct navigation to trusted pad registry coordinate, search fallback.
+* **Section 11: Precision Landing & Delivery Strategies (Tasks 11, 12)** — Visual descent, payload release, transit out, auto land.
+* **Section 12: Security & End-to-End Mission Rehearsal (Tasks 13, 14, 15)** — Multi-machine security, full mission rehearsal, final verification.

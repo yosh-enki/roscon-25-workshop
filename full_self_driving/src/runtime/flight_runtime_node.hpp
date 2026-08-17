@@ -12,6 +12,7 @@
 #include "full_self_driving/msg/flight_safety_status.hpp"
 #include "full_self_driving/msg/vehicle_telemetry.hpp"
 #include "full_self_driving/msg/live_target_lock.hpp"
+#include "full_self_driving/msg/working_plan_status.hpp"
 #include "full_self_driving/srv/emergency_stop.hpp"
 
 #include "domain/engineering_config.hpp"
@@ -19,6 +20,7 @@
 #include "domain/mission_coordinator.hpp"
 #include "persistence/persistence_manager.hpp"
 #include "runtime/lifecycle_supervisor.hpp"
+#include "runtime/plan_manager.hpp"
 #include "adapters/px4_api_capabilities.hpp"
 #include "adapters/px4_state_cache.hpp"
 #include "flight/full_self_driving_mode.hpp"
@@ -40,6 +42,7 @@ public:
   std::shared_ptr<domain::MissionCoordinator> coordinator() const { return coordinator_; }
   std::shared_ptr<LifecycleSupervisor> supervisor() const { return supervisor_; }
   std::shared_ptr<persistence::PersistenceManager> persistence() const { return persistence_; }
+  std::shared_ptr<PlanManager> plan_manager() const { return plan_manager_; }
   std::shared_ptr<flight::FullSelfDrivingMode> mode() const { return mode_; }
   std::shared_ptr<flight::FullSelfDrivingModeExecutor> executor() const { return executor_; }
 
@@ -55,6 +58,7 @@ private:
   rclcpp::Publisher<full_self_driving::msg::ReadinessReport>::SharedPtr readiness_pub_;
   rclcpp::Publisher<full_self_driving::msg::FlightSafetyStatus>::SharedPtr safety_pub_;
   rclcpp::Publisher<full_self_driving::msg::VehicleTelemetry>::SharedPtr telemetry_pub_;
+  rclcpp::Publisher<full_self_driving::msg::WorkingPlanStatus>::SharedPtr working_plan_status_pub_;
 
   // Subscriptions & Services
   rclcpp::Subscription<full_self_driving::msg::LiveTargetLock>::SharedPtr target_lock_sub_;
@@ -68,6 +72,7 @@ private:
   std::shared_ptr<domain::MissionContext> context_;
   std::shared_ptr<persistence::PersistenceManager> persistence_;
   std::shared_ptr<LifecycleSupervisor> supervisor_;
+  std::shared_ptr<PlanManager> plan_manager_;
   std::unique_ptr<px4_ros2::Context> px4_context_;
   std::shared_ptr<adapters::Px4StateCache> state_cache_;
   std::shared_ptr<domain::MissionCoordinator> coordinator_;

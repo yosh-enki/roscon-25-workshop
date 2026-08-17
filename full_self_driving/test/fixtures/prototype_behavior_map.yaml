@@ -49,6 +49,24 @@ mappings:
         requirement: "2.10"
         description: "Disarmed and confirmation-guarded reset that resets progress to 0% and clears checkpoint"
 
+  - prototype_symbol: "px4_roscon_25/search/SearchMode"
+    production_component: "full_self_driving/flight/search_strategy"
+    preserved_algorithm: "Working plan waypoint following, climb-to-search-altitude, heading alignment, arrival radius progression, final hold, and safe deactivation checkpoint persistence"
+    test_fixture: "test/flight/search_parity_test.cpp"
+    intentional_changes:
+      - safety_change_id: "CHG_SEARCH_001"
+        requirement: "5.7"
+        description: "Implemented as internal strategy inside single registered FullSelfDrivingMode rather than standalone ModeBase"
+      - safety_change_id: "CHG_SEARCH_002"
+        requirement: "2.3"
+        description: "Follows active WorkingPlan and durable SearchCheckpoint, not arbitrary file paths or mutable files"
+      - safety_change_id: "CHG_SEARCH_003"
+        requirement: "3.4"
+        description: "Search publishes durable progress and remains data-only with respect to live target lock"
+      - safety_change_id: "CHG_SEARCH_004"
+        requirement: "6.7"
+        description: "Safe deactivation checkpoint persistence on mode deactivation or manual takeover"
+
   - prototype_symbol: "px4_roscon_25/precision_land/PrecisionLand"
     production_component: "full_self_driving/flight/precision_land_strategy"
     preserved_algorithm: "Precision landing state machine (search spiral, visual centering, descent)"
@@ -87,4 +105,3 @@ mappings:
       - safety_change_id: "CHG_DIR_001"
         requirement: "3.3"
         description: "Direct navigation to trusted registry coordinate followed by visual acquisition search"
-

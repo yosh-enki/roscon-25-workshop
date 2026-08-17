@@ -348,6 +348,7 @@ def launch_setup(context, *args, **kwargs):
             "engineering_config": config_path,
             "simulation": True,
             "world": world_name,
+            "flight_fixture": flight_fixture,
         }],
     )
 
@@ -459,7 +460,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "flight_fixture",
             default_value="none",
-            description="Flight replay fixture test mode ('none', 'transit_in')",
+            description="Flight replay fixture test mode ('none', 'transit_in', 'search')",
         ),
         DeclareLaunchArgument(
             "test_selection",
