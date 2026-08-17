@@ -61,6 +61,24 @@ mappings:
         requirement: "3.9"
         description: "Strict live target lock freshness gate; halt/reverse descent on target lock loss"
 
+  - prototype_symbol: "px4_roscon_25/transit_in/TransitIn"
+    production_component: "full_self_driving/flight/transit_in_strategy"
+    preserved_algorithm: "Global goto waypoint navigation, course heading alignment, arrival radius and vertical velocity settle gates"
+    test_fixture: "test/flight/transit_in_parity_test.cpp"
+    intentional_changes:
+      - safety_change_id: "CHG_TRANSIT_001"
+        requirement: "5.7"
+        description: "Implemented as internal strategy inside single registered FullSelfDrivingMode rather than standalone ModeBase"
+      - safety_change_id: "CHG_TRANSIT_002"
+        requirement: "5.8"
+        description: "Waypoints and velocity/altitude parameters resolved strictly from locked authoritative MissionContext and EngineeringConfig"
+      - safety_change_id: "CHG_TRANSIT_003"
+        requirement: "6.7"
+        description: "Persist durable route checkpoint on each waypoint arrival and strategy completion"
+      - safety_change_id: "CHG_TRANSIT_004"
+        requirement: "5.1"
+        description: "Strategy execution and transitions coordinated by MissionCoordinator following Takeoff"
+
   - prototype_symbol: "DIRECT_PROTOTYPE_BASELINE"
     production_component: "full_self_driving/flight/direct_strategy"
     preserved_algorithm: "ABSENT"
@@ -69,3 +87,4 @@ mappings:
       - safety_change_id: "CHG_DIR_001"
         requirement: "3.3"
         description: "Direct navigation to trusted registry coordinate followed by visual acquisition search"
+

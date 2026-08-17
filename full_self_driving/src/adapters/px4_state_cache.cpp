@@ -21,7 +21,7 @@ Px4StateSnapshot Px4StateCache::capture_snapshot() const
   snapshot.monotonic_timestamp_ns = now.nanoseconds();
 
   // Local Position
-  if (local_pos_.lastValid()) {
+  if (local_pos_.lastValid(std::chrono::milliseconds(1000))) {
     snapshot.local_pos_valid = local_pos_.positionXYValid() && local_pos_.positionZValid();
     snapshot.local_position_ned = local_pos_.positionNed();
     if (local_pos_.velocityXYValid() && local_pos_.velocityZValid()) {
@@ -33,27 +33,35 @@ Px4StateSnapshot Px4StateCache::capture_snapshot() const
   }
 
   // Global Position
-  if (global_pos_.lastValid()) {
+  if (global_pos_.lastValid(std::chrono::milliseconds(1000))) {
     snapshot.global_pos_valid = global_pos_.positionValid();
     snapshot.global_position = global_pos_.position();
   }
 
-  // Home Position
-  if (home_pos_.lastValid()) {
-    snapshot.home_pos_valid = home_pos_.localPositionValid() || home_pos_.globaHorizontalPositionValid();
-    snapshot.home_local_position = home_pos_.localPosition();
-    snapshot.home_global_position = home_pos_.globalPosition();
-    snapshot.home_yaw = home_pos_.yaw();
+  // Home Position (Latched message - cache once received)
+  if (home_pos_.lastValid(std::chrono::hours(24))) {
+    if (home_pos_.localPositionValid() || home_pos_.globaHorizontalPositionValid()) {
+      home_received_ = true;
+      cached_home_local_ = home_pos_.localPosition();
+      cached_home_global_ = home_pos_.globalPosition();
+      cached_home_yaw_ = home_pos_.yaw();
+    }
+  }
+  if (home_received_) {
+    snapshot.home_pos_valid = true;
+    snapshot.home_local_position = cached_home_local_;
+    snapshot.home_global_position = cached_home_global_;
+    snapshot.home_yaw = cached_home_yaw_;
   }
 
   // Land Detected
-  if (land_detected_.lastValid()) {
+  if (land_detected_.lastValid(std::chrono::milliseconds(1000))) {
     snapshot.land_detected_valid = true;
     snapshot.is_landed = land_detected_.landed();
   }
 
   // Vehicle Status
-  if (vehicle_status_.lastValid()) {
+  if (vehicle_status_.lastValid(std::chrono::milliseconds(1000))) {
     snapshot.vehicle_status_valid = true;
     snapshot.is_armed = vehicle_status_.armed();
     snapshot.nav_state = vehicle_status_.navState();
@@ -74,8 +82,9 @@ bool Px4StateCache::is_global_position_fresh(std::chrono::milliseconds timeout) 
 
 bool Px4StateCache::is_home_position_fresh(std::chrono::milliseconds timeout) const
 {
-  return home_pos_.lastValid(timeout) &&
-         (home_pos_.localPositionValid() || home_pos_.globaHorizontalPositionValid());
+  (void)timeout;
+  return home_received_ || (home_pos_.lastValid(std::chrono::hours(24)) &&
+         (home_pos_.localPositionValid() || home_pos_.globaHorizontalPositionValid()));
 }
 
 bool Px4StateCache::is_land_detected_fresh(std::chrono::milliseconds timeout) const

@@ -1,4 +1,6 @@
 #include "domain/mission_coordinator.hpp"
+#include "flight/strategies/takeoff_strategy.hpp"
+#include "flight/strategies/transit_in_strategy.hpp"
 
 namespace full_self_driving::domain
 {
@@ -69,10 +71,31 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
   current_strategy_ = next_strategy;
 
   if (mode_) {
-    // In later tasks specific strategy instances will be attached.
-    // For now we set WaitingForModeStrategy or placeholder
     if (next_strategy == flight::StrategyType::WAITING_FOR_MODE) {
       mode_->set_strategy(std::make_unique<flight::WaitingForModeStrategy>());
+    } else if (next_strategy == flight::StrategyType::TAKEOFF) {
+      double takeoff_alt = 10.0;
+      if (context_ && context_->get_resolved_config()) {
+        takeoff_alt = context_->get_resolved_config()->routes.search_altitude_m;
+      }
+      mode_->set_strategy(std::make_unique<flight::TakeoffStrategy>(
+        mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), takeoff_alt));
+    } else if (next_strategy == flight::StrategyType::TRANSIT_IN) {
+      Route route;
+      if (has_custom_transit_in_route_) {
+        route = custom_transit_in_route_;
+      } else {
+        route = Route::create_default_kmitl_transit_in_route();
+        if (context_ && context_->get_resolved_config()) {
+          const auto & cfg = context_->get_resolved_config()->routes;
+          route.set_max_horizontal_speed_m_s(static_cast<float>(cfg.transit_in_speed_m_s));
+          route.set_transit_altitude_above_home_m(cfg.search_altitude_m);
+          route.set_acceptance_radius_m(static_cast<float>(cfg.acceptance_radius_m));
+          route.set_max_yaw_rate_deg_s(static_cast<float>(cfg.max_yaw_rate_deg_s));
+        }
+      }
+      mode_->set_strategy(std::make_unique<flight::TransitInStrategy>(
+        mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), route));
     }
   }
 
@@ -89,6 +112,19 @@ void MissionCoordinator::clear_transition_trace()
 {
   std::lock_guard<std::mutex> guard(mutex_);
   transition_trace_.clear();
+}
+
+void MissionCoordinator::set_custom_transit_in_route(const Route & route)
+{
+  std::lock_guard<std::mutex> guard(mutex_);
+  custom_transit_in_route_ = route;
+  has_custom_transit_in_route_ = true;
+}
+
+void MissionCoordinator::reset_custom_transit_in_route()
+{
+  std::lock_guard<std::mutex> guard(mutex_);
+  has_custom_transit_in_route_ = false;
 }
 
 }  // namespace full_self_driving::domain

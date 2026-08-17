@@ -21,6 +21,7 @@ class FullSelfDrivingMode : public px4_ros2::ModeBase
 public:
   using ReadinessCheckCallback = std::function<bool(std::vector<std::string> & /* failure_codes */)>;
   using ActivationCallback = std::function<void(bool /* is_active */)>;
+  using StrategyCompletedCallback = std::function<void(StrategyType)>;
 
   FullSelfDrivingMode(
     rclcpp::Node & node,
@@ -31,6 +32,7 @@ public:
 
   void set_readiness_check_callback(ReadinessCheckCallback cb) { readiness_cb_ = std::move(cb); }
   void set_activation_callback(ActivationCallback cb) { activation_cb_ = std::move(cb); }
+  void set_strategy_completed_callback(StrategyCompletedCallback cb) { strategy_completed_cb_ = std::move(cb); }
 
   void checkArmingAndRunConditions(px4_ros2::HealthAndArmingCheckReporter & reporter) override;
   void onActivate() override;
@@ -40,17 +42,21 @@ public:
   void set_strategy(std::unique_ptr<InternalStrategy> strategy);
   StrategyType get_current_strategy_type() const;
   std::string get_current_strategy_name() const;
+  InternalStrategy * current_strategy() const { return strategy_.get(); }
 
+  rclcpp::Node & node() const { return node_; }
   std::shared_ptr<adapters::Px4StateCache> state_cache() const { return state_cache_; }
+  std::shared_ptr<px4_ros2::GotoGlobalSetpointType> goto_global_setpoint() const { return goto_global_setpoint_; }
 
 private:
   rclcpp::Node & node_;
   std::shared_ptr<adapters::Px4StateCache> state_cache_;
   std::unique_ptr<InternalStrategy> strategy_;
-  std::shared_ptr<px4_ros2::GotoSetpointType> goto_setpoint_;
+  std::shared_ptr<px4_ros2::GotoGlobalSetpointType> goto_global_setpoint_;
 
   ReadinessCheckCallback readiness_cb_;
   ActivationCallback activation_cb_;
+  StrategyCompletedCallback strategy_completed_cb_;
 };
 
 }  // namespace full_self_driving::flight

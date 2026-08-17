@@ -7,6 +7,7 @@
 
 #include "domain/mission_context.hpp"
 #include "domain/live_target_lock.hpp"
+#include "domain/route.hpp"
 #include "flight/internal_strategy.hpp"
 #include "flight/full_self_driving_mode_executor.hpp"
 
@@ -36,6 +37,9 @@ public:
   const std::vector<std::string> & get_transition_trace() const { return transition_trace_; }
   void clear_transition_trace();
 
+  void set_custom_transit_in_route(const Route & route);
+  void reset_custom_transit_in_route();
+
 private:
   mutable std::mutex mutex_;
   std::shared_ptr<MissionContext> context_;
@@ -45,6 +49,9 @@ private:
   flight::StrategyType current_strategy_{flight::StrategyType::WAITING_FOR_MODE};
   bool takeover_active_{false};
   bool emergency_stop_active_{false};
+
+  Route custom_transit_in_route_;
+  bool has_custom_transit_in_route_{false};
 
   std::vector<std::string> transition_trace_;
 };

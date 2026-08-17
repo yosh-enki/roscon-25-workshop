@@ -812,10 +812,111 @@ ctest --test-dir build/full_self_driving -R fsd_property_22_lifecycle_registrati
 
 ---
 
-## 9. Subsequent Task Sections (To Be Extended by Other Tasks)
+## 9. Section 8: Takeoff & TransitIn Internal Flight Strategies (Task 8)
 
-* **Section 8: Internal Flight Strategies (Tasks 8, 9, 10, 11, 12)** — Takeoff, TransitIn, Search, Direct, PrecisionLand, Payload, TransitOut, Land.
-* **Section 9: Security & End-to-End Verification (Tasks 13, 14, 15)** — Multi-machine security, full mission rehearsal, documentation.
+### 9.1 Overview & Architecture
+
+Task 8 establishes the first autonomous flight strategies ported from the prototype baseline into the production `full_self_driving` architecture:
+
+1. **Internal Flight Strategies**:
+   - `TakeoffStrategy` ([`src/flight/strategies/takeoff_strategy.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/strategies/takeoff_strategy.hpp)): Manages vehicle climb from home altitude to configured search altitude (e.g. 10.0m / 15.0m), evaluates altitude arrival within configured tolerance (default: 1.0m) and vertical speed settling ($|v_z| \le 0.5\text{ m/s}$) across multiple consecutive cycles before signaling strategy completion.
+   - `TransitInStrategy` ([`src/flight/strategies/transit_in_strategy.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/strategies/transit_in_strategy.hpp)): Internal strategy executing global goto setpoint waypoint navigation using `px4_ros2::GotoGlobalSetpointType`. Implements 100% behavioral parity with the proven prototype `TransitIn` algorithm including:
+     - First-setpoint guard cycle ensuring map projection initialization.
+     - Course heading alignment (ground speed $\ge 0.3\text{ m/s}$ computes $\text{atan2}(v_y, v_x)$ heading, with fallback to previous valid heading and local yaw).
+     - Geodesic horizontal distance evaluation (`px4_ros2::horizontalDistanceToGlobalPosition`), altitude tolerance checks, and vertical speed settle gates.
+     - Durable route checkpointing via `PersistenceManager` upon each waypoint arrival.
+
+2. **Route Value Object (`domain::Route`, `domain::RoutePoint`)**:
+   - Encapsulates geographic waypoints (`latitude_deg`, `longitude_deg`, `altitude_m`) and flight limits.
+   - Enforces hard safety caps: maximum horizontal speed ($\le 10.0\text{ m/s}$), maximum vertical speed ($\le 3.0\text{ m/s}$), maximum heading rate ($\le 180^\circ/\text{s}$), maximum altitude ($\le 120.0\text{ m}$), and maximum data timeout ($\le 10.0\text{ s}$).
+   - Supports YAML loading from both sequence-of-maps and flattened coordinate formats.
+
+3. **Coordinator-Driven Execution Flow**:
+   - `WAITING_FOR_MODE` $\rightarrow$ `TAKEOFF` $\rightarrow$ `TRANSIT_IN` $\rightarrow$ `ACQUIRE_TARGET`.
+   - Strategies are attached dynamically to the single registered `FullSelfDrivingMode` without creating extra ROS 2 nodes or PX4 mode registrations.
+   - Immediate takeover authority: any operator manual takeover (RC switch or QGC mode change) triggers `onDeactivate` and forces immediate transition to `HOLD`.
+
+### 9.2 Production Components & Files Added
+
+1. **Domain Route Objects**:
+   - [`src/domain/route.hpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/domain/route.hpp) / [`src/domain/route.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/domain/route.cpp): Value objects for route definitions, waypoint validation, and safety cap clamping. Built into `fsd_domain_core`.
+
+2. **Flight Strategies**:
+   - [`src/flight/strategies/takeoff_strategy.hpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/strategies/takeoff_strategy.hpp) / [`src/flight/strategies/takeoff_strategy.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/strategies/takeoff_strategy.cpp): Takeoff strategy implementation. Built into `fsd_flight_core`.
+   - [`src/flight/strategies/transit_in_strategy.hpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/strategies/transit_in_strategy.hpp) / [`src/flight/strategies/transit_in_strategy.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/strategies/transit_in_strategy.cpp): TransitIn strategy implementation. Built into `fsd_flight_core`.
+
+3. **Fixtures & Tests**:
+   - [`test/fixtures/prototype_behavior/transit_in/golden_waypoints.yaml`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/fixtures/prototype_behavior/transit_in/golden_waypoints.yaml): Baseline TransitIn waypoints fixture.
+   - [`test/fixtures/prototype_behavior/transit_in/golden_transit_in_trace.yaml`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/fixtures/prototype_behavior/transit_in/golden_transit_in_trace.yaml): Golden telemetry trace fixture.
+   - [`test/fixtures/prototype_behavior_map.yaml`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/fixtures/prototype_behavior_map.yaml): Updated mapping with safety change IDs (`CHG_TRANSIT_001` through `CHG_TRANSIT_004`).
+   - [`test/flight/transit_in_parity_test.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/flight/transit_in_parity_test.cpp): 5-part parity test suite (`transit_in_parity_test`).
+
+### 9.3 How to Run and Verify (Task 8)
+
+```bash
+cd /home/ubuntu/roscon-25-workshop_ws
+source /opt/ros/humble/setup.bash
+source /home/ubuntu/px4_ros_ws/install/setup.bash
+
+# 1. Build package
+colcon build --packages-select full_self_driving --symlink-install \
+  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+
+# 2. Source workspace
+source install/setup.bash
+
+# 3. Run all 25 test suites (169 tests total)
+colcon test --packages-select full_self_driving --event-handlers console_direct+
+colcon test-result --all --verbose
+
+# 4. Run TransitIn parity test directly
+ctest --test-dir build/full_self_driving -R transit_in_parity_test --output-on-failure
+```
+
+### 9.4 SITL Integration Issues Encountered & Solutions (Knowledge Base)
+
+During Gazebo SITL simulation testing and bringup, three critical runtime integration challenges were diagnosed and resolved:
+
+```mermaid
+graph TD
+    A[QGC Arm & Mode Select] --> B[FullSelfDrivingModeExecutor: ActivateOnlyWhenArmed]
+    B --> C[Compute Relative Takeoff Alt: Home AMSL + 10m]
+    C --> D[PX4 Auto-Takeoff Sequence]
+    D --> E[Takeoff Complete Callback]
+    E --> F[scheduleMode: FullSelfDrivingMode ID 23]
+    F --> G[TransitInStrategy Waypoint Follow: 5 m/s, 4m Acceptance Rad, 45 deg/s Yaw Rate]
+```
+
+1. **PX4 Takeoff Rejection & ModeExecutor Lifecycle**:
+   * **Symptom**: Calling `takeoff(...)` immediately upon mode selection resulted in `[EXECUTOR] Takeoff failed with result: Rejected` and `MAV_CMD_COMPONENT_ARM_DISARM command temporarily rejected`.
+   * **Root Cause**: In PX4, `MAV_CMD_NAV_TAKEOFF` sent via `vehicle_command` is rejected if the vehicle is not armed. Using `ModeExecutorBase::Settings::Activation::ActivateAlways` caused `onActivate()` to trigger while the vehicle was still disarmed (`is_armed=0`).
+   * **Fix**: Configured `FullSelfDrivingModeExecutor` with `ModeExecutorBase::Settings{ModeExecutorBase::Settings::Activation::ActivateOnlyWhenArmed}`. When the operator selects `Full Self-Driving` and arms in QGroundControl, PX4 confirms the arming state first, activates the executor, and accepts the `takeoff(...)` command. When PX4 auto-takeoff settles, the completion callback executes `scheduleMode(ownedMode().id())` to hand over control to `FullSelfDrivingMode` airborne.
+
+2. **Absolute AMSL vs. Relative (Above Home / Ground) Takeoff Altitude**:
+   * **Symptom**: The drone climbed to 7.8m above ground instead of the configured 10.0m.
+   * **Root Cause**: PX4 interprets the altitude parameter in `takeoff(altitude)` as Mean Sea Level (AMSL). KMITL Airfield ground elevation in Gazebo SITL is $+2.21\text{ m AMSL}$. Passing 10.0m commanded the drone to climb to 10.0m AMSL, resulting in $10.0 - 2.21 = 7.79\text{ m}$ height above ground.
+   * **Fix**: Updated `FullSelfDrivingModeExecutor::trigger_takeoff_sequence()` to query `Px4StateCache` and compute the relative altitude target:
+     $$\text{Target Altitude (AMSL)} = \text{Home Altitude (AMSL)} + \text{Configured Relative Altitude (10.0 m)}$$
+     This guarantees the drone climbs exactly $10.0\text{ m}$ above the takeoff point.
+
+3. **Latched Home Position 500ms Expiration in `px4_ros2_cpp`**:
+   * **Symptom**: `TransitInStrategy` logged alternating messages `Waiting for a valid PX4 home position before starting Transit In` and `Waiting for a fresh PX4 vehicle_land_detected sample before starting Transit In`, refusing to proceed to the waypoints.
+   * **Root Cause**: `px4_ros2::Subscription::lastValid()` defaults to a 500ms timeout window. PX4 publishes `/fmu/out/home_position` as a static/latched state when the home point is set at boot (not as a continuous high-rate stream). Once 500ms elapsed, `home_pos_.lastValid()` returned `false`, clearing `snapshot.home_pos_valid`.
+   * **Fix**: Implemented durable in-memory caching for Home Position in [`Px4StateCache`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/adapters/px4_state_cache.cpp). Once received from PX4, the coordinates are latched and `snapshot.home_pos_valid` remains `true` throughout the entire mission flight.
+
+4. **Standard International Route Parameters**:
+   * `transit_in_speed_m_s`: **`5.0` m/s** (horizontal transit speed).
+   * `acceptance_radius_m`: **`4.0` m** (standard acceptance radius per PX4 `NAV_ACC_RAD` / Nav2).
+   * `max_yaw_rate_deg_s`: **`45.0` deg/s** (smooth heading slew rate).
+
+---
+
+## 10. Subsequent Task Sections (To Be Extended by Other Tasks)
+
+* **Section 9: Search & Target Acquisition Strategies (Tasks 9, 10)** — Working plan waypoint following, visual target qualification, direct flight.
+* **Section 10: Precision Landing & Delivery Strategies (Tasks 11, 12)** — Visual descent, payload release, transit out, auto land.
+* **Section 11: Security & End-to-End Mission Rehearsal (Tasks 13, 14, 15)** — Multi-machine security, full mission rehearsal, final verification.
+
 
 
 

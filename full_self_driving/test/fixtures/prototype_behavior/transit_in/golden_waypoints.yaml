@@ -1,0 +1,26 @@
+version: "1.0.0"
+fixture_name: "transit_in_baseline"
+source_provenance:
+  description: "Prototype TransitIn configuration and waypoint baseline"
+  source_file: "config/transit_in.yaml"
+
+transit_in_alt: 15.0
+arrival_radius_m: 4.0
+max_horizontal_speed_m_s: 5.0
+max_vertical_speed_m_s: 1.0
+max_heading_rate_deg_s: 45.0
+course_heading_min_speed_m_s: 0.3
+altitude_tolerance_m: 1.0
+altitude_settle_speed_m_s: 0.5
+data_timeout_s: 2.0
+
+waypoints:
+  - latitude_deg: 13.730322
+    longitude_deg: 100.787446
+    altitude_m: 15.0
+  - latitude_deg: 13.730397
+    longitude_deg: 100.788694
+    altitude_m: 15.0
+  - latitude_deg: 13.730712
+    longitude_deg: 100.788755
+    altitude_m: 15.0

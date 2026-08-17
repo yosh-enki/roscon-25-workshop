@@ -20,12 +20,18 @@ public:
   FullSelfDrivingModeExecutor(
     rclcpp::Node & node,
     FullSelfDrivingMode & owned_mode,
+    std::shared_ptr<adapters::Px4StateCache> state_cache = nullptr,
     const std::string & topic_namespace_prefix = "");
 
   ~FullSelfDrivingModeExecutor() override = default;
 
   void set_takeover_callback(TakeoverCallback cb) { takeover_cb_ = std::move(cb); }
   void set_activation_callback(ExecutorActivationCallback cb) { activation_cb_ = std::move(cb); }
+  void set_takeoff_altitude(float alt) { takeoff_altitude_ = alt; }
+  float takeoff_altitude() const { return takeoff_altitude_; }
+  void set_state_cache(std::shared_ptr<adapters::Px4StateCache> sc) { state_cache_ = std::move(sc); }
+
+  void trigger_takeoff_sequence();
 
   void onActivate() override;
   void onDeactivate(DeactivateReason reason) override;
@@ -39,10 +45,12 @@ private:
   rclcpp::Node & node_;
   FullSelfDrivingMode & mode_;
   bool is_active_{false};
+  float takeoff_altitude_{10.0f};
   DeactivateReason last_deactivate_reason_{DeactivateReason::Other};
 
   TakeoverCallback takeover_cb_;
   ExecutorActivationCallback activation_cb_;
+  std::shared_ptr<adapters::Px4StateCache> state_cache_;
 };
 
 }  // namespace full_self_driving::flight

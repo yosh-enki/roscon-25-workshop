@@ -12,12 +12,14 @@ namespace full_self_driving::domain
 
 struct RoutePolicy
 {
-  double transit_in_speed_m_s{3.0};
+  double transit_in_speed_m_s{5.0};
   double transit_out_speed_m_s{3.0};
   double search_altitude_m{10.0};
   double approach_altitude_m{5.0};
   double max_horizontal_velocity_m_s{5.0};
   double landing_descent_rate_m_s{0.5};
+  double acceptance_radius_m{4.0};
+  double max_yaw_rate_deg_s{45.0};
 };
 
 struct SafetyPolicy

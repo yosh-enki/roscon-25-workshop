@@ -7,12 +7,12 @@ FullSelfDrivingMode::FullSelfDrivingMode(
   rclcpp::Node & node,
   std::shared_ptr<adapters::Px4StateCache> state_cache,
   const std::string & topic_namespace_prefix)
-: px4_ros2::ModeBase(node, Settings("Full Self-Driving", true), topic_namespace_prefix),
+: px4_ros2::ModeBase(node, Settings("Full Self-Driving", false), topic_namespace_prefix),
   node_(node),
   state_cache_(std::move(state_cache)),
   strategy_(std::make_unique<WaitingForModeStrategy>())
 {
-  goto_setpoint_ = std::make_shared<px4_ros2::GotoSetpointType>(*this);
+  goto_global_setpoint_ = std::make_shared<px4_ros2::GotoGlobalSetpointType>(*this);
 
   // Configure mode requirements
   modeRequirements().angular_velocity = true;
@@ -65,6 +65,9 @@ void FullSelfDrivingMode::updateSetpoint(float dt_s)
 {
   if (strategy_) {
     strategy_->on_update(dt_s);
+    if (strategy_->is_completed() && strategy_completed_cb_) {
+      strategy_completed_cb_(strategy_->get_type());
+    }
   }
 }
 

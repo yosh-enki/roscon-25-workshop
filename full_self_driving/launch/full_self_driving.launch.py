@@ -30,6 +30,7 @@ def launch_setup(context, *args, **kwargs):
     config_path = LaunchConfiguration("engineering_config").perform(context)
     test_fault_child = LaunchConfiguration("test_fault_child").perform(context)
     replay_fixture = LaunchConfiguration("replay_fixture").perform(context).lower()
+    flight_fixture = LaunchConfiguration("flight_fixture").perform(context).lower()
     dictionary_name = LaunchConfiguration("dictionary").perform(context)
     marker_size_val = float(LaunchConfiguration("marker_size").perform(context))
 
@@ -454,6 +455,11 @@ def generate_launch_description():
             "replay_fixture",
             default_value="none",
             description="Replay fixture test mode ('none', 'aruco')",
+        ),
+        DeclareLaunchArgument(
+            "flight_fixture",
+            default_value="none",
+            description="Flight replay fixture test mode ('none', 'transit_in')",
         ),
         DeclareLaunchArgument(
             "test_selection",

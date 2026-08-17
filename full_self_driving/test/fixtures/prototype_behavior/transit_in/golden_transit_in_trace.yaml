@@ -1,0 +1,88 @@
+version: "1.0.0"
+fixture_name: "golden_transit_in_trace"
+home_position:
+  latitude_deg: 13.730322
+  longitude_deg: 100.787446
+  altitude_amsl_m: 2.0
+
+steps:
+  - step_id: 0
+    description: "Initial activation at takeoff altitude"
+    telemetry:
+      armed: true
+      landed: false
+      latitude_deg: 13.730322
+      longitude_deg: 100.787446
+      altitude_amsl_m: 17.0
+      vx_m_s: 0.0
+      vy_m_s: 0.0
+      vz_m_s: 0.0
+      heading_rad: 0.0
+    expected:
+      current_waypoint_index: 0
+      target_altitude_amsl_m: 17.0
+      is_completed: false
+
+  - step_id: 1
+    description: "Arriving at waypoint 0"
+    telemetry:
+      armed: true
+      landed: false
+      latitude_deg: 13.730322
+      longitude_deg: 100.787446
+      altitude_amsl_m: 17.0
+      vx_m_s: 1.0
+      vy_m_s: 0.0
+      vz_m_s: 0.1
+      heading_rad: 0.0
+    expected:
+      current_waypoint_index: 1
+      is_completed: false
+
+  - step_id: 2
+    description: "En route to waypoint 1"
+    telemetry:
+      armed: true
+      landed: false
+      latitude_deg: 13.730350
+      longitude_deg: 100.788000
+      altitude_amsl_m: 17.0
+      vx_m_s: 3.0
+      vy_m_s: 0.5
+      vz_m_s: 0.0
+      heading_rad: 0.165
+    expected:
+      current_waypoint_index: 1
+      is_completed: false
+
+  - step_id: 3
+    description: "Arriving at waypoint 1"
+    telemetry:
+      armed: true
+      landed: false
+      latitude_deg: 13.730397
+      longitude_deg: 100.788694
+      altitude_amsl_m: 17.0
+      vx_m_s: 0.5
+      vy_m_s: 0.5
+      vz_m_s: 0.2
+      heading_rad: 0.785
+    expected:
+      current_waypoint_index: 2
+      is_completed: false
+
+  - step_id: 4
+    description: "Arriving at final waypoint 2"
+    telemetry:
+      armed: true
+      landed: false
+      latitude_deg: 13.730712
+      longitude_deg: 100.788755
+      altitude_amsl_m: 17.0
+      vx_m_s: 0.1
+      vy_m_s: 0.0
+      vz_m_s: 0.05
+      heading_rad: 1.57
+    expected:
+      current_waypoint_index: 3
+      is_completed: true

@@ -358,8 +358,8 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 6.2 lifecycle shutdown and 7.3 registered-mode smoke.
     - **Requirements:** 5.2, 6.4, 6.5; **Property 22: Lifecycle activation precedes external-mode registration**.
 
-- [ ] 8. Port takeoff and TransitIn as the first internal flight strategy
-  - [ ] 8.1 Add library-supported takeoff and the production internal TransitIn strategy
+- [x] 8. Port takeoff and TransitIn as the first internal flight strategy
+  - [x] 8.1 Add library-supported takeoff and the production internal TransitIn strategy
     - **Prerequisites:** 7.1–7.3. Read-only behavior baseline: `transit_in/TransitIn.cpp/.hpp`; use the exact verified library action/setpoint APIs, not guessed signatures.
     - **Production files/components:** Add `src/flight/strategies/takeoff_strategy.cpp`, `src/flight/strategies/transit_in_strategy.hpp/.cpp`, route value objects, and the coordinator/executor transition from `WAITING_FOR_MODE` → `TAKEOFF` → `TRANSIT_IN`.
     - **Implementation:** Port the proven TransitIn behavior: fresh land/home data gates, global/local odometry validity, target altitude above home, configured waypoint order, velocity/heading limits, first-setpoint guard, geodesic distance/altitude/vertical-velocity settle checks, monotonic timeout, and explicit failure result. Resolve all values from the locked snapshot; do not copy the prototype's node/mode/parameter names. Keep the strategy internal to the single registered mode and use only library-managed abstractions.
@@ -369,7 +369,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 7.3 authority, lifecycle, config, plan, perception, registry, and live-lock status tests before and after the flight smoke.
     - **Requirements:** 5.1, 5.2, 5.8, 6.7, 7.1.
 
-  - [ ]* 8.2 Add TransitIn behavior-parity and failure-gate tests
+  - [x] 8.2 Add TransitIn behavior-parity and failure-gate tests
     - **Prerequisites:** 8.1. Use copied inputs/golden traces from the read-only prototype, not the prototype executable.
     - **Production files/components:** Add `test/fixtures/prototype_behavior/transit_in/`, TransitIn entry in `prototype_behavior_map.yaml`, `test/flight/transit_in_parity_test.cpp`, and deterministic PX4 odometry/home/land fakes.
     - **Implementation:** Compare waypoint ordering, target-altitude computation, heading selection, first-update behavior, arrival/settle conditions, freshness timeout, and failure result. Add explicit `safety_change_id` coverage for snapshot/config, durability, and single-mode ownership changes.

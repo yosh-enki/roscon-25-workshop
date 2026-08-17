@@ -87,6 +87,15 @@ void FlightRuntimeNode::initialize_components()
   context_ = std::make_shared<domain::MissionContext>("ctx_flight_runtime");
   context_->set_engineering_config(config_);
 
+  // Pre-commit default simulation context for simulation bringup
+  std::string err;
+  context_->select_map_scenario("kmitl_airfield", "default_scenario", 0, &err);
+  context_->select_target(domain::TargetIdentity(7, "DICT_4X4_50", "aavc2026"), 1, &err);
+  auto vreport = context_->validate_selection(2);
+  if (vreport.is_valid) {
+    context_->commit(vreport.token, 2, &err);
+  }
+
   persistence::StoragePaths paths;
   paths.state_directory = "/tmp/fsd_state";
   paths.evidence_directory = "/tmp/fsd_evidence";
@@ -114,6 +123,20 @@ void FlightRuntimeNode::initialize_components()
 void FlightRuntimeNode::trigger_evaluation_cycle()
 {
   check_and_register_mode();
+
+  if (mode_ && mode_->isActive() && state_cache_ && state_cache_->is_armed()) {
+    if (coordinator_ && coordinator_->get_current_strategy() == flight::StrategyType::WAITING_FOR_MODE) {
+      auto snapshot = state_cache_->capture_snapshot();
+      if (snapshot.is_landed) {
+        RCLCPP_INFO(get_logger(), "[RUNTIME] Mode active on ground. Transitioning to TAKEOFF...");
+        coordinator_->request_transition(flight::StrategyType::TAKEOFF);
+      } else {
+        RCLCPP_INFO(get_logger(), "[RUNTIME] Mode active airborne. Transitioning to TRANSIT_IN...");
+        coordinator_->request_transition(flight::StrategyType::TRANSIT_IN);
+      }
+    }
+  }
+
   publish_status_cycle();
 }
 
@@ -153,7 +176,39 @@ void FlightRuntimeNode::check_and_register_mode()
       return ok;
     });
 
-    executor_ = std::make_shared<flight::FullSelfDrivingModeExecutor>(*this, *mode_);
+    mode_->set_activation_callback([this](bool is_active) {
+      if (is_active && state_cache_->is_armed()) {
+        if (coordinator_ && coordinator_->get_current_strategy() == flight::StrategyType::WAITING_FOR_MODE) {
+          auto snapshot = state_cache_->capture_snapshot();
+          if (snapshot.is_landed) {
+            RCLCPP_INFO(get_logger(), "[RUNTIME] Mode activated on ground. Transitioning to TAKEOFF...");
+            coordinator_->request_transition(flight::StrategyType::TAKEOFF);
+          } else {
+            RCLCPP_INFO(get_logger(), "[RUNTIME] Mode activated airborne. Transitioning to TRANSIT_IN...");
+            coordinator_->request_transition(flight::StrategyType::TRANSIT_IN);
+          }
+        }
+      }
+    });
+
+    mode_->set_strategy_completed_callback([this](flight::StrategyType completed_type) {
+      if (completed_type == flight::StrategyType::TAKEOFF) {
+        RCLCPP_INFO(get_logger(), "[RUNTIME] Takeoff completed. Transitioning to TRANSIT_IN...");
+        if (coordinator_) {
+          coordinator_->request_transition(flight::StrategyType::TRANSIT_IN);
+        }
+      } else if (completed_type == flight::StrategyType::TRANSIT_IN) {
+        RCLCPP_INFO(get_logger(), "[RUNTIME] TransitIn completed. Transitioning to ACQUIRE_TARGET...");
+        if (coordinator_) {
+          coordinator_->request_transition(flight::StrategyType::ACQUIRE_TARGET);
+        }
+      }
+    });
+
+    executor_ = std::make_shared<flight::FullSelfDrivingModeExecutor>(*this, *mode_, state_cache_);
+    if (config_) {
+      executor_->set_takeoff_altitude(static_cast<float>(config_->routes.search_altitude_m));
+    }
     executor_->set_takeover_callback([this](flight::FullSelfDrivingModeExecutor::DeactivateReason reason) {
       if (coordinator_) {
         coordinator_->handle_takeover(reason);

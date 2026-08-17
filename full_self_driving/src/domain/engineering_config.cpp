@@ -65,6 +65,14 @@ ValidationResult EngineeringConfig::validate() const
     res.add_violation("routes.landing_descent_rate_m_s must be finite and > 0.0");
   }
 
+  if (!std::isfinite(routes.acceptance_radius_m) || routes.acceptance_radius_m <= 0.0) {
+    res.add_violation("routes.acceptance_radius_m must be finite and > 0.0");
+  }
+
+  if (!std::isfinite(routes.max_yaw_rate_deg_s) || routes.max_yaw_rate_deg_s <= 0.0) {
+    res.add_violation("routes.max_yaw_rate_deg_s must be finite and > 0.0");
+  }
+
   // Relationship check
   if (std::isfinite(routes.search_altitude_m) && std::isfinite(routes.approach_altitude_m) &&
       routes.search_altitude_m < routes.approach_altitude_m)
@@ -189,6 +197,16 @@ EngineeringConfig EngineeringConfig::from_yaml(const YAML::Node & node)
     if (r["approach_altitude_m"]) config.routes.approach_altitude_m = r["approach_altitude_m"].as<double>();
     if (r["max_horizontal_velocity_m_s"]) config.routes.max_horizontal_velocity_m_s = r["max_horizontal_velocity_m_s"].as<double>();
     if (r["landing_descent_rate_m_s"]) config.routes.landing_descent_rate_m_s = r["landing_descent_rate_m_s"].as<double>();
+    if (r["acceptance_radius_m"]) {
+      config.routes.acceptance_radius_m = r["acceptance_radius_m"].as<double>();
+    } else if (r["arrival_radius_m"]) {
+      config.routes.acceptance_radius_m = r["arrival_radius_m"].as<double>();
+    }
+    if (r["max_yaw_rate_deg_s"]) {
+      config.routes.max_yaw_rate_deg_s = r["max_yaw_rate_deg_s"].as<double>();
+    } else if (r["max_heading_rate_deg_s"]) {
+      config.routes.max_yaw_rate_deg_s = r["max_heading_rate_deg_s"].as<double>();
+    }
   }
 
   if (node["adapters"]) {
@@ -248,12 +266,14 @@ EngineeringConfig EngineeringConfig::create_default_simulation_config()
   config.safety.target_loss_timeout_s = 2.0;
   config.safety.emergency_stop_enabled = true;
 
-  config.routes.transit_in_speed_m_s = 3.0;
+  config.routes.transit_in_speed_m_s = 5.0;
   config.routes.transit_out_speed_m_s = 3.0;
   config.routes.search_altitude_m = 10.0;
   config.routes.approach_altitude_m = 5.0;
   config.routes.max_horizontal_velocity_m_s = 5.0;
   config.routes.landing_descent_rate_m_s = 0.5;
+  config.routes.acceptance_radius_m = 4.0;
+  config.routes.max_yaw_rate_deg_s = 45.0;
 
   config.adapters.px4_transport = "px4_sitl_uxrce_dds";
   config.adapters.camera_adapter = "ros_gz_image_bridge";

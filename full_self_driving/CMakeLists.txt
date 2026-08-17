@@ -90,6 +90,7 @@ add_library(fsd_domain_core
   src/domain/live_target_lock.cpp
   src/domain/engineering_config.cpp
   src/domain/mission_context.cpp
+  src/domain/route.cpp
   src/domain/plan_parser.cpp
   src/domain/plan_printer.cpp
   src/domain/working_plan.cpp
@@ -246,6 +247,8 @@ ament_target_dependencies(fsd_adapters_core
 add_library(fsd_flight_core
   src/flight/full_self_driving_mode.cpp
   src/flight/full_self_driving_mode_executor.cpp
+  src/flight/strategies/takeoff_strategy.cpp
+  src/flight/strategies/transit_in_strategy.cpp
   src/domain/mission_coordinator.cpp
 )
 target_include_directories(fsd_flight_core PUBLIC
@@ -255,6 +258,7 @@ target_include_directories(fsd_flight_core PUBLIC
 )
 target_link_libraries(fsd_flight_core
   fsd_domain_core
+  fsd_persistence_core
   fsd_adapters_core
   "${cpp_typesupport_target}"
 )
@@ -856,6 +860,30 @@ if(BUILD_TESTING)
     px4_ros2_cpp
     px4_msgs
     geometry_msgs
+  )
+
+  ament_add_gtest(transit_in_parity_test
+    test/flight/transit_in_parity_test.cpp
+  )
+  target_include_directories(transit_in_parity_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(transit_in_parity_test
+    fsd_flight_core
+    fsd_adapters_core
+    fsd_domain_core
+    fsd_persistence_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(transit_in_parity_test
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+    ament_index_cpp
   )
 
   ament_add_pytest_test(fsd_property_21_ros_interface_boundary

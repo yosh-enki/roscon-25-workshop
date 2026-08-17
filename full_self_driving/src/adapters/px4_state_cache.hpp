@@ -79,6 +79,11 @@ private:
   px4_ros2::HomePosition home_pos_;
   px4_ros2::LandDetected land_detected_;
   px4_ros2::VehicleStatus vehicle_status_;
+
+  mutable bool home_received_{false};
+  mutable Eigen::Vector3f cached_home_local_{0.f, 0.f, 0.f};
+  mutable Eigen::Vector3d cached_home_global_{0.0, 0.0, 0.0};
+  mutable float cached_home_yaw_{0.f};
 };
 
 }  // namespace full_self_driving::adapters
