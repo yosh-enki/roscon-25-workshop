@@ -1,0 +1,10 @@
+string<=64 request_id
+string<=64 working_plan_id
+uint64 expected_selection_revision
+string<=64 confirmation
+---
+bool accepted
+uint64 new_generation
+WorkingPlanStatus working_plan
+bool has_error
+ErrorReport error

@@ -1,0 +1,23 @@
+uint8 STATE_MISSING=0
+uint8 STATE_READY=1
+uint8 STATE_SEARCHING=2
+uint8 STATE_COMPLETE=3
+uint8 STATE_INVALID=4
+uint8 STATE_RECOVERY_REQUIRED=5
+uint8 DURABILITY_UNKNOWN=0
+uint8 DURABILITY_SYNCED=1
+uint8 DURABILITY_DIRTY=2
+uint8 DURABILITY_FAILED=3
+
+MessageHeader header
+uint8 state
+string<=64 working_plan_id
+string<=64 map_id
+string<=64 scenario_id
+string<=64 source_artifact_sha256
+string<=64 canonical_route_sha256
+uint64 generation
+SearchCheckpoint checkpoint
+uint8 durability_state
+string<=64 update_reason
+builtin_interfaces/Time updated_at

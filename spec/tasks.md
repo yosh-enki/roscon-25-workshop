@@ -175,8 +175,8 @@ Every task's regression check includes the previously completed slices, `colcon 
   - [x] 4.7 Add the complete Ownmode-readiness property test
   - [x] 4.8 Add the concrete bounded ROS interface property test
 
-- [ ] 5. Make managed plan artifacts and working-plan progress runnable
-  - [ ] 5.1 Port the proven QGroundControl plan parser/printer into PlanManager with immutable managed artifacts
+- [x] 5. Make managed plan artifacts and working-plan progress runnable
+  - [x] 5.1 Port the proven QGroundControl plan parser/printer into PlanManager with immutable managed artifacts
     - **Prerequisites:** 4.1, 4.2, and 4.3. Read-only behavior baseline: `search/src/PlanParser.cpp/.hpp` and `search/src/SearchPlanner.cpp/.hpp`.
     - **Production files/components:** Add `src/domain/plan_parser.cpp`, `src/domain/plan_printer.cpp`, `src/runtime/plan_manager.cpp`, `msg/PlanArtifactReference`, the typed `UploadPlanArtifact` and `SelectPlanArtifact` handlers, and the read-only managed artifact projection used by `list_plan_artifacts`.
     - **Implementation:** Port bounded JSON parsing, nested mission-item walking, command-16 waypoint extraction/source indexes, `CameraCalc.DistanceToSurface` handling, finite coordinate validation, canonical route hashing, and canonical printing. Ingest bytes rather than paths, enforce safe basename/size/depth/item limits, atomically store immutable managed artifacts, reject hash-changing replacement, and never expose the source path.
@@ -186,7 +186,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat config/context/live-lock/registry launch; scan for old `search` package or arbitrary path use.
     - **Requirements:** 2.2, 2.4, 2.5, 2.6, 2.8, 2.9, 2.11, 7.9.
 
-  - [ ] 5.2 Add WorkingPlan generation, reset, checkpoint, resume, and status wiring
+  - [x] 5.2 Add WorkingPlan generation, reset, checkpoint, resume, and status wiring
     - **Prerequisites:** 5.1. Preserve the prototype's timestamped-copy/active-marker semantics as behavior, while replacing filenames with managed IDs and adding generation/revision/durability fields.
     - **Production files/components:** Add `src/domain/working_plan.cpp`, `src/runtime/working_plan_store.cpp`, `msg/SearchCheckpoint`, `msg/WorkingPlanStatus`, and handlers for `CreateOrSelectWorkingPlan`, `ResetWorkingPlan`, and checkpoint updates.
     - **Implementation:** Keep manual artifacts immutable; create a separate generated working record with source hash, map/scenario, generation, canonical route, checkpoint, reason, and progress. Reset is disarmed/revision/confirmation guarded, increments generation, sets empty checkpoint and `0%`; normal resume starts at checkpoint position or next source index. Use the durable store hook even before full journal recovery is wired.
@@ -196,7 +196,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat artifact upload/hash/path tests, context revision/lock tests, and perception/registry launch.
     - **Requirements:** 2.3, 2.4, 2.5, 2.6, 2.7, 2.10, 6.7.
 
-  - [ ]* 5.3 Add the plan immutability and safe-path property test
+  - [x] 5.3 Add the plan immutability and safe-path property test
     - **Prerequisites:** 5.1.
     - **Production files/components:** Add `test/property/property_4_plan_immutability.cpp` and register `fsd_property_4_plan_immutability`.
     - **Implementation:** Generate safe/unsafe names, paths, bytes, duplicate IDs, and replacement attempts; assert managed identity/hash semantics and no arbitrary filesystem access or source replacement.
@@ -206,7 +206,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Run 5.1 and 5.2 plan/context smoke.
     - **Requirements:** 2.2, 2.11; **Property 4: Plan immutability and safe paths**.
 
-  - [ ]* 5.4 Add the working-plan generation and resume property test
+  - [x] 5.4 Add the working-plan generation and resume property test
     - **Prerequisites:** 5.2.
     - **Production files/components:** Add `test/property/property_5_working_plan.cpp` and register `fsd_property_5_working_plan`.
     - **Implementation:** Generate valid working plans/checkpoints and resets; assert generation increases, progress/checkpoint clear on reset, source hash is preserved, and resume begins at the checkpoint or next source index.
@@ -216,7 +216,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat artifact immutability and context revision tests.
     - **Requirements:** 2.3, 2.7; **Property 5: Working-plan generation correctness**.
 
-  - [ ]* 5.5 Add parser/printer round-trip and prototype SearchPlanner parity tests
+  - [x] 5.5 Add parser/printer round-trip and prototype SearchPlanner parity tests
     - **Prerequisites:** 5.1 and 5.2. Read-only baseline is the checked-in prototype `PlanParser`/`SearchPlanner`; production tests must use copied fixtures or independently generated inputs.
     - **Production files/components:** Add nested QGC plan fixtures, malformed/unsupported fixtures, `test/plan/plan_round_trip_test.cpp`, `test/plan/working_plan_parity_test.cpp`, and the Search entry in `prototype_behavior_map.yaml`.
     - **Implementation:** Compare extracted waypoint order/source indexes, altitude fallback, route hash, timestamped working generation, active selection, entry-point update, and resume route semantics. Record any bounded schema/generation differences as approved changes.

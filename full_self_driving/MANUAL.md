@@ -533,13 +533,127 @@ ros2 interface show full_self_driving/srv/BackupPadRegistry
 
 ---
 
-## 6. Subsequent Task Sections (To Be Extended by Other Tasks)
+## 6. Section 5: Managed Plan Artifacts & Working-Plan State (Task 5)
 
-* **Section 5: Plan Management & Working Plan (Task 5)** — `PlanManager`, QGC `.plan` parser/printer, search checkpoint tracking.
+### 6.1 Overview & Architecture
+
+Task 5 delivers production plan artifact ingestion, immutable managed storage, canonical route extraction, working-plan generation, and resume/checkpoint tracking:
+
+1. **Immutable Managed Plan Artifacts (`PlanManager`, `PlanParser`)**:
+   - Ingests raw QGroundControl `.plan` JSON bytes with size and nesting depth bounds.
+   - Rejects unsafe filenames and path traversal attempts (no `/`, `\`, `..`, leading dot).
+   - Walks nested mission items (supporting surveys, transect complex items, and simple items) and extracts command-16 waypoints with source indexes.
+   - Extracts altitude (`CameraCalc.DistanceToSurface` or waypoint altitude parameters) and cruise speed.
+   - Computes deterministic **Canonical Route SHA-256** and **Artifact SHA-256**.
+   - Stores accepted artifacts under managed immutable IDs (`art_<sha256_prefix>`).
+   - Strictly rejects hash-changing replacements for existing artifact IDs (Requirement 2.11 / Property 4).
+
+2. **Working-Plan Generation & Checkpoint Tracking (`WorkingPlan`, `WorkingPlanStore`)**:
+   - Creates a separate working plan record with generation counters and scope (`map_id`, `scenario_id`).
+   - Tracks live search progress via `SearchCheckpoint` (`next_source_index`, `completed_waypoints`, `progress_percent`, `checkpoint_position`, `sequence`).
+   - Provides safe resume semantics: `route_for_search()` starts from the interrupted entry point position (if present) followed by remaining unsearched waypoints (never silently restarts at index 0).
+   - Holds at the final waypoint when all waypoints are completed.
+   - Disarmed and confirmation-guarded reset: `reset("CONFIRM")` increments generation, clears checkpoint position, sets `next_source_index = 0`, `progress = 0%`, while strictly preserving the source artifact hash.
+
+```mermaid
+graph TD
+    UPLOAD["UploadPlanArtifact.srv (raw bytes, safe_name)"] --> PM[PlanManager]
+    PM --> PP[PlanParser: JSON DOM, Cmd 16, Altitude, Hash]
+    PP --> ART[ManagedPlanArtifact: immutable, art_id, sha256]
+    
+    CREATE["CreateOrSelectWorkingPlan.srv"] --> PM
+    PM --> WP[WorkingPlan: Generation 1, 0% Progress]
+    
+    SEARCH_FLIGHT["Search Strategy / Flight Runtime"] -->|Update Checkpoint| WP
+    WP --> CP[SearchCheckpoint: next_index, entry_point, progress]
+    
+    WP --> RESUME["route_for_search() -> [EntryPoint, Remaining Waypoints...]"]
+    
+    RESET["ResetWorkingPlan.srv (CONFIRM)"] --> WP
+    WP -->|Reset Checkpoint| WP_RESET[WorkingPlan: Generation++, 0% Progress]
+```
+
+### 6.2 Created Production Components & Artifacts
+
+1. **Production Messages & Services (`msg/`, `srv/`)**:
+   - [`msg/PlanArtifactReference.msg`](file:///home/yosh/roscon-25-workshop/full_self_driving/msg/PlanArtifactReference.msg): Managed artifact ID, safe name, SHA-256, byte length, immutable flag.
+   - [`msg/SearchCheckpoint.msg`](file:///home/yosh/roscon-25-workshop/full_self_driving/msg/SearchCheckpoint.msg): Working plan ID, generation, next source index, optional checkpoint position, completed count, total count, progress percent, reason, sequence.
+   - [`msg/WorkingPlanStatus.msg`](file:///home/yosh/roscon-25-workshop/full_self_driving/msg/WorkingPlanStatus.msg): Working plan state (`STATE_*`), IDs, hashes, generation, checkpoint, durability, update reason.
+   - [`msg/ErrorReport.msg`](file:///home/yosh/roscon-25-workshop/full_self_driving/msg/ErrorReport.msg): Bounded error diagnostics report.
+   - [`srv/UploadPlanArtifact.srv`](file:///home/yosh/roscon-25-workshop/full_self_driving/srv/UploadPlanArtifact.srv): Ingest raw plan bytes, returns artifact reference and error report.
+   - [`srv/SelectPlanArtifact.srv`](file:///home/yosh/roscon-25-workshop/full_self_driving/srv/SelectPlanArtifact.srv): Selects managed artifact into mission context.
+   - [`srv/CreateOrSelectWorkingPlan.srv`](file:///home/yosh/roscon-25-workshop/full_self_driving/srv/CreateOrSelectWorkingPlan.srv): Generates scoped working plan from artifact.
+   - [`srv/ResetWorkingPlan.srv`](file:///home/yosh/roscon-25-workshop/full_self_driving/srv/ResetWorkingPlan.srv): Confirmation-guarded working plan reset.
+
+2. **Core Domain & Runtime Libraries (`src/domain/`, `src/runtime/`)**:
+   - [`src/domain/plan_parser.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/domain/plan_parser.hpp): Bounded JSON parsing, command-16 waypoint extraction, finite coordinate checks, canonical route hashing.
+   - [`src/domain/plan_printer.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/domain/plan_printer.hpp): Canonical QGC plan serializer with round-trip idempotency.
+   - [`src/domain/working_plan.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/domain/working_plan.hpp): Working-plan domain model, checkpoint progression, resume route generation, and reset logic.
+   - [`src/runtime/plan_manager.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/runtime/plan_manager.hpp): Thread-safe runtime manager for artifacts and working plans with atomic storage.
+   - [`src/runtime/working_plan_store.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/runtime/working_plan_store.hpp): Disk persistence adapter for working plans.
+
+3. **Test Suites & Fixtures**:
+   - [`test/fixtures/plans/aavc2026_mission.plan`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/fixtures/plans/aavc2026_mission.plan): Production fixture copied for parity testing.
+   - [`test/property/property_4_plan_immutability.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/property/property_4_plan_immutability.cpp): Property 4 test suite (Plan immutability and safe paths).
+   - [`test/property/property_5_working_plan.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/property/property_5_working_plan.cpp): Property 5 test suite (Working-plan generation correctness).
+   - [`test/plan/plan_round_trip_test.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/plan/plan_round_trip_test.cpp): Round-trip serialization idempotency test.
+   - [`test/plan/working_plan_parity_test.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/plan/working_plan_parity_test.cpp): Algorithm parity test against prototype SearchPlanner.
+
+### 6.3 Verification Commands (Task 5)
+
+#### A. Run All Automated Test Suites (99 Tests Total)
+```bash
+cd /home/ubuntu/roscon-25-workshop_ws
+source /opt/ros/humble/setup.bash
+source /home/ubuntu/px4_ros_ws/install/setup.bash
+
+# Build package
+colcon build --packages-select full_self_driving --symlink-install \
+  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+
+# Source workspace
+source install/setup.bash
+
+# Run all 15 test suites
+colcon test --packages-select full_self_driving --event-handlers console_direct+
+colcon test-result --verbose
+```
+
+#### B. Run Individual Task 5 Tests
+```bash
+# 1. Property 4: Plan Immutability & Safe Paths (5 tests)
+ctest --test-dir build/full_self_driving -R fsd_property_4_plan_immutability --output-on-failure
+
+# 2. Property 5: Working Plan Generation Correctness (4 tests)
+ctest --test-dir build/full_self_driving -R fsd_property_5_working_plan --output-on-failure
+
+# 3. Plan Parser / Printer Round-Trip Test (2 tests)
+ctest --test-dir build/full_self_driving -R plan_round_trip_test --output-on-failure
+
+# 4. Working Plan Parity Test (2 tests)
+ctest --test-dir build/full_self_driving -R working_plan_parity_test --output-on-failure
+```
+
+#### C. Inspect Generated ROS 2 Interfaces
+```bash
+ros2 interface show full_self_driving/msg/PlanArtifactReference
+ros2 interface show full_self_driving/msg/SearchCheckpoint
+ros2 interface show full_self_driving/msg/WorkingPlanStatus
+ros2 interface show full_self_driving/srv/UploadPlanArtifact
+ros2 interface show full_self_driving/srv/SelectPlanArtifact
+ros2 interface show full_self_driving/srv/CreateOrSelectWorkingPlan
+ros2 interface show full_self_driving/srv/ResetWorkingPlan
+```
+
+---
+
+## 7. Subsequent Task Sections (To Be Extended by Other Tasks)
+
 * **Section 6: Operator Gateway & Read Models (Task 6)** — `fsd_gateway`, MQTT bridge, status projections.
 * **Section 7: Flight Runtime & PX4 Mode Executor (Task 7)** — `fsd_flight_runtime`, `FullSelfDrivingMode`, `FullSelfDrivingModeExecutor`.
 * **Section 8: Persistence & Evidence (Task 8)** — Durable journal, recovery state machine, evidence manifest.
 * **Section 9: Security & End-to-End Verification (Task 9)** — Final verification and property tests.
+
 
 
 

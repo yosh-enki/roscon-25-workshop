@@ -44,10 +44,21 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/VehicleTelemetry.msg"
   "msg/LandingTargetSetpoint.msg"
   "msg/FlightSafetyStatus.msg"
+  "msg/ErrorReport.msg"
+  "msg/PlanArtifactReference.msg"
+  "msg/SearchCheckpoint.msg"
+  "msg/WorkingPlanStatus.msg"
+  "msg/ReadinessReport.msg"
+  "msg/PayloadStatus.msg"
+  "msg/MissionContext.msg"
   "srv/FullSelfDrivingCommand.srv"
   "srv/EmergencyStop.srv"
   "srv/ClearPadRegistry.srv"
   "srv/BackupPadRegistry.srv"
+  "srv/UploadPlanArtifact.srv"
+  "srv/SelectPlanArtifact.srv"
+  "srv/CreateOrSelectWorkingPlan.srv"
+  "srv/ResetWorkingPlan.srv"
   DEPENDENCIES builtin_interfaces geometry_msgs
 )
 
@@ -57,6 +68,11 @@ add_library(fsd_domain_core
   src/domain/live_target_lock.cpp
   src/domain/engineering_config.cpp
   src/domain/mission_context.cpp
+  src/domain/plan_parser.cpp
+  src/domain/plan_printer.cpp
+  src/domain/working_plan.cpp
+  src/runtime/plan_manager.cpp
+  src/runtime/working_plan_store.cpp
 )
 target_include_directories(fsd_domain_core PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -384,6 +400,79 @@ if(BUILD_TESTING)
   ament_target_dependencies(fsd_property_9_readiness
     rclcpp
     geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_4_plan_immutability
+    test/property/property_4_plan_immutability.cpp
+  )
+  target_include_directories(fsd_property_4_plan_immutability PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_4_plan_immutability
+    fsd_domain_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_4_plan_immutability
+    rclcpp
+    geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_5_working_plan
+    test/property/property_5_working_plan.cpp
+  )
+  target_include_directories(fsd_property_5_working_plan PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_5_working_plan
+    fsd_domain_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_5_working_plan
+    rclcpp
+    geometry_msgs
+  )
+
+  ament_add_gtest(plan_round_trip_test
+    test/plan/plan_round_trip_test.cpp
+  )
+  target_include_directories(plan_round_trip_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(plan_round_trip_test
+    fsd_domain_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(plan_round_trip_test
+    rclcpp
+    geometry_msgs
+  )
+
+  ament_add_gtest(working_plan_parity_test
+    test/plan/working_plan_parity_test.cpp
+  )
+  target_include_directories(working_plan_parity_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(working_plan_parity_test
+    fsd_domain_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(working_plan_parity_test
+    rclcpp
+    geometry_msgs
+    ament_index_cpp
   )
 
   ament_add_pytest_test(fsd_property_21_ros_interface_boundary

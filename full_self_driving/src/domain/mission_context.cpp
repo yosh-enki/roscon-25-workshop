@@ -183,6 +183,74 @@ bool MissionContext::select_target(
   return true;
 }
 
+bool MissionContext::select_plan_artifact(
+  const std::string & artifact_id,
+  uint64_t expected_revision,
+  std::string * out_error)
+{
+  if (locked_ || armed_) {
+    if (out_error) *out_error = "Cannot edit selection while locked or armed";
+    return false;
+  }
+
+  if (expected_revision != selection_.selection_revision) {
+    if (out_error) {
+      *out_error = "Selection revision mismatch: expected " +
+                   std::to_string(expected_revision) + ", actual " +
+                   std::to_string(selection_.selection_revision);
+    }
+    return false;
+  }
+
+  if (artifact_id.empty()) {
+    if (out_error) *out_error = "Plan artifact ID must not be empty";
+    return false;
+  }
+
+  selection_.plan_artifact_id = artifact_id;
+  selection_.selection_revision = expected_revision + 1;
+
+  if (state_ == ConfigState::STANDBY || state_ == ConfigState::COMMITTED || state_ == ConfigState::VALIDATING) {
+    state_ = ConfigState::CONFIGURING;
+  }
+  validation_token_.clear();
+  return true;
+}
+
+bool MissionContext::select_working_plan(
+  const std::string & working_plan_id,
+  uint64_t expected_revision,
+  std::string * out_error)
+{
+  if (locked_ || armed_) {
+    if (out_error) *out_error = "Cannot edit selection while locked or armed";
+    return false;
+  }
+
+  if (expected_revision != selection_.selection_revision) {
+    if (out_error) {
+      *out_error = "Selection revision mismatch: expected " +
+                   std::to_string(expected_revision) + ", actual " +
+                   std::to_string(selection_.selection_revision);
+    }
+    return false;
+  }
+
+  if (working_plan_id.empty()) {
+    if (out_error) *out_error = "Working plan ID must not be empty";
+    return false;
+  }
+
+  selection_.working_plan_id = working_plan_id;
+  selection_.selection_revision = expected_revision + 1;
+
+  if (state_ == ConfigState::STANDBY || state_ == ConfigState::COMMITTED || state_ == ConfigState::VALIDATING) {
+    state_ = ConfigState::CONFIGURING;
+  }
+  validation_token_.clear();
+  return true;
+}
+
 ValidationReport MissionContext::validate_selection(uint64_t expected_revision)
 {
   ValidationReport report;

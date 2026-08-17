@@ -1,0 +1,14 @@
+string<=64 working_plan_id
+uint64 generation
+uint32 next_source_index
+bool has_checkpoint_position
+float64 checkpoint_latitude_deg
+float64 checkpoint_longitude_deg
+float64 checkpoint_altitude_m
+uint32 completed_waypoints
+uint32 total_waypoints
+float32 progress_percent
+string<=64 checkpoint_reason
+uint64 checkpoint_sequence
+builtin_interfaces/Time updated_at
+uint64 updated_monotonic_ns

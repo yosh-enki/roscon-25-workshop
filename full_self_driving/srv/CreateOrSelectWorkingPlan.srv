@@ -1,0 +1,10 @@
+string<=64 request_id
+string<=64 artifact_id
+string<=64 map_id
+string<=64 scenario_id
+uint64 expected_selection_revision
+---
+bool accepted
+WorkingPlanStatus working_plan
+bool has_error
+ErrorReport error

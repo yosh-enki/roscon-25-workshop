@@ -97,6 +97,16 @@ public:
     uint64_t expected_revision,
     std::string * out_error = nullptr);
 
+  bool select_plan_artifact(
+    const std::string & artifact_id,
+    uint64_t expected_revision,
+    std::string * out_error = nullptr);
+
+  bool select_working_plan(
+    const std::string & working_plan_id,
+    uint64_t expected_revision,
+    std::string * out_error = nullptr);
+
   ValidationReport validate_selection(uint64_t expected_revision);
 
   bool commit(

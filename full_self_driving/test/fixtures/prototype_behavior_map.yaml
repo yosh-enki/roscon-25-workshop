@@ -26,16 +26,28 @@ mappings:
         description: "Registry coordinate used for Direct navigation assistance only; never creates live visual lock"
 
   - prototype_symbol: "px4_roscon_25/search/PlanParser"
-    production_component: "full_self_driving/plan/plan_manager"
-    preserved_algorithm: "QGroundControl .plan JSON parsing, waypoint extraction"
-    test_fixture: "test/plan/plan_parser_test.cpp"
+    production_component: "full_self_driving/domain/plan_parser"
+    preserved_algorithm: "QGroundControl .plan JSON parsing, nested mission-item walking, command-16 waypoint extraction, DistanceToSurface altitude extraction"
+    test_fixture: "test/plan/plan_round_trip_test.cpp"
     intentional_changes:
       - safety_change_id: "CHG_PLAN_001"
         requirement: "2.2"
         description: "Immutable PlanArtifact with canonical SHA-256 hash and managed ID"
       - safety_change_id: "CHG_PLAN_002"
+        requirement: "2.4"
+        description: "Enforce strict size bounds, nesting limits, finite coordinate validation, and canonical route hashing"
+
+  - prototype_symbol: "px4_roscon_25/search/SearchPlanner"
+    production_component: "full_self_driving/domain/working_plan"
+    preserved_algorithm: "Timestamped working plan creation, resume route generation starting from entry point, next waypoint index progress"
+    test_fixture: "test/plan/working_plan_parity_test.cpp"
+    intentional_changes:
+      - safety_change_id: "CHG_WP_001"
         requirement: "2.3"
-        description: "Separate WorkingPlan generation with durable checkpoint progress tracking"
+        description: "Separate WorkingPlan generation with durable checkpoint progress tracking and generation counters"
+      - safety_change_id: "CHG_WP_002"
+        requirement: "2.10"
+        description: "Disarmed and confirmation-guarded reset that resets progress to 0% and clears checkpoint"
 
   - prototype_symbol: "px4_roscon_25/precision_land/PrecisionLand"
     production_component: "full_self_driving/flight/precision_land_strategy"

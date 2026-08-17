@@ -1,0 +1,10 @@
+string<=64 request_id
+string<=128 safe_name
+uint8[<=8388608] content
+uint64 expected_selection_revision
+---
+bool accepted
+bool has_artifact
+PlanArtifactReference artifact
+bool has_error
+ErrorReport error
