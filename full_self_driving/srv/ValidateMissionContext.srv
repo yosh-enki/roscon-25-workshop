@@ -1,0 +1,9 @@
+string<=64 request_id
+uint64 expected_selection_revision
+---
+bool accepted
+string<=64 validation_token
+string<=64[<=64] failure_codes
+ErrorReport[<=64] violations
+bool has_error
+ErrorReport error

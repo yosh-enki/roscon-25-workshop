@@ -1,0 +1,14 @@
+uint8 DECISION_UNKNOWN=0
+uint8 DECISION_MARK_SAFE_STANDBY=1
+uint8 DECISION_DISCARD_AMBIGUOUS_WORKING_PLAN=2
+uint8 DECISION_INSPECT_PAYLOAD_BEFORE_NEXT_SORTIE=3
+uint8 DECISION_ABORT_SORTIE_AND_CLEAR_LOCK=4
+string<=64 request_id
+uint8 decision
+uint64 expected_recovery_revision
+string<=64 confirmation
+---
+bool accepted
+RecoveryStatus recovery
+bool has_error
+ErrorReport error

@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GatewayCommandEnvelope",
+  "type": "object",
+  "required": [
+    "schema",
+    "request_id",
+    "command",
+    "sent_at_unix_ms",
+    "expected_revision",
+    "payload"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "enum": ["full_self_driving.command.v1"]
+    },
+    "request_id": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "command": {
+      "type": "string",
+      "enum": [
+        "select_map_scenario",
+        "select_target_identity",
+        "select_plan_artifact",
+        "create_or_select_working_plan",
+        "reset_working_plan",
+        "upload_plan_artifact",
+        "prepare_payload",
+        "clear_pad_registry",
+        "validate_mission_context",
+        "commit_mission_context",
+        "resolve_recovery",
+        "list_plan_artifacts",
+        "inspect_pad_registry",
+        "inspect_recovery",
+        "get_status",
+        "get_evidence_manifest"
+      ]
+    },
+    "sent_at_unix_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expected_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "payload": {
+      "type": "object"
+    }
+  }
+}

@@ -226,8 +226,8 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Run 5.1/5.2 service smoke and all previous launch tests.
     - **Requirements:** 2.3, 2.4, 2.5, 2.6, 2.7.
 
-- [ ] 6. Add durable state, lifecycle supervision, recovery gates, and the preparation gateway
-  - [ ] 6.1 Implement PersistenceManager durable boundaries, journals, backups, and restart loading
+- [x] 6. Add durable state, lifecycle supervision, recovery gates, and the preparation gateway
+  - [x] 6.1 Implement PersistenceManager durable boundaries, journals, backups, and restart loading
     - **Prerequisites:** 4.3 and 5.2. Storage paths must be outside installed package share and selected by the authoritative config.
     - **Production files/components:** Add `src/persistence/persistence_manager.hpp/.cpp`, snapshot/journal/backup schemas under `config/schemas/`, `msg/RecoveryStatus`, durable sequence integration for context/plan/registry, and storage fault-injection adapters under `test/fakes/`.
     - **Implementation:** Implement validate → sibling temporary write → flush/fsync/equivalent → atomic rename → directory durability → journal sequence → bounded backup. Persist config hash, selection/context, artifacts/working plans/checkpoints, registry, executor placeholder, payload placeholder, recovery markers, and evidence references. On restart validate hashes/sequences/scope/config compatibility and enter `RECOVERY_REQUIRED` for ambiguity; never auto-arm/resume/action/release.
@@ -237,7 +237,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat config/context/plan/live-lock/registry smoke after restart and run all CTest cases.
     - **Requirements:** 1.9, 2.7, 3.6, 4.1, 6.1, 6.2, 6.3, 6.7, 6.8, 6.9.
 
-  - [ ] 6.2 Implement lifecycle ownership, activation order, and reverse process supervision
+  - [x] 6.2 Implement lifecycle ownership, activation order, and reverse process supervision
     - **Prerequisites:** 6.1. `fsd_flight_runtime` must remain a stable regular node; perception, registry, evidence, and gateway are lifecycle-managed.
     - **Production files/components:** Add lifecycle implementations for `fsd_perception`, `fsd_pad_registry`, `fsd_evidence`, and `fsd_gateway`; add `src/runtime/lifecycle_supervisor.cpp`, launch readiness/transition actions, and failure fixtures.
     - **Implementation:** Configure in the approved order, activate registry → perception → evidence → gateway, wait for config/storage/health, and only then report runtime readiness. Deactivate/cleanup in reverse order; preserve state; stop child processes reverse-dependency order. Do not construct/register a PX4 mode yet.
@@ -247,7 +247,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 6.1 restart/fault tests and all earlier perception/registry/context/plan launch checks.
     - **Requirements:** 5.2, 6.4, 6.5, 6.6, 7.1.
 
-  - [ ] 6.3 Implement the typed Node-RED/MQTT preparation and inspection gateway
+  - [x] 6.3 Implement the typed Node-RED/MQTT preparation and inspection gateway
     - **Prerequisites:** 6.1, 6.2, and 4.1. Use a local/fake TLS broker for automated tests; never place credentials in the repository or command lines.
     - **Production files/components:** Add `src/gateway/fsd_gateway.cpp`, fixed command envelope/schema validation, MQTT/TLS/ACL configuration adapters, typed ROS clients for every allowed preparation/inspection service, and gateway status/read-model translation.
     - **Implementation:** Allow only the design command set; enforce request size/age/rate, non-retained commands, request ID idempotency, expected revisions, disarmed/locked/recovery gates, and complete authoritative response reconciliation. Explicitly reject arm/disarm/Ownmode/takeoff/land/RTL/goto/setpoint/raw-control/release/arbitrary ROS/filesystem commands. Gateway must never publish PX4 or payload control commands.
@@ -257,7 +257,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat lifecycle/readiness and persistence/restart tests; verify status topics are informational rather than authorization.
     - **Requirements:** 2.1, 2.8, 2.9, 2.10, 4.2, 4.3, 4.4, 6.8, 6.9, 7.6, 7.9.
 
-  - [ ]* 6.4 Add the gateway-command-boundary property test
+  - [x] 6.4 Add the gateway-command-boundary property test
     - **Prerequisites:** 6.3.
     - **Production files/components:** Add `test/property/property_10_gateway_boundary.cpp` and register `fsd_property_10_gateway_boundary`.
     - **Implementation:** Generate every disallowed command plus malformed, retained, stale, replayed, oversized, unauthorized, armed, locked, and stale-revision envelopes; assert no PX4, payload, filesystem, or state mutation side effect.
@@ -267,7 +267,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 6.3 allowed-command smoke and 6.1 durability checks.
     - **Requirements:** 2.9, 4.2, 4.3; **Property 10: Gateway command boundary**.
 
-  - [ ]* 6.5 Add the durable-boundary integrity property test
+  - [x] 6.5 Add the durable-boundary integrity property test
     - **Prerequisites:** 6.1.
     - **Production files/components:** Add `test/property/property_16_durable_boundary.cpp` and register `fsd_property_16_durable_boundary`.
     - **Implementation:** Generate snapshots/journal entries and inject failure at validation, temporary write, flush/fsync, rename, directory sync, journal, and backup stages; assert only fully completed records are marked durable and last-valid state is preserved.
@@ -277,7 +277,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 6.1 restart recovery and 5.2 checkpoint smoke.
     - **Requirements:** 6.1, 6.3; **Property 16: Durable boundary integrity**.
 
-  - [ ]* 6.6 Add the recovery-safety property test
+  - [x] 6.6 Add the recovery-safety property test
     - **Prerequisites:** 6.1.
     - **Production files/components:** Add `test/property/property_17_recovery_safety.cpp` and register `fsd_property_17_recovery_safety`.
     - **Implementation:** Generate ambiguous snapshot, journal, working-plan, registry, config-hash, executor-placeholder, evidence, and payload states; assert `RECOVERY_REQUIRED`, no auto-arm/resume/strategy switch/payload operation, explicit ambiguity codes, and disarmed resolution requirement.
@@ -287,15 +287,15 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat valid restart and lifecycle order from 6.1/6.2.
     - **Requirements:** 6.2, 6.8, 6.9; **Property 17: Recovery safety**.
 
-  - [ ]* 6.7 Add the snapshot commit and recovery ordering property test
+  - [x] 6.7 Add the snapshot commit and recovery ordering property test
     - **Prerequisites:** 6.1 and 6.2.
-    - **Production files/components:** Add `test/property/property_23_commit_recovery_order.cpp` and register `fsd_property_23_commit_recovery_order`.
+    - **Production files/components:** Add `test/property/property_18_snapshot_commit.cpp` and register `fsd_property_18_snapshot_commit`.
     - **Implementation:** Trace commit publication ordering and restart reconciliation across snapshot, journal, registry, working plan, payload, executor checkpoint, and evidence records; assert publication happens only after the configured durable boundary and ambiguity enters recovery.
     - **Launch update:** Add a trace collector to the existing persistence/lifecycle test path.
     - **Run:** Run the named CTest and inspect the ordered event/durable sequence trace from a public launch commit/restart.
-    - **Pass criteria:** Design Property 23 holds; no status can claim committed/durable before the required ordering completes.
+    - **Pass criteria:** Design Property 18 holds; no status can claim committed/durable before the required ordering completes.
     - **Regression checks:** Repeat gateway/context/plan commit and restart smoke.
-    - **Requirements:** 6.1, 6.2, 6.3; **Property 23: Snapshot commit and recovery ordering**.
+    - **Requirements:** 6.1, 6.2, 6.3; **Property 18: Snapshot commit and recovery ordering**.
 
 - [ ] 7. Verify the actual PX4 API and establish the single registered-mode authority path
   - [ ] 7.1 Create the pinned/version-matched `px4_ros2_cpp`/`px4_msgs` API verification gate

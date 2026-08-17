@@ -647,12 +647,98 @@ ros2 interface show full_self_driving/srv/ResetWorkingPlan
 
 ---
 
-## 7. Subsequent Task Sections (To Be Extended by Other Tasks)
+---
 
-* **Section 6: Operator Gateway & Read Models (Task 6)** — `fsd_gateway`, MQTT bridge, status projections.
+## 7. Section 6: Durable State, Lifecycle Supervision, Recovery Gates & Gateway (Task 6)
+
+### 7.1 Overview & Architecture
+
+Task 6 delivers production-grade state durability, reverse lifecycle process supervision, recovery safety gates, and the typed preparation gateway:
+
+1. **Atomic Durability Pipeline (`PersistenceManager`)**:
+   - Implements a 7-stage write pipeline: `VALIDATE` $\rightarrow$ `TEMP_WRITE` (sibling `.tmp`) $\rightarrow$ `FLUSH_FSYNC` (`fsync`) $\rightarrow$ `RENAME` (atomic `rename`) $\rightarrow$ `DIRECTORY_SYNC` (`fsync` directory) $\rightarrow$ `JOURNAL` (append to `mission_journal.jsonl`) $\rightarrow$ `BACKUP`.
+   - Any fault during the write pipeline retains the previous valid state and prevents durable sequence advancement.
+   - Computes canonical SHA-256 checksums over snapshot data.
+
+2. **Ordered Lifecycle Supervision (`LifecycleSupervisor`, `EvidenceNode`)**:
+   - Supervised configure and activation order: `fsd_pad_registry` $\rightarrow$ `fsd_perception` $\rightarrow$ `fsd_evidence` $\rightarrow$ `fsd_gateway`.
+   - Supervised reverse deactivation and shutdown order: `fsd_gateway` $\rightarrow$ `fsd_evidence` $\rightarrow$ `fsd_perception` $\rightarrow$ `fsd_pad_registry`.
+   - Immediate rollback: if any node fails during activation, already-activated nodes are deactivated in reverse order and runtime readiness is withheld.
+
+3. **Recovery Safety Gates (`RecoveryStatus`, `ResolveRecovery`)**:
+   - Detects ambiguity upon restart across snapshots, journals, working plans, executor checkpoints, payload states, registry scopes, and configuration hashes.
+   - Any ambiguity enters `STATE_REQUIRED` (`safe_decision_required = true`), blocking auto-arm and auto-resume.
+   - Explicit `ResolveRecovery` service requires disarmed vehicle, expected recovery revision, confirmation token, and valid decision code to transition to `STATE_RESOLVED`.
+
+4. **Typed Preparation & Inspection Gateway (`FsdGateway`, `GatewayNode`)**:
+   - Strictly enforces command envelope schema `"full_self_driving.command.v1"`.
+   - Allows only allowlisted preparation and inspection commands (`select_map_scenario`, `select_target_identity`, `upload_plan_artifact`, `list_plan_artifacts`, `inspect_pad_registry`, `get_status`, etc.).
+   - Explicitly rejects all flight/arm/setpoint/raw-control commands with `ERROR_FORBIDDEN_COMMAND`.
+   - Rejects retained MQTT commands (`ERROR_RETAINED_COMMAND_FORBIDDEN`) and stale requests (`ERROR_STALE_REQUEST`).
+   - Idempotency cache ensures duplicate request IDs return cached responses without re-triggering side effects.
+
+### 7.2 Production Components Added
+
+1. **Production Messages & Services (`msg/`, `srv/`)**:
+   - [`msg/RecoveryStatus.msg`](file:///home/yosh/roscon-25-workshop/full_self_driving/msg/RecoveryStatus.msg): Recovery state (`STATE_*`), ambiguity codes (`AMBIGUOUS_*`), decision codes (`DECISION_*`), and durability sequences.
+   - [`srv/SelectMapScenario.srv`](file:///home/yosh/roscon-25-workshop/full_self_driving/srv/SelectMapScenario.srv): Scoped map/scenario selection.
+   - [`srv/SelectTargetIdentity.srv`](file:///home/yosh/roscon-25-workshop/full_self_driving/srv/SelectTargetIdentity.srv): Target identity selection.
+   - [`srv/PreparePayload.srv`](file:///home/yosh/roscon-25-workshop/full_self_driving/srv/PreparePayload.srv): Disarmed payload preparation.
+   - [`srv/ValidateMissionContext.srv`](file:///home/yosh/roscon-25-workshop/full_self_driving/srv/ValidateMissionContext.srv): Mission context validation.
+   - [`srv/CommitMissionContext.srv`](file:///home/yosh/roscon-25-workshop/full_self_driving/srv/CommitMissionContext.srv): Mission context commit.
+   - [`srv/ResolveRecovery.srv`](file:///home/yosh/roscon-25-workshop/full_self_driving/srv/ResolveRecovery.srv): Disarmed recovery resolution.
+
+2. **JSON Schemas (`config/schemas/`)**:
+   - `snapshot.schema.json`: Schema for mission snapshot records.
+   - `journal.schema.json`: Schema for journal entries.
+   - `backup.schema.json`: Schema for backup records.
+   - `command_envelope.schema.json`: Schema for gateway command envelope.
+
+3. **Core Libraries & Lifecycle Nodes (`src/persistence/`, `src/runtime/`, `src/gateway/`)**:
+   - [`src/persistence/persistence_manager.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/persistence/persistence_manager.hpp): Persistence manager engine. Built into `fsd_persistence_core`.
+   - [`src/runtime/lifecycle_supervisor.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/runtime/lifecycle_supervisor.hpp): Lifecycle supervisor. Built into `fsd_runtime_core`.
+   - [`src/runtime/evidence_node.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/runtime/evidence_node.hpp): `fsd_evidence` lifecycle node executable.
+   - [`src/gateway/fsd_gateway.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/gateway/fsd_gateway.hpp): Gateway security core. Built into `fsd_gateway_core`.
+   - [`src/gateway/fsd_gateway_node.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/gateway/fsd_gateway_node.hpp): `fsd_gateway` lifecycle node executable.
+
+4. **Property Test Suites (`test/property/`)**:
+   - [`test/property/property_10_gateway_boundary.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/property/property_10_gateway_boundary.cpp): Property 10 test suite (`fsd_property_10_gateway_boundary`).
+   - [`test/property/property_16_durable_boundary.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/property/property_16_durable_boundary.cpp): Property 16 test suite (`fsd_property_16_durable_boundary`).
+   - [`test/property/property_17_recovery_safety.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/property/property_17_recovery_safety.cpp): Property 17 test suite (`fsd_property_17_recovery_safety`).
+   - [`test/property/property_18_snapshot_commit.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/property/property_18_snapshot_commit.cpp): Property 18 test suite (`fsd_property_18_snapshot_commit`).
+
+### 7.3 How to Run and Verify (Task 6)
+
+```bash
+cd /home/ubuntu/roscon-25-workshop_ws
+source /opt/ros/humble/setup.bash
+source /home/ubuntu/px4_ros_ws/install/setup.bash
+
+# 1. Build package
+colcon build --packages-select full_self_driving --symlink-install \
+  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+
+# 2. Source workspace
+source install/setup.bash
+
+# 3. Run all 19 test suites (138 tests total)
+colcon test --packages-select full_self_driving --event-handlers console_direct+
+colcon test-result --verbose
+
+# 4. Run individual Task 6 property test suites
+ctest --test-dir build/full_self_driving -R fsd_property_10_gateway_boundary --output-on-failure
+ctest --test-dir build/full_self_driving -R fsd_property_16_durable_boundary --output-on-failure
+ctest --test-dir build/full_self_driving -R fsd_property_17_recovery_safety --output-on-failure
+ctest --test-dir build/full_self_driving -R fsd_property_18_snapshot_commit --output-on-failure
+```
+
+---
+
+## 8. Subsequent Task Sections (To Be Extended by Other Tasks)
+
 * **Section 7: Flight Runtime & PX4 Mode Executor (Task 7)** — `fsd_flight_runtime`, `FullSelfDrivingMode`, `FullSelfDrivingModeExecutor`.
-* **Section 8: Persistence & Evidence (Task 8)** — Durable journal, recovery state machine, evidence manifest.
-* **Section 9: Security & End-to-End Verification (Task 9)** — Final verification and property tests.
+* **Section 8: Internal Flight Strategies (Tasks 8, 9, 10, 11, 12)** — Takeoff, TransitIn, Search, Direct, PrecisionLand, Payload, TransitOut, Land.
+* **Section 9: Security & End-to-End Verification (Tasks 13, 14, 15)** — Multi-machine security, full mission rehearsal, documentation.
 
 
 

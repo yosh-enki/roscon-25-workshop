@@ -1,0 +1,8 @@
+string<=64 request_id
+uint64 expected_selection_revision
+string<=64 validation_token
+---
+bool accepted
+MissionContext snapshot
+bool has_error
+ErrorReport error

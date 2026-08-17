@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BackupMetadata",
+  "type": "object",
+  "required": [
+    "backup_id",
+    "created_at_utc",
+    "source_type",
+    "checksum"
+  ],
+  "properties": {
+    "backup_id": { "type": "string", "maxLength": 128 },
+    "created_at_utc": { "type": "string" },
+    "source_type": { "type": "string", "enum": ["registry", "working_plan", "snapshot"] },
+    "source_identifier": { "type": "string", "maxLength": 128 },
+    "revision": { "type": "integer", "minimum": 0 },
+    "byte_size": { "type": "integer", "minimum": 0 },
+    "checksum": { "type": "string", "maxLength": 64 }
+  }
+}

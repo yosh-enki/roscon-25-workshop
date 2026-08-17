@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MissionSnapshot",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "snapshot_revision",
+    "durable_sequence",
+    "resolved_config_hash",
+    "map_id",
+    "scenario_id"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "mission_id": { "type": "string", "maxLength": 64 },
+    "sortie_id": { "type": "string", "maxLength": 64 },
+    "snapshot_revision": { "type": "integer", "minimum": 0 },
+    "durable_sequence": { "type": "integer", "minimum": 0 },
+    "resolved_config_hash": { "type": "string", "maxLength": 64 },
+    "map_id": { "type": "string", "maxLength": 64 },
+    "scenario_id": { "type": "string", "maxLength": 64 },
+    "plan_artifact_id": { "type": "string", "maxLength": 64 },
+    "working_plan_id": { "type": "string", "maxLength": 64 },
+    "working_plan_generation": { "type": "integer", "minimum": 0 },
+    "target": {
+      "type": "object",
+      "properties": {
+        "marker_id": { "type": "integer", "minimum": 0 },
+        "dictionary": { "type": "string" },
+        "target_namespace": { "type": "string" }
+      }
+    },
+    "payload_state": {
+      "type": "object",
+      "properties": {
+        "commanded_state": { "type": "integer" },
+        "cargo_loaded": { "type": "boolean" },
+        "secured": { "type": "boolean" },
+        "successful_operations": { "type": "integer" },
+        "last_operation_id": { "type": "string" },
+        "last_result": { "type": "integer" },
+        "unknown_result": { "type": "boolean" }
+      }
+    },
+    "executor_checkpoint": {
+      "type": "object",
+      "properties": {
+        "phase": { "type": "string" },
+        "active_action": { "type": "string" },
+        "durable_sequence": { "type": "integer" }
+      }
+    },
+    "checksum": { "type": "string", "maxLength": 64 }
+  }
+}

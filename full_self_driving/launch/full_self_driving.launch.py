@@ -314,6 +314,29 @@ def launch_setup(context, *args, **kwargs):
         }],
     )
 
+    fsd_evidence_node = Node(
+        package="full_self_driving",
+        executable="fsd_evidence",
+        name="fsd_evidence",
+        output="screen",
+        parameters=[{
+            "use_sim_time": True,
+            "evidence_directory": "/tmp/fsd_evidence",
+            "autostart": True,
+        }],
+    )
+
+    fsd_gateway_node = Node(
+        package="full_self_driving",
+        executable="fsd_gateway",
+        name="fsd_gateway",
+        output="screen",
+        parameters=[{
+            "use_sim_time": True,
+            "autostart": True,
+        }],
+    )
+
     entities = [
         gz_process,
         px4_process,
@@ -326,8 +349,10 @@ def launch_setup(context, *args, **kwargs):
         foxglove_bridge_node,
         tf_container,
         launch_probe_node,
-        fsd_perception_node,
         fsd_pad_registry_node,
+        fsd_perception_node,
+        fsd_evidence_node,
+        fsd_gateway_node,
     ]
 
     if test_selection and test_selection.lower() != "none" and selected_marker_id >= 0:

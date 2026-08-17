@@ -1,0 +1,11 @@
+uint8 OP_OPEN_FOR_LOADING=0
+uint8 OP_VERIFY_SECURED=1
+uint8 OP_PREPARE_FOR_SORTIE=2
+string<=64 request_id
+uint8 operation
+uint64 expected_selection_revision
+---
+bool accepted
+PayloadStatus status
+bool has_error
+ErrorReport error

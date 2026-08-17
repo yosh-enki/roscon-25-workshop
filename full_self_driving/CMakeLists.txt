@@ -51,6 +51,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ReadinessReport.msg"
   "msg/PayloadStatus.msg"
   "msg/MissionContext.msg"
+  "msg/RecoveryStatus.msg"
   "srv/FullSelfDrivingCommand.srv"
   "srv/EmergencyStop.srv"
   "srv/ClearPadRegistry.srv"
@@ -59,6 +60,12 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SelectPlanArtifact.srv"
   "srv/CreateOrSelectWorkingPlan.srv"
   "srv/ResetWorkingPlan.srv"
+  "srv/SelectMapScenario.srv"
+  "srv/SelectTargetIdentity.srv"
+  "srv/PreparePayload.srv"
+  "srv/ValidateMissionContext.srv"
+  "srv/CommitMissionContext.srv"
+  "srv/ResolveRecovery.srv"
   DEPENDENCIES builtin_interfaces geometry_msgs
 )
 
@@ -89,6 +96,26 @@ target_link_libraries(fsd_domain_core
   OpenSSL::Crypto
   yaml-cpp
   "${cpp_typesupport_target}"
+)
+
+# Persistence Core Library
+add_library(fsd_persistence_core
+  src/persistence/persistence_manager.cpp
+)
+target_include_directories(fsd_persistence_core PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(fsd_persistence_core
+  fsd_domain_core
+  OpenSSL::Crypto
+  "${cpp_typesupport_target}"
+)
+ament_target_dependencies(fsd_persistence_core
+  rclcpp
+  geometry_msgs
+  builtin_interfaces
 )
 
 # Perception Core Library
@@ -130,6 +157,48 @@ target_link_libraries(fsd_registry_core
   "${cpp_typesupport_target}"
 )
 ament_target_dependencies(fsd_registry_core
+  rclcpp
+  rclcpp_lifecycle
+  geometry_msgs
+  builtin_interfaces
+)
+
+# Gateway Core Library
+add_library(fsd_gateway_core
+  src/gateway/fsd_gateway.cpp
+)
+target_include_directories(fsd_gateway_core PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(fsd_gateway_core
+  fsd_domain_core
+  fsd_persistence_core
+  fsd_registry_core
+  "${cpp_typesupport_target}"
+)
+ament_target_dependencies(fsd_gateway_core
+  rclcpp
+  geometry_msgs
+  builtin_interfaces
+)
+
+# Runtime Core Library
+add_library(fsd_runtime_core
+  src/runtime/lifecycle_supervisor.cpp
+)
+target_include_directories(fsd_runtime_core PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(fsd_runtime_core
+  fsd_domain_core
+  fsd_persistence_core
+  "${cpp_typesupport_target}"
+)
+ament_target_dependencies(fsd_runtime_core
   rclcpp
   rclcpp_lifecycle
   geometry_msgs
@@ -194,6 +263,45 @@ ament_target_dependencies(fsd_pad_registry
   geometry_msgs
 )
 
+add_executable(fsd_evidence
+  src/runtime/evidence_node.cpp
+)
+target_include_directories(fsd_evidence PRIVATE
+  include
+  src
+)
+target_link_libraries(fsd_evidence
+  fsd_domain_core
+  "${cpp_typesupport_target}"
+)
+ament_target_dependencies(fsd_evidence
+  rclcpp
+  rclcpp_lifecycle
+  lifecycle_msgs
+  geometry_msgs
+)
+
+add_executable(fsd_gateway
+  src/gateway/fsd_gateway_node.cpp
+)
+target_include_directories(fsd_gateway PRIVATE
+  include
+  src
+)
+target_link_libraries(fsd_gateway
+  fsd_gateway_core
+  fsd_domain_core
+  fsd_persistence_core
+  fsd_registry_core
+  "${cpp_typesupport_target}"
+)
+ament_target_dependencies(fsd_gateway
+  rclcpp
+  rclcpp_lifecycle
+  lifecycle_msgs
+  geometry_msgs
+)
+
 add_executable(fsd_replay_fixture_publisher
   src/runtime/replay_fixture_publisher.cpp
 )
@@ -232,11 +340,16 @@ ament_target_dependencies(fsd_target_selection_provider
 # Install rules
 install(TARGETS
   fsd_domain_core
+  fsd_persistence_core
   fsd_perception_core
   fsd_registry_core
+  fsd_gateway_core
+  fsd_runtime_core
   fsd_launch_probe
   fsd_perception
   fsd_pad_registry
+  fsd_evidence
+  fsd_gateway
   fsd_replay_fixture_publisher
   fsd_target_selection_provider
   ARCHIVE DESTINATION lib
@@ -475,6 +588,84 @@ if(BUILD_TESTING)
     ament_index_cpp
   )
 
+  ament_add_gtest(fsd_property_10_gateway_boundary
+    test/property/property_10_gateway_boundary.cpp
+  )
+  target_include_directories(fsd_property_10_gateway_boundary PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_10_gateway_boundary
+    fsd_gateway_core
+    fsd_domain_core
+    fsd_persistence_core
+    fsd_registry_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_10_gateway_boundary
+    rclcpp
+    geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_16_durable_boundary
+    test/property/property_16_durable_boundary.cpp
+  )
+  target_include_directories(fsd_property_16_durable_boundary PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_16_durable_boundary
+    fsd_persistence_core
+    fsd_domain_core
+    OpenSSL::Crypto
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_16_durable_boundary
+    rclcpp
+    geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_17_recovery_safety
+    test/property/property_17_recovery_safety.cpp
+  )
+  target_include_directories(fsd_property_17_recovery_safety PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_17_recovery_safety
+    fsd_persistence_core
+    fsd_domain_core
+    OpenSSL::Crypto
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_17_recovery_safety
+    rclcpp
+    geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_18_snapshot_commit
+    test/property/property_18_snapshot_commit.cpp
+  )
+  target_include_directories(fsd_property_18_snapshot_commit PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_18_snapshot_commit
+    fsd_runtime_core
+    fsd_persistence_core
+    fsd_domain_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_18_snapshot_commit
+    rclcpp
+    rclcpp_lifecycle
+    geometry_msgs
+  )
+
   ament_add_pytest_test(fsd_property_21_ros_interface_boundary
     test/property/property_21_ros_interface_boundary.py
   )
@@ -489,7 +680,14 @@ if(BUILD_TESTING)
 endif()
 
 ament_export_include_directories(include)
-ament_export_libraries(fsd_domain_core fsd_perception_core fsd_registry_core)
+ament_export_libraries(
+  fsd_domain_core
+  fsd_persistence_core
+  fsd_perception_core
+  fsd_registry_core
+  fsd_gateway_core
+  fsd_runtime_core
+)
 ament_export_dependencies(
   rosidl_default_runtime
   rclcpp
