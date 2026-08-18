@@ -3,6 +3,7 @@
 #include "flight/strategies/transit_in_strategy.hpp"
 #include "flight/strategies/search_strategy.hpp"
 #include "flight/strategies/direct_strategy.hpp"
+#include "flight/strategies/precision_land_strategy.hpp"
 #include <cmath>
 
 namespace full_self_driving::domain
@@ -54,8 +55,28 @@ void MissionCoordinator::handle_target_lock_update(const LiveTargetLock & lock)
   // The coordinator evaluates domain rules before deciding if any transition is needed.
   if (lock.is_qualified()) {
     transition_trace_.push_back("LOCK_QUALIFIED: id=" + std::to_string(lock.identity.marker_id));
+
+    // When a qualified live target lock is acquired during SEARCH or DIRECT:
+    if (current_strategy_ == flight::StrategyType::SEARCH || current_strategy_ == flight::StrategyType::DIRECT) {
+      transition_trace_.push_back("FLY-008 / EVT_TARGET_ACQUIRED -> PRECISION_LAND.HOVER_BRAKE");
+      current_strategy_ = flight::StrategyType::PRECISION_LAND;
+      instantiate_precision_land_strategy();
+    }
+
+    if (mode_ && current_strategy_ == flight::StrategyType::PRECISION_LAND) {
+      auto * strat = dynamic_cast<flight::PrecisionLandStrategy *>(mode_->current_strategy());
+      if (strat) {
+        strat->update_target_lock(lock);
+      }
+    }
   } else if (lock.is_lost()) {
     transition_trace_.push_back("LOCK_LOST");
+    if (mode_ && current_strategy_ == flight::StrategyType::PRECISION_LAND) {
+      auto * strat = dynamic_cast<flight::PrecisionLandStrategy *>(mode_->current_strategy());
+      if (strat) {
+        strat->update_target_lock(lock);
+      }
+    }
   }
 }
 
@@ -246,7 +267,7 @@ bool MissionCoordinator::is_direct_eligible(
     }
     if (out_lat) *out_lat = rec.latitude_deg;
     if (out_lon) *out_lon = rec.longitude_deg;
-    double direct_alt = 15.0;
+    double direct_alt = 13.0;
     if (context_ && context_->get_resolved_config()) {
       direct_alt = context_->get_resolved_config()->routes.search_altitude_m;
     }
@@ -334,7 +355,7 @@ bool MissionCoordinator::is_direct_eligible(
 
   if (out_lat) *out_lat = record.latitude_deg;
   if (out_lon) *out_lon = record.longitude_deg;
-  double direct_alt = 15.0;
+  double direct_alt = 13.0;
   if (context_ && context_->get_resolved_config()) {
     direct_alt = context_->get_resolved_config()->routes.search_altitude_m;
   }
@@ -399,7 +420,7 @@ void MissionCoordinator::instantiate_direct_strategy(double lat, double lon, dou
 void MissionCoordinator::instantiate_search_strategy()
 {
   if (!mode_) return;
-  double search_alt = 15.0;
+  double search_alt = 13.0;
   float max_h_speed = 5.0f;
   float reach_rad = 4.0f;
   float max_yaw_rate = 0.785398163f;
@@ -469,6 +490,36 @@ void MissionCoordinator::instantiate_search_strategy()
   }
 }
 
+void MissionCoordinator::instantiate_precision_land_strategy()
+{
+  if (!mode_) return;
+  float max_vel = 3.0f;
+  float descent_vel = 1.0f;
+  float p_gain = 1.5f;
+  float i_gain = 0.0f;
+  float target_timeout = 3.0f;
+  float delta_pos = 0.25f;
+  float delta_vel = 0.25f;
+  float stabilize_duration = 1.0f;
+  double search_alt = 13.0;
+  double approach_alt = 5.0;
+
+  if (context_ && context_->get_resolved_config()) {
+    const auto & cfg = context_->get_resolved_config()->routes;
+    const auto & safety = context_->get_resolved_config()->safety;
+    approach_alt = cfg.approach_altitude_m;
+    search_alt = cfg.search_altitude_m;
+    if (safety.target_loss_timeout_s > 0.0) {
+      target_timeout = static_cast<float>(safety.target_loss_timeout_s);
+    }
+  }
+
+  mode_->set_strategy(std::make_unique<flight::PrecisionLandStrategy>(
+    mode_->node(), mode_->goto_global_setpoint(), mode_->trajectory_setpoint(), mode_->state_cache(),
+    max_vel, descent_vel, p_gain, i_gain, target_timeout,
+    delta_pos, delta_vel, stabilize_duration, search_alt, approach_alt));
+}
+
 bool MissionCoordinator::handle_direct_complete()
 {
   return request_transition(flight::StrategyType::PRECISION_LAND);
@@ -498,7 +549,7 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
   // Branch evaluation for ACQUIRE_TARGET
   if (next_strategy == flight::StrategyType::ACQUIRE_TARGET) {
     std::string direct_rejection_reason;
-    double direct_lat = 0.0, direct_lon = 0.0, direct_alt = 15.0;
+    double direct_lat = 0.0, direct_lon = 0.0, direct_alt = 13.0;
     bool direct_ok = is_direct_eligible(&direct_rejection_reason, &direct_lat, &direct_lon, &direct_alt);
 
     if (direct_ok) {
@@ -589,6 +640,8 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
       instantiate_direct_strategy(direct_lat, direct_lon, direct_alt);
     } else if (next_strategy == flight::StrategyType::SEARCH) {
       instantiate_search_strategy();
+    } else if (next_strategy == flight::StrategyType::PRECISION_LAND) {
+      instantiate_precision_land_strategy();
     }
   }
 

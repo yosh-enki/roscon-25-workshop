@@ -299,6 +299,8 @@ def launch_setup(context, *args, **kwargs):
             "selected_marker_id": selected_marker_id,
             "selected_dictionary": selected_dict,
             "selected_namespace": selected_ns,
+            "lock_min_consecutive_observations": 1,
+            "lock_spatial_consistency_radius_m": 25.0,
             "autostart": True,
         }],
     )

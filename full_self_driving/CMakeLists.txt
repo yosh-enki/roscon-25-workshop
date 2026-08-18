@@ -251,6 +251,7 @@ add_library(fsd_flight_core
   src/flight/strategies/transit_in_strategy.cpp
   src/flight/strategies/search_strategy.cpp
   src/flight/strategies/direct_strategy.cpp
+  src/flight/strategies/precision_land_strategy.cpp
   src/domain/mission_coordinator.cpp
 )
 target_include_directories(fsd_flight_core PUBLIC
@@ -957,6 +958,31 @@ if(BUILD_TESTING)
     "${cpp_typesupport_target}"
   )
   ament_target_dependencies(acquisition_branch_test
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+    ament_index_cpp
+  )
+
+  ament_add_gtest(precision_land_parity_test
+    test/flight/precision_land_parity_test.cpp
+  )
+  target_include_directories(precision_land_parity_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(precision_land_parity_test
+    fsd_flight_core
+    fsd_registry_core
+    fsd_adapters_core
+    fsd_domain_core
+    fsd_persistence_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(precision_land_parity_test
     rclcpp
     px4_ros2_cpp
     px4_msgs

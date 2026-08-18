@@ -34,9 +34,9 @@ void PerceptionNode::load_parameters()
   // Target lock policy parameters
   declare_parameter<double>("lock_min_quality", 0.1);
   declare_parameter<double>("lock_max_pose_age_s", 0.5);
-  declare_parameter<int>("lock_min_consecutive_observations", 2);
+  declare_parameter<int>("lock_min_consecutive_observations", 1);
   declare_parameter<double>("lock_max_position_uncertainty", 10.0);
-  declare_parameter<double>("lock_spatial_consistency_radius_m", 5.0);
+  declare_parameter<double>("lock_spatial_consistency_radius_m", 25.0);
   declare_parameter<double>("lock_target_loss_timeout_s", 2.0);
 
   // Initial target selection parameters
@@ -281,6 +281,13 @@ void PerceptionNode::image_callback(const sensor_msgs::msg::Image::SharedPtr msg
     domain::LiveTargetLock lock = target_coordinator_.process_observation_batch(res.batch, monotonic_ns);
     if (live_target_lock_pub_ && live_target_lock_pub_->is_activated()) {
       live_target_lock_pub_->publish(lock.to_msg());
+    }
+
+    if (res.total_detected > 0) {
+      RCLCPP_INFO_THROTTLE(
+        get_logger(), *get_clock(), 500,
+        "[PERCEPTION] Detected %zu markers in frame. Lock state: %d (consecutive: %u)",
+        res.batch.observations.size(), static_cast<int>(lock.lock_state), lock.consecutive_observations);
     }
 
   } catch (const cv_bridge::Exception & e) {

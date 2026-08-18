@@ -13,6 +13,7 @@
 #include "flight/internal_strategy.hpp"
 #include "flight/full_self_driving_mode_executor.hpp"
 #include "flight/strategies/direct_strategy.hpp"
+#include "flight/strategies/precision_land_strategy.hpp"
 #include "full_self_driving/msg/pad_record.hpp"
 #include "registry/pad_registry.hpp"
 #include "runtime/plan_manager.hpp"
@@ -103,6 +104,7 @@ public:
 private:
   void instantiate_direct_strategy(double lat, double lon, double alt);
   void instantiate_search_strategy();
+  void instantiate_precision_land_strategy();
 
   mutable std::mutex mutex_;
   std::shared_ptr<MissionContext> context_;

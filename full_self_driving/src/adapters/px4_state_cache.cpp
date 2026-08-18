@@ -7,6 +7,7 @@ namespace full_self_driving::adapters
 Px4StateCache::Px4StateCache(px4_ros2::Context & context)
 : context_(context),
   local_pos_(context, false),
+  attitude_(context),
   global_pos_(context),
   home_pos_(context),
   land_detected_(context),
@@ -30,6 +31,12 @@ Px4StateSnapshot Px4StateCache::capture_snapshot() const
     snapshot.local_acceleration_ned = local_pos_.accelerationNed();
     snapshot.heading = local_pos_.heading();
     snapshot.distance_ground = local_pos_.distanceGround();
+  }
+
+  // Attitude
+  if (attitude_.lastValid(std::chrono::milliseconds(1000))) {
+    snapshot.attitude_valid = true;
+    snapshot.attitude = attitude_.attitude();
   }
 
   // Global Position

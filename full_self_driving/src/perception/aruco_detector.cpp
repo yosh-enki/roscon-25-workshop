@@ -135,7 +135,11 @@ bool ArucoDetector::update_camera_info(const sensor_msgs::msg::CameraInfo & info
   }
 
   camera_matrix_ = cv::Mat(3, 3, CV_64F, const_cast<double *>(info.k.data())).clone();
-  dist_coeffs_ = cv::Mat(static_cast<int>(info.d.size()), 1, CV_64F, const_cast<double *>(info.d.data())).clone();
+  if (!info.d.empty()) {
+    dist_coeffs_ = cv::Mat(static_cast<int>(info.d.size()), 1, CV_64F, const_cast<double *>(info.d.data())).clone();
+  } else {
+    dist_coeffs_ = cv::Mat::zeros(5, 1, CV_64F);
+  }
   calibration_sha256_ = compute_calibration_hash(info);
   calibration_valid_ = true;
   return true;

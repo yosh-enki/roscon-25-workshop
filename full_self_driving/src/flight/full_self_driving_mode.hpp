@@ -9,6 +9,7 @@
 #include <px4_ros2/components/mode.hpp>
 #include <px4_ros2/components/health_and_arming_checks.hpp>
 #include <px4_ros2/control/setpoint_types/goto.hpp>
+#include <px4_ros2/control/setpoint_types/experimental/trajectory.hpp>
 
 #include "adapters/px4_state_cache.hpp"
 #include "flight/internal_strategy.hpp"
@@ -47,12 +48,14 @@ public:
   rclcpp::Node & node() const { return node_; }
   std::shared_ptr<adapters::Px4StateCache> state_cache() const { return state_cache_; }
   std::shared_ptr<px4_ros2::GotoGlobalSetpointType> goto_global_setpoint() const { return goto_global_setpoint_; }
+  std::shared_ptr<px4_ros2::TrajectorySetpointType> trajectory_setpoint() const { return trajectory_setpoint_; }
 
 private:
   rclcpp::Node & node_;
   std::shared_ptr<adapters::Px4StateCache> state_cache_;
   std::unique_ptr<InternalStrategy> strategy_;
   std::shared_ptr<px4_ros2::GotoGlobalSetpointType> goto_global_setpoint_;
+  std::shared_ptr<px4_ros2::TrajectorySetpointType> trajectory_setpoint_;
 
   ReadinessCheckCallback readiness_cb_;
   ActivationCallback activation_cb_;

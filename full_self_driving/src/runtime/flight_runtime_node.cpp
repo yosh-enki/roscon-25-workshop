@@ -184,14 +184,31 @@ void FlightRuntimeNode::initialize_components()
     rec.identity.target_namespace = target_ns;
     rec.map_id = "kmitl_airfield";
     rec.scenario_id = "default_scenario";
-    rec.latitude_deg = 13.73132845;
-    rec.longitude_deg = 100.78990948;
+
+    // Precise Gazebo ground coordinates based on airfield SDF models
+    if (marker_id == 1) {
+      rec.latitude_deg = 13.7311319;
+      rec.longitude_deg = 100.7882329;
+    } else if (marker_id == 2) {
+      rec.latitude_deg = 13.7322116;
+      rec.longitude_deg = 100.7882329;
+    } else if (marker_id == 3) {
+      rec.latitude_deg = 13.7311319;
+      rec.longitude_deg = 100.7879552;
+    } else if (marker_id == 4) {
+      rec.latitude_deg = 13.7322116;
+      rec.longitude_deg = 100.7879552;
+    } else {
+      rec.latitude_deg = 13.73132845;
+      rec.longitude_deg = 100.78990948;
+    }
     rec.altitude_m = 2.21;
     rec.quality = 1.0f;
     rec.uncertainty_m = 0.05;
     rec.last_observed_monotonic_ns = this->get_clock()->now().nanoseconds();
     pad_registry_->insert_record_for_test(rec);
-    RCLCPP_INFO(get_logger(), "[RUNTIME] Injected trusted PadRecord for Direct acquisition fixture (id=%d)", marker_id);
+    RCLCPP_INFO(get_logger(), "[RUNTIME] Injected trusted PadRecord for Direct acquisition fixture (id=%d, lat=%.7f, lon=%.7f)",
+      marker_id, rec.latitude_deg, rec.longitude_deg);
   } else if (acquisition_fixture == "stale_direct") {
     full_self_driving::msg::PadRecord rec;
     rec.identity.marker_id = marker_id;
@@ -199,8 +216,8 @@ void FlightRuntimeNode::initialize_components()
     rec.identity.target_namespace = target_ns;
     rec.map_id = "kmitl_airfield";
     rec.scenario_id = "default_scenario";
-    rec.latitude_deg = 13.73132845;
-    rec.longitude_deg = 100.78990948;
+    rec.latitude_deg = (marker_id == 2) ? 13.7322116 : 13.73132845;
+    rec.longitude_deg = (marker_id == 2) ? 100.7882329 : 100.78990948;
     rec.altitude_m = 2.21;
     rec.quality = 1.0f;
     rec.uncertainty_m = 0.05;

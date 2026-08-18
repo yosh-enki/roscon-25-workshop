@@ -9,6 +9,7 @@
 
 #include <px4_ros2/common/context.hpp>
 #include <px4_ros2/odometry/local_position.hpp>
+#include <px4_ros2/odometry/attitude.hpp>
 #include <px4_ros2/odometry/global_position.hpp>
 #include <px4_ros2/vehicle_state/home_position.hpp>
 #include <px4_ros2/vehicle_state/land_detected.hpp>
@@ -20,6 +21,7 @@ namespace full_self_driving::adapters
 struct Px4StateSnapshot
 {
   bool local_pos_valid{false};
+  bool attitude_valid{false};
   bool global_pos_valid{false};
   bool home_pos_valid{false};
   bool land_detected_valid{false};
@@ -32,6 +34,7 @@ struct Px4StateSnapshot
   Eigen::Vector3f local_position_ned{0.f, 0.f, 0.f};
   Eigen::Vector3f local_velocity_ned{0.f, 0.f, 0.f};
   Eigen::Vector3f local_acceleration_ned{0.f, 0.f, 0.f};
+  Eigen::Quaternionf attitude{1.f, 0.f, 0.f, 0.f};
   float heading{0.f};
   float distance_ground{0.f};
 
@@ -67,6 +70,7 @@ public:
 
   // Direct accessors to underlying px4_ros2 objects
   px4_ros2::OdometryLocalPosition & local_position() { return local_pos_; }
+  px4_ros2::OdometryAttitude & attitude() { return attitude_; }
   px4_ros2::OdometryGlobalPosition & global_position() { return global_pos_; }
   px4_ros2::HomePosition & home_position() { return home_pos_; }
   px4_ros2::LandDetected & land_detected() { return land_detected_; }
@@ -75,6 +79,7 @@ public:
 private:
   px4_ros2::Context & context_;
   px4_ros2::OdometryLocalPosition local_pos_;
+  px4_ros2::OdometryAttitude attitude_;
   px4_ros2::OdometryGlobalPosition global_pos_;
   px4_ros2::HomePosition home_pos_;
   px4_ros2::LandDetected land_detected_;

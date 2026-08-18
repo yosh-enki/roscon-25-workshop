@@ -13,6 +13,7 @@ FullSelfDrivingMode::FullSelfDrivingMode(
   strategy_(std::make_unique<WaitingForModeStrategy>())
 {
   goto_global_setpoint_ = std::make_shared<px4_ros2::GotoGlobalSetpointType>(*this);
+  trajectory_setpoint_ = std::make_shared<px4_ros2::TrajectorySetpointType>(*this);
 
   // Configure mode requirements
   modeRequirements().angular_velocity = true;

@@ -268,7 +268,7 @@ EngineeringConfig EngineeringConfig::create_default_simulation_config()
 
   config.routes.transit_in_speed_m_s = 5.0;
   config.routes.transit_out_speed_m_s = 3.0;
-  config.routes.search_altitude_m = 15.0;
+  config.routes.search_altitude_m = 13.0;
   config.routes.approach_altitude_m = 5.0;
   config.routes.max_horizontal_velocity_m_s = 5.0;
   config.routes.landing_descent_rate_m_s = 0.5;
