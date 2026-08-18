@@ -182,6 +182,7 @@ ament_target_dependencies(fsd_registry_core
 # Payload Core Library
 add_library(fsd_payload_core
   src/payload/simulation_payload_adapter.cpp
+  src/payload/hardware_payload_adapter.cpp
   src/payload/payload_controller.cpp
 )
 target_include_directories(fsd_payload_core PUBLIC
@@ -245,6 +246,8 @@ ament_target_dependencies(fsd_runtime_core
 add_library(fsd_adapters_core
   src/adapters/px4_api_capabilities.cpp
   src/adapters/px4_state_cache.cpp
+  src/adapters/hardware_fmu_adapter.cpp
+  src/adapters/hardware_camera_adapter.cpp
 )
 target_include_directories(fsd_adapters_core PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -262,6 +265,21 @@ ament_target_dependencies(fsd_adapters_core
   geometry_msgs
   builtin_interfaces
 )
+
+# Launch Core Library (Hardware Manifest Validator)
+add_library(fsd_launch_core
+  src/launch/hardware_manifest_validator.cpp
+)
+target_include_directories(fsd_launch_core PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(fsd_launch_core
+  yaml-cpp
+  OpenSSL::Crypto
+)
+
 
 # Flight Core Library
 add_library(fsd_flight_core
@@ -457,15 +475,28 @@ ament_target_dependencies(fsd_flight_runtime
   ament_index_cpp
 )
 
+add_executable(fsd_hardware_manifest_validator
+  src/launch/fsd_hardware_manifest_validator_main.cpp
+)
+target_include_directories(fsd_hardware_manifest_validator PRIVATE
+  include
+  src
+)
+target_link_libraries(fsd_hardware_manifest_validator
+  fsd_launch_core
+)
+
 # Install rules
 install(TARGETS
   fsd_domain_core
   fsd_persistence_core
   fsd_perception_core
   fsd_registry_core
+  fsd_payload_core
   fsd_gateway_core
   fsd_runtime_core
   fsd_adapters_core
+  fsd_launch_core
   fsd_flight_core
   fsd_launch_probe
   fsd_perception
@@ -475,6 +506,7 @@ install(TARGETS
   fsd_flight_runtime
   fsd_replay_fixture_publisher
   fsd_target_selection_provider
+  fsd_hardware_manifest_validator
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
@@ -502,6 +534,21 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   find_package(ament_cmake_pytest REQUIRED)
 
+  ament_add_gtest(hardware_manifest_validator_test
+    test/launch/hardware_manifest_validator_test.cpp
+  )
+  target_include_directories(hardware_manifest_validator_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(hardware_manifest_validator_test
+    fsd_launch_core
+    ament_index_cpp::ament_index_cpp
+  )
+  ament_target_dependencies(hardware_manifest_validator_test
+    ament_index_cpp
+  )
+
   ament_add_gtest(launch_manifest_test
     test/launch/launch_manifest_test.cpp
   )
@@ -512,6 +559,7 @@ if(BUILD_TESTING)
   ament_target_dependencies(launch_manifest_test
     ament_index_cpp
   )
+
 
   ament_add_gtest(aruco_replay_test
     test/perception/aruco_replay_test.cpp
