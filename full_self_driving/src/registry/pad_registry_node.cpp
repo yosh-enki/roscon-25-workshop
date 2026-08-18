@@ -222,8 +222,9 @@ void PadRegistryNode::all_id_callback(const full_self_driving::msg::AllIdObserva
         geometry_msgs::msg::PoseStamped world_pose;
         tf2::doTransform(src_pose, world_pose, world_transform);
 
-        const double north_m = world_pose.pose.position.x;
-        const double east_m = world_pose.pose.position.y;
+        // ROS "map" frame is ENU (East-North-Up): X is East, Y is North
+        const double east_m = world_pose.pose.position.x;
+        const double north_m = world_pose.pose.position.y;
 
         const double origin_lat_rad = origin_lat * kPi / 180.0;
         const double sin_lat = std::sin(origin_lat_rad);

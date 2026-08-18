@@ -18,6 +18,7 @@
 #include "full_self_driving/msg/target_identity.hpp"
 #include "full_self_driving/srv/emergency_stop.hpp"
 #include "full_self_driving/srv/prepare_payload.hpp"
+#include "full_self_driving/srv/select_target_identity.hpp"
 
 #include "domain/engineering_config.hpp"
 #include "domain/mission_context.hpp"
@@ -67,6 +68,7 @@ private:
   rclcpp::Publisher<full_self_driving::msg::VehicleTelemetry>::SharedPtr telemetry_pub_;
   rclcpp::Publisher<full_self_driving::msg::WorkingPlanStatus>::SharedPtr working_plan_status_pub_;
   rclcpp::Publisher<full_self_driving::msg::PayloadStatus>::SharedPtr payload_status_pub_;
+  rclcpp::Publisher<full_self_driving::msg::TargetIdentity>::SharedPtr target_selection_pub_;
 
   // Subscriptions & Services
   rclcpp::Subscription<full_self_driving::msg::LiveTargetLock>::SharedPtr target_lock_sub_;
@@ -74,6 +76,7 @@ private:
   rclcpp::Subscription<full_self_driving::msg::TargetIdentity>::SharedPtr target_selection_sub_;
   rclcpp::Service<full_self_driving::srv::EmergencyStop>::SharedPtr emergency_stop_srv_;
   rclcpp::Service<full_self_driving::srv::PreparePayload>::SharedPtr prepare_payload_srv_;
+  rclcpp::Service<full_self_driving::srv::SelectTargetIdentity>::SharedPtr select_target_srv_;
 
   // Timers
   rclcpp::TimerBase::SharedPtr periodic_timer_;

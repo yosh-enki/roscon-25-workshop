@@ -133,7 +133,6 @@ PerceptionNode::on_activate(const rclcpp_lifecycle::State & /*state*/)
   health_pub_->on_activate();
 
   auto sensor_qos = rclcpp::SensorDataQoS().keep_last(5);
-  auto reliable_qos = rclcpp::QoS(10).reliable();
 
   image_sub_ = create_subscription<sensor_msgs::msg::Image>(
     camera_topic_, sensor_qos,
@@ -143,6 +142,7 @@ PerceptionNode::on_activate(const rclcpp_lifecycle::State & /*state*/)
     camera_info_topic_, sensor_qos,
     std::bind(&PerceptionNode::camera_info_callback, this, std::placeholders::_1));
 
+  auto reliable_qos = rclcpp::QoS(10).reliable();
   target_selection_sub_ = create_subscription<full_self_driving::msg::TargetIdentity>(
     target_selection_topic_, reliable_qos,
     std::bind(&PerceptionNode::target_selection_callback, this, std::placeholders::_1));

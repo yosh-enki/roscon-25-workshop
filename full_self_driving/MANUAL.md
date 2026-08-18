@@ -1765,6 +1765,210 @@ ros2 launch full_self_driving full_self_driving.launch.py simulation:=false
 # Output: [ERROR] HARDWARE_PROFILE_NOT_CONFIGURED: Hardware bringup for Raspberry Pi 4 is explicitly deferred pending an approved hardware manifest.
 ```
 
+---
+
+## 18. Section 18: Operational Interface, Node-RED & External Integration Manual
+
+This section serves as the complete integration guide for building external web dashboards, Node-RED mission planners, Ground Control Station (GCS) telemetry widgets, and REST/WebSocket gateways interfacing with `full_self_driving`.
+
+### 18.1 Master Architecture Diagram for External Dashboards
+
+```mermaid
+graph LR
+    subgraph External["External Systems (Node-RED / GCS / Web UI)"]
+        NR_SEL[Select Target Service Client]
+        NR_PREP[Prepare Payload Service Client]
+        NR_ESTOP[Emergency Stop Client]
+        NR_DASH[Telemetry & Map Dashboard]
+    end
+
+    subgraph FSD["Full Self-Driving ROS 2 Stack"]
+        SRV_SEL["/full_self_driving/select_target<br/>(SelectTargetIdentity.srv)"]
+        SRV_PREP["/full_self_driving/prepare_payload<br/>(PreparePayload.srv)"]
+        SRV_ESTOP["/full_self_driving/emergency_stop<br/>(EmergencyStop.srv)"]
+        
+        PUB_TELEM["/full_self_driving/telemetry<br/>(VehicleTelemetry)"]
+        PUB_STATE["/full_self_driving/state<br/>(FullSelfDrivingState)"]
+        PUB_READY["/full_self_driving/readiness<br/>(ReadinessReport)"]
+        PUB_PADS["/full_self_driving/pad_registry<br/>(PadRegistrySnapshot)"]
+        PUB_LOCK["/full_self_driving/perception/live_target_lock<br/>(LiveTargetLock)"]
+        PUB_PAYLOAD["/full_self_driving/payload/status<br/>(PayloadStatus)"]
+    end
+
+    NR_SEL -->|Request / Response| SRV_SEL
+    NR_PREP -->|Request / Response| SRV_PREP
+    NR_ESTOP -->|Request / Response| SRV_ESTOP
+
+    PUB_TELEM -->|10 Hz Telemetry| NR_DASH
+    PUB_STATE -->|10 Hz State Machine| NR_DASH
+    PUB_READY -->|Readiness Gate| NR_DASH
+    PUB_PADS -->|Discovered Pads GPS| NR_DASH
+    PUB_LOCK -->|Live Visual Lock| NR_DASH
+    PUB_PAYLOAD -->|Cargo Status| NR_DASH
+```
+
+---
+
+### 18.2 Services Catalog (Commands from Node-RED / Operator)
+
+#### 1. Select Target Identity Service
+* **Service Name**: `/full_self_driving/select_target`
+* **Service Type**: `full_self_driving/srv/SelectTargetIdentity`
+* **Description**: Deterministically assigns and commits a new target marker for the upcoming sortie. Broadcasts the target to the perception node and updates the mission context. Rejects target edits if vehicle is armed or locked in flight.
+* **CLI Call**:
+  ```bash
+  ros2 service call /full_self_driving/select_target full_self_driving/srv/SelectTargetIdentity "{target: {marker_id: 1, dictionary: 'DICT_4X4_50', target_namespace: 'aavc2026'}}"
+  ```
+* **Request Schema**:
+  ```yaml
+  request_id: "optional_client_request_uuid"   # string<=64
+  target:
+    marker_id: 1                               # uint32 (ArUco ID)
+    dictionary: "DICT_4X4_50"                  # string<=32 (DICT_4X4_50, DICT_4X4_250, DICT_5X5_50)
+    target_namespace: "aavc2026"               # string<=64
+  expected_selection_revision: 0               # uint64 (0 to ignore revision check)
+  ```
+* **Response Schema**:
+  ```yaml
+  accepted: true                               # bool (true if committed successfully)
+  selection:
+    context_id: "ctx_flight_runtime"
+    config_state: 5                            # 5 = COMMITTED, 6 = READY_FOR_OWNMODE
+    selection_revision: 5                      # incremented monotonically
+    committed: true
+    committed_revision: 5
+    has_target: true
+    target:
+      marker_id: 1
+      dictionary: "DICT_4X4_50"
+      target_namespace: "aavc2026"
+  has_error: false
+  error:
+    code: ""
+    message: ""
+  ```
+
+#### 2. Prepare Payload Service
+* **Service Name**: `/full_self_driving/prepare_payload`
+* **Service Type**: `full_self_driving/srv/PreparePayload`
+* **Description**: Prepares the physical or simulated delivery mechanism before arming and takeoff.
+* **CLI Call**:
+  ```bash
+  ros2 service call /full_self_driving/prepare_payload full_self_driving/srv/PreparePayload "{request_id: 'sortie_01_prep', operation: 2, expected_selection_revision: 0}"
+  ```
+* **Request Schema**:
+  ```yaml
+  request_id: "sortie_01_prep"                 # string<=64
+  operation: 2                                 # uint8: 1=QUERY, 2=PREPARE/ATTACH, 3=RELEASE/DROP, 4=RESET
+  expected_selection_revision: 0               # uint64 (0 to bypass revision match)
+  ```
+* **Response Schema**:
+  ```yaml
+  accepted: true                               # bool
+  status:
+    cargo_loaded: true                         # bool (cargo attached and secured)
+    secured: true                              # bool
+    commanded_state: 1
+    feedback_state: 1
+  has_error: false
+  ```
+
+#### 3. Emergency Stop Service
+* **Service Name**: `/full_self_driving/emergency_stop`
+* **Service Type**: `full_self_driving/srv/EmergencyStop`
+* **Description**: Instantly halts autonomous flight, disengages mission strategies, and commands emergency failsafe / land.
+* **CLI Call**:
+  ```bash
+  ros2 service call /full_self_driving/emergency_stop full_self_driving/srv/EmergencyStop "{reason: 'Operator manual emergency trigger'}"
+  ```
+
+---
+
+### 18.3 Telemetry & Status Topics (Published for Node-RED / Dashboards)
+
+| Topic Name | Message Type | Rate | Description | Key Fields for Dashboard |
+| :--- | :--- | :--- | :--- | :--- |
+| `/full_self_driving/telemetry` | `full_self_driving/msg/VehicleTelemetry` | 10 Hz | Live GPS, altitude, velocity, and battery | `latitude_deg`, `longitude_deg`, `altitude_m`, `ground_speed_m_s`, `heading_deg`, `armed`, `airborne`, `landed` |
+| `/full_self_driving/state` | `full_self_driving/msg/FullSelfDrivingState` | 10 Hz | State machine & active strategy | `active_strategy` (`TAKEOFF`, `TRANSIT_IN`, `SEARCH`, `DIRECT`, `PRECISION_LAND`, `TRANSIT_OUT`, `RETURN_STRATEGY`, `RETURN_LANDED`), `ready_for_mode`, `config_state` |
+| `/full_self_driving/readiness` | `full_self_driving/msg/ReadinessReport` | 10 Hz | Safety preflight verification gate | `ready` (boolean), `readiness_revision`, `failures` |
+| `/full_self_driving/pad_registry` | `full_self_driving/msg/PadRegistrySnapshot` | Latched / On Change | Discovered marker registry database | `records[]` (`identity.marker_id`, `latitude_deg`, `longitude_deg`, `altitude_m`, `quality`, `uncertainty_m`) |
+| `/full_self_driving/perception/live_target_lock` | `full_self_driving/msg/LiveTargetLock` | On Detection | Real-time camera visual tracking status | `identity.marker_id`, `lock_state` (`0=NONE`, `1=CANDIDATE`, `2=QUALIFIED`, `3=STALE`, `4=LOST`), `quality`, `pose.position` |
+| `/full_self_driving/payload/status` | `full_self_driving/msg/PayloadStatus` | 10 Hz | Cargo mechanism status | `cargo_loaded`, `secured`, `last_operation_result` |
+| `/full_self_driving/flight_safety` | `full_self_driving/msg/FlightSafetyStatus` | 10 Hz | Safety supervisor status | `safety_status` (`0=OK`, `1=HOLD`, `2=FAILSAFE`, `3=EMERGENCY_STOP`) |
+
+---
+
+### 18.4 Multi-Sortie Operational Lifecycle (Node-RED Flow)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Operator as Node-RED / Operator
+    participant FSD as fsd_flight_runtime
+    participant PX4 as PX4 Autopilot / QGC
+
+    Note over Operator,PX4: --- Sortie N Start ---
+    Operator->>FSD: ros2 service call /full_self_driving/select_target (Target ID)
+    FSD-->>Operator: Response: accepted=True, committed=True
+    Operator->>FSD: ros2 service call /full_self_driving/prepare_payload (op=2)
+    FSD-->>Operator: Response: accepted=True, cargo_loaded=True
+    Operator->>PX4: Arm & Switch to FullSelfDriving Mode (QGC slider)
+    PX4->>FSD: Mode Activated (is_armed=True)
+
+    Note over FSD,PX4: Autonomous Flight Phase
+    FSD->>PX4: Takeoff -> Transit In (3 waypoints)
+    alt Target in PadRegistry?
+        FSD->>PX4: DIRECT Strategy straight to Target GPS Pad
+    else Target not yet in PadRegistry
+        FSD->>PX4: SEARCH Strategy route scanning
+    end
+    FSD->>PX4: PRECISION_LAND (Visual servoing -> Zero-velocity hover -> Touchdown)
+    FSD->>FSD: Payload Release (PayloadOperation)
+    FSD->>PX4: Second Takeoff -> Transit Out (3 waypoints) -> Return Home Base
+    FSD->>PX4: Touchdown at Origin Datum & Auto-Disarm
+
+    Note over Operator,PX4: --- Sortie N Finished & Standby ---
+    FSD-->>Operator: State = RETURN_LANDED (Disarmed, ready for next Sortie)
+```
+
+---
+
+### 18.5 Node-RED Sample JSON Message Payloads
+
+#### Receiving Telemetry in Node-RED:
+```json
+{
+  "header": { "stamp": { "sec": 120, "nanosec": 450000000 }, "frame_id": "base_link" },
+  "armed": true,
+  "airborne": true,
+  "landed": false,
+  "latitude_deg": 13.731093,
+  "longitude_deg": 100.788277,
+  "altitude_m": 17.31,
+  "heading_deg": 89.5,
+  "ground_speed_m_s": 4.95,
+  "vertical_speed_m_s": 0.02,
+  "battery_percentage": 100.0,
+  "voltage_v": 16.8
+}
+```
+
+#### Receiving Discovered Pads in Node-RED:
+```json
+{
+  "map_id": "kmitl_airfield",
+  "scenario_id": "default_scenario",
+  "total_records": 4,
+  "records": [
+    { "identity": { "marker_id": 1, "dictionary": "DICT_4X4_50" }, "latitude_deg": 13.731093, "longitude_deg": 100.788277, "quality": 1.0 },
+    { "identity": { "marker_id": 2, "dictionary": "DICT_4X4_50" }, "latitude_deg": 13.731103, "longitude_deg": 100.789392, "quality": 0.86 },
+    { "identity": { "marker_id": 5, "dictionary": "DICT_4X4_50" }, "latitude_deg": 13.730322, "longitude_deg": 100.787446, "quality": 1.0 },
+    { "identity": { "marker_id": 17, "dictionary": "DICT_4X4_50" }, "latitude_deg": 13.731119, "longitude_deg": 100.788228, "quality": 1.0 }
+  ]
+}
+```
+
+
 
 
 

@@ -70,7 +70,7 @@ void FlightRuntimeNode::initialize_components()
         for (const auto & rec : msg->records) {
           pad_registry_->insert_record_for_test(rec);
         }
-        RCLCPP_INFO(get_logger(),
+        RCLCPP_DEBUG(get_logger(),
           "[RUNTIME] Synced %zu PadRecord(s) from snapshot into flight runtime",
           msg->records.size());
       }
@@ -78,7 +78,7 @@ void FlightRuntimeNode::initialize_components()
 
   // Target Selection Subscription (Update MissionContext target for next Sortie when disarmed)
   target_selection_sub_ = this->create_subscription<full_self_driving::msg::TargetIdentity>(
-    "/full_self_driving/target_selection", rclcpp::QoS(1).reliable(),
+    "/full_self_driving/target_selection", rclcpp::QoS(10).reliable(),
     [this](full_self_driving::msg::TargetIdentity::ConstSharedPtr msg) {
       if (context_ && !context_->is_locked() && !context_->is_armed()) {
         std::string err;
@@ -334,6 +334,9 @@ void FlightRuntimeNode::initialize_components()
   payload_status_pub_ = this->create_publisher<full_self_driving::msg::PayloadStatus>(
     "/full_self_driving/payload/status", rclcpp::QoS(1).transient_local().reliable());
 
+  target_selection_pub_ = this->create_publisher<full_self_driving::msg::TargetIdentity>(
+    "/full_self_driving/target_selection", rclcpp::QoS(10).reliable());
+
   prepare_payload_srv_ = this->create_service<full_self_driving::srv::PreparePayload>(
     "/full_self_driving/prepare_payload",
     [this](
@@ -357,6 +360,76 @@ void FlightRuntimeNode::initialize_components()
       } else {
         res->has_error = false;
       }
+    });
+
+  select_target_srv_ = this->create_service<full_self_driving::srv::SelectTargetIdentity>(
+    "/full_self_driving/select_target",
+    [this](
+      const std::shared_ptr<full_self_driving::srv::SelectTargetIdentity::Request> req,
+      std::shared_ptr<full_self_driving::srv::SelectTargetIdentity::Response> res)
+    {
+      if (!context_) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "CONTEXT_UNAVAILABLE";
+        res->error.message = "MissionContext is not available";
+        return;
+      }
+      if (context_->is_locked() || context_->is_armed()) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "REJECTED_ARMED_OR_LOCKED";
+        res->error.message = "Cannot select target while vehicle is armed or mission context is locked";
+        return;
+      }
+      std::string err;
+      uint64_t current_rev = context_->get_selection_revision();
+      if (!context_->select_target(
+            domain::TargetIdentity(req->target.marker_id, req->target.dictionary, req->target.target_namespace),
+            current_rev, &err))
+      {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "TARGET_SELECTION_FAILED";
+        res->error.message = err;
+        return;
+      }
+      uint64_t validate_rev = context_->get_selection_revision();
+      auto vreport = context_->validate_selection(validate_rev);
+      if (!vreport.is_valid) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "VALIDATION_FAILED";
+        std::string viol_str;
+        for (const auto & v : vreport.violations) {
+          if (!viol_str.empty()) viol_str += "; ";
+          viol_str += v;
+        }
+        res->error.message = viol_str;
+        return;
+      }
+      if (!context_->commit(vreport.token, validate_rev, &err)) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "COMMIT_FAILED";
+        res->error.message = err;
+        return;
+      }
+      res->accepted = true;
+      res->has_error = false;
+      res->selection.context_id = context_->get_context_id();
+      res->selection.config_state = static_cast<uint8_t>(context_->get_state());
+      res->selection.selection_revision = validate_rev;
+      res->selection.committed = (context_->get_state() == domain::ConfigState::COMMITTED);
+      res->selection.committed_revision = context_->get_committed_revision();
+      res->selection.has_target = true;
+      res->selection.target = req->target;
+      if (target_selection_pub_) {
+        target_selection_pub_->publish(req->target);
+      }
+      RCLCPP_INFO(get_logger(),
+        "[RUNTIME] Target selection service executed: ID %u (%s), context committed (rev=%lu)",
+        req->target.marker_id, req->target.dictionary.c_str(), validate_rev);
     });
 
   if (acquisition_fixture == "stale_direct") {

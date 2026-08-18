@@ -610,14 +610,16 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
     bool direct_ok = is_direct_eligible(&direct_rejection_reason, &direct_lat, &direct_lon, &direct_alt);
 
     if (mode_) {
+      uint32_t tid = (context_ && context_->get_selection().target.has_value())
+        ? context_->get_selection().target->marker_id : 0;
       if (direct_ok) {
         RCLCPP_INFO(mode_->node().get_logger(),
-          "[COORDINATOR] Direct Acquisition ELIGIBLE! Navigating straight to target: lat=%.7f, lon=%.7f, alt=%.2f m",
-          direct_lat, direct_lon, direct_alt);
+          "[COORDINATOR] Direct Acquisition ELIGIBLE for Target ID %u! Destination: lat=%.7f, lon=%.7f, alt=%.2f m",
+          tid, direct_lat, direct_lon, direct_alt);
       } else {
         RCLCPP_INFO(mode_->node().get_logger(),
-          "[COORDINATOR] Direct Acquisition INELIGIBLE: %s. Branching to Search.",
-          direct_rejection_reason.c_str());
+          "[COORDINATOR] Direct Acquisition INELIGIBLE for Target ID %u: %s. Branching to Search.",
+          tid, direct_rejection_reason.c_str());
       }
     }
 
@@ -651,6 +653,7 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
   if (current_strategy_ == flight::StrategyType::DIRECT && next_strategy == flight::StrategyType::PRECISION_LAND) {
     transition_trace_.push_back("FLY-006 / EVT_DIRECT_COMPLETE -> PRECISION_LAND.SEARCH");
     current_strategy_ = flight::StrategyType::PRECISION_LAND;
+    instantiate_precision_land_strategy();
     return true;
   }
 
