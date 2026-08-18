@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<CycloneDDS xmlns="https://cdds.io/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
+    <!--
+      Authoritative CycloneDDS Security Profile for Full Self-Driving Stack.
+      Configures Unicast Peer Discovery, Disabled Multicast on External Interfaces,
+      and DDS Security Plugin Parameters.
+    -->
+    <Domain id="0">
+        <General>
+            <!-- Disable Unauthenticated Multicast Auto-Discovery on External Networks -->
+            <AllowMulticast>false</AllowMulticast>
+            <EnableSharedMemory>true</EnableSharedMemory>
+        </General>
+        
+        <Discovery>
+            <ParticipantIndex>auto</ParticipantIndex>
+            <Peers>
+                <!-- Onboard Autonomy Flight-Critical Peer Locators -->
+                <Peer address="127.0.0.1"/>
+            </Peers>
+        </Discovery>
+
+        <Security>
+            <!-- Authentication & Access Control -->
+            <Authentication>
+                <Library finalizeFunction="finalize_authentication" initFunction="init_authentication" path="dds_security_auth"/>
+                <IdentityCA>file://public/ca.cert.pem</IdentityCA>
+                <IdentityCertificate>file://cert.pem</IdentityCertificate>
+                <PrivateKey>file://key.pem</PrivateKey>
+            </Authentication>
+
+            <AccessControl>
+                <Library finalizeFunction="finalize_access_control" initFunction="init_access_control" path="dds_security_ac"/>
+                <PermissionsCA>file://public/ca.cert.pem</PermissionsCA>
+                <Governance>file://governance.p7s</Governance>
+                <Permissions>file://permissions.p7s</Permissions>
+            </AccessControl>
+
+            <Cryptographic>
+                <Library finalizeFunction="finalize_crypto" initFunction="init_crypto" path="dds_security_crypto"/>
+                <EncryptionAlgorithm>AES-GCM-256</EncryptionAlgorithm>
+            </Cryptographic>
+        </Security>
+    </Domain>
+</CycloneDDS>

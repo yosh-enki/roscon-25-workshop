@@ -1245,8 +1245,109 @@ ctest --test-dir build/full_self_driving -R fsd_property_11_mission_sequence --o
 
 ---
 
-## 14. Subsequent Task Sections (To Be Extended by Other Tasks)
+## 14. Section 13: Security & Multi-Machine DDS Hardening (Task 13)
 
-* **Section 13: Security & End-to-End Mission Rehearsal (Tasks 13, 14, 15)** — Multi-machine DDS security, end-to-end rehearsal, final compliance verification.
+### 14.1 Overview & Defense-in-Depth Model
+
+Task 13 introduces complete cryptographic authentication, granular SROS2 access controls, transport-level payload encryption, and network segmentation to harden the Full Self-Driving stack against rogue network nodes, eavesdropping, and unauthorized flight command injection.
+
+```
+[ FLIGHT-CRITICAL ONBOARD DOMAIN ]                [ AIRLOCK GATEWAY ]               [ GROUND / TELEMETRY PLANE ]
+Domain ID: 0 (Strict SROS2 Enforced)                                                TLS / MQTT / External Network
++------------------------------------+             +-------------------+             +--------------------------+
+|  fsd_flight_runtime                |             |                   |             |  QGroundControl          |
+|  fsd_perception                    | <---------> |    fsd_gateway    | <---------> |  Node-RED Dashboard      |
+|  fsd_pad_registry                  |             |                   |             |  Web Telemetry UI        |
+|  fsd_evidence                      |             +-------------------+             +--------------------------+
+|  PX4 MicroXRCE-DDS Agent           |             (Strict Command      
++------------------------------------+              Filter & Bounded
+(AES-GCM-256 Encrypted SHM/Unicast)                 Payload Interlock)
+```
+
+### 14.2 SROS2 PKI & Automated Keystore Management
+
+Every autonomy node runs inside an isolated security enclave verified by an X.509 digital certificate signed by the Authoritative Root CA:
+
+```
+sros2_keystore/
+├── public/
+│   ├── ca.cert.pem                   # FSD Root CA Certificate
+│   └── identity_ca.cert.pem          # CA public anchor for node identity
+├── private/
+│   └── ca.key.pem                    # Root CA Private Key (0600 root-only)
+└── enclaves/
+    └── full_self_driving/
+        ├── flight_runtime/           # Enclave for /full_self_driving/fsd_flight_runtime
+        │   ├── cert.pem, key.pem, identity_ca.cert.pem, permissions_ca.cert.pem
+        │   ├── governance.xml, governance.p7s
+        │   └── permissions.xml, permissions.p7s
+        ├── perception/               # Enclave for /full_self_driving/fsd_perception
+        ├── pad_registry/             # Enclave for /full_self_driving/fsd_pad_registry
+        ├── gateway/                  # Enclave for /full_self_driving/fsd_gateway
+        └── evidence/                 # Enclave for /full_self_driving/fsd_evidence
+```
+
+**Management Tooling**:
+- `full_self_driving/scripts/generate_sros2_keystore.py`: Automated generator provisioning Root CA, node keys, X.509 certificates with Subject DN (`CN=/full_self_driving/<enclave>`), OMG DDS Security `governance.xml`, and PKCS#7 (`.p7s`) signed policies.
+- `full_self_driving/scripts/manage_sros2_keystore.sh`: Operations CLI supporting `generate`, `verify`, `inspect`, `rotate`, and `clean`.
+
+### 14.3 Granular Access Control Matrix (`permissions.xml`)
+
+Each node enclave enforces strict **least-privilege** allowlists with default `DENY`:
+
+| Node Enclave | Allowed Subscriptions | Allowed Publications | Allowed Services / Clients |
+|---|---|---|---|
+| `/full_self_driving/flight_runtime` | `/full_self_driving/live_target_lock`, `/fmu/out/*`, `/clock`, `/tf`, `/tf_static` | `/full_self_driving/state`, `/full_self_driving/readiness`, `/full_self_driving/safety`, `/full_self_driving/telemetry`, `/full_self_driving/plan/working_status`, `/full_self_driving/payload/status` | Server: `/full_self_driving/emergency_stop`, `/full_self_driving/prepare_payload` |
+| `/full_self_driving/perception` | `/camera`, `/camera_info`, `/full_self_driving/target_selection`, `/clock`, `/tf`, `/tf_static` | `/full_self_driving/all_id_observations`, `/full_self_driving/annotated_image`, `/full_self_driving/live_target_lock`, `/full_self_driving/health/perception` | (None) |
+| `/full_self_driving/pad_registry` | `/full_self_driving/all_id_observations`, `/clock` | `/full_self_driving/pad_registry/snapshot`, `/full_self_driving/pad_registry/status`, `/full_self_driving/health/pad_registry` | (None) |
+| `/full_self_driving/evidence` | `/full_self_driving/state`, `/full_self_driving/payload/status`, `/full_self_driving/safety`, `/clock` | `/full_self_driving/health/evidence` | (None) |
+| `/full_self_driving/gateway` | `/full_self_driving/state`, `/full_self_driving/telemetry`, `/full_self_driving/readiness`, `/full_self_driving/payload/status`, `/full_self_driving/plan/working_status`, `/full_self_driving/pad_registry/snapshot`, `/clock` | `/full_self_driving/health/gateway`, `/full_self_driving/target_selection` | Client: `/full_self_driving/prepare_payload`, `/full_self_driving/emergency_stop` |
+
+### 14.4 DDS Security & Multi-Machine Transport Profiles
+
+1. **FastDDS Profile (`config/security/fastdds_security.xml`)**:
+   - Authentication Plugin: `builtin.PKI-DH`
+   - Access Control Plugin: `builtin.Access-Permissions`
+   - Cryptographic Plugin: `builtin.AES-GCM-256`
+   - Transport: Intra-host Shared Memory (SHM) + UDPv4
+2. **CycloneDDS Profile (`config/security/cyclonedds_security.xml`)**:
+   - Disabled unauthenticated multicast on external interfaces (`<AllowMulticast>false</AllowMulticast>`).
+   - Unicast discovery peer lists (`<Peer address="127.0.0.1"/>`).
+   - Cryptographic plugin with AES-GCM-256.
+
+### 14.5 Safety Property 26: Security Rejection Has No Flight Side Effect
+
+- **Validates**: Requirements 4.2, 7.6, 7.7
+- Any unauthorized DDS participant, rogue command injection (`arm`, `takeoff`, `raw_actuator`, `override`), stale request age, retained MQTT command, or malformed schema is rejected immediately.
+- Rejection produces **zero** state changes in the `MissionCoordinator`, **zero** physical release actuations, and fails closed with durable error reporting.
+
+### 14.6 How to Run and Verify (Task 13)
+
+```bash
+cd /home/ubuntu/roscon-25-workshop_ws
+source /opt/ros/humble/setup.bash
+source /home/ubuntu/px4_ros_ws/install/setup.bash
+source install/setup.bash
+
+# 1. Manage and verify SROS2 Keystore
+./src/roscon-25-workshop/full_self_driving/scripts/manage_sros2_keystore.sh verify
+./src/roscon-25-workshop/full_self_driving/scripts/manage_sros2_keystore.sh inspect
+
+# 2. Run Task 13 specific security test suites
+ctest --test-dir build/full_self_driving -R fsd_property_26_security_rejection --output-on-failure
+pytest-3 src/roscon-25-workshop/full_self_driving/test/security/security_policy_enforcement_test.py -v
+pytest-3 src/roscon-25-workshop/full_self_driving/test/security/forbidden_dependency_scan.py -v
+
+# 3. Run all 273 package tests (100% pass)
+colcon test --packages-select full_self_driving
+colcon test-result --all --verbose
+```
+
+---
+
+## 15. Subsequent Task Sections (To Be Extended by Other Tasks)
+
+* **Section 14: End-to-End Mission Rehearsal & Live Mission Acceptance (Tasks 14, 15)** — Full mission soak testing, multi-sortie cycle validation, and final acceptance verification.
+
 
 

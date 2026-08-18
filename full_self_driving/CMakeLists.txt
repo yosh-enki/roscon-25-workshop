@@ -485,8 +485,15 @@ install(DIRECTORY
   simulation
   config
   resource
+  scripts
   test
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  scripts/generate_sros2_keystore.py
+  scripts/manage_sros2_keystore.sh
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 # Testing
@@ -1167,12 +1174,40 @@ if(BUILD_TESTING)
     geometry_msgs
   )
 
+  ament_add_gtest(fsd_property_26_security_rejection
+    test/property/property_26_security_rejection.cpp
+  )
+  target_include_directories(fsd_property_26_security_rejection PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_26_security_rejection
+    fsd_payload_core
+    fsd_gateway_core
+    fsd_flight_core
+    fsd_domain_core
+    fsd_adapters_core
+    fsd_persistence_core
+    OpenSSL::Crypto
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_26_security_rejection
+    rclcpp
+    builtin_interfaces
+    px4_msgs
+    geometry_msgs
+  )
+
   ament_add_pytest_test(fsd_property_21_ros_interface_boundary
     test/property/property_21_ros_interface_boundary.py
   )
 
   ament_add_pytest_test(forbidden_dependency_scan
     test/security/forbidden_dependency_scan.py
+  )
+
+  ament_add_pytest_test(security_policy_enforcement_test
+    test/security/security_policy_enforcement_test.py
   )
 
   ament_add_pytest_test(launch_boundary_test
