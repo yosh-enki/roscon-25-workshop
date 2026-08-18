@@ -635,8 +635,8 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 14.2 security integration and 14.1 source scan.
     - **Requirements:** 4.2, 7.6, 7.7; **Property 26: Security rejection has no flight side effect**.
 
-- [ ] 15. Complete exact simulation acceptance and adapter-invariance proof
-  - [ ] 15.1 Run the complete end-to-end simulation acceptance suite
+- [x] 15. Complete exact simulation acceptance and adapter-invariance proof
+  - [x] 15.1 Run the complete end-to-end simulation acceptance suite
     - **Prerequisites:** All required tasks 1.1–14.3; optional property tests should be enabled in the acceptance profile when available.
     - **Production files/components:** Add `test/acceptance/full_sortie_acceptance.py`, complete fixture catalog/config, launch readiness summary assertions, and CI/CTest registration for the exact acceptance command.
     - **Implementation:** Exercise preparation via typed gateway, immutable plan/working generation, target/registry, commit/lock, QGC registered-mode selection/arming, takeoff, TransitIn, trusted Direct or Search fallback, live-lock PrecisionLand, landing verification, named payload feedback, second takeoff, distinct TransitOut, configured ReturnStrategy, recovery landing, evidence manifest, disarm/reset, and fault branches for stale target, takeover, energy, transport, persistence, unknown payload, and restart. Do not bypass QGC/PX4 authority in the flight test.
@@ -646,7 +646,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Run the complete `colcon test`, source/dependency scan, API probe, and all prior vertical-slice manual smoke procedures.
     - **Requirements:** 1.1–1.9, 2.1–2.11, 3.1–3.10, 4.1–4.5, 5.1–5.12, 6.1–6.9, 7.1–7.9.
 
-  - [ ] 15.2 Verify clean install, one-launch ownership, restart/recovery, and regression from an isolated workspace
+  - [x] 15.2 Verify clean install, one-launch ownership, restart/recovery, and regression from an isolated workspace
     - **Prerequisites:** 15.1. Do not alter the prototype or rely on an already sourced prototype install.
     - **Production files/components:** Add isolated-workspace CI script/configuration, install-tree launch/package checks, and final test report collection under `test/acceptance/`.
     - **Implementation:** Build/install only `full_self_driving` plus declared external dependencies, inspect the install tree for exactly one public launch, start from a clean state directory, restart at every action boundary, and verify no hidden prototype/gazebo_models runtime path exists. Confirm `simulation:=false` fails clearly without an approved hardware manifest.
@@ -656,7 +656,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 15.1 exact command, all source/security/API scans, and final git diff check to ensure prototype/design/requirements files were not modified.
     - **Requirements:** 1.3, 1.5–1.8, 5.6, 6.2, 6.4–6.6, 7.7.
 
-  - [ ]* 15.3 Add the simulation/hardware adapter-invariance property test
+  - [x]* 15.3 Add the simulation/hardware adapter-invariance property test
     - **Prerequisites:** 15.1 and 15.2. Use the existing approved profile-manifest schema; do not require real Pi hardware.
     - **Production files/components:** Add `test/property/property_24_adapter_invariance.cpp` and register `fsd_property_24_adapter_invariance`.
     - **Implementation:** Generate approved simulation/hardware adapter selections and compare domain policy, snapshot hashes/ownership boundaries, ROS contracts, persistence protocol, Node-RED preparation API, and mode/executor ownership. Assert only declared transport/camera/TF/payload/telemetry/process/resource adapters differ.
@@ -683,9 +683,9 @@ Every task's regression check includes the previously completed slices, `colcon 
 - [x] Checkpoint B — After Task 3: ensure live camera input produces all-ID observations, selected-target qualification is separate, registry scopes are isolated, and no flight behavior depends on an unqualified record.
 - [x] Checkpoint C — After Task 6: ensure config/context/plan/gateway mutations are typed, revisioned, disarmed-only, durable, lifecycle-supervised, and recover safely before any mode registration.
 - [x] Checkpoint D — After Task 7: ensure the actual pinned PX4 APIs compile, exactly one registered mode/executor exists, QGC/PX4 authority is observable, and no flight behavior uses Offboard/raw control.
-- [ ] Checkpoint E — After Task 11: ensure takeoff/TransitIn/Search/Direct/PrecisionLand are internal strategies, live-lock gates descent, and all earlier camera/plan/persistence/authority slices still pass.
-- [ ] Checkpoint F — After Task 12: ensure payload unknown/failure behavior is non-retrying, second takeoff/TransitOut/ReturnStrategy are explicit, and the complete sequence is durably ordered.
-- [ ] Checkpoint G — After Task 15: run the exact acceptance command, full regression/security/source scans, clean-install test, and confirm only the production package is in the runtime graph.
+- [x] Checkpoint E — After Task 11: ensure takeoff/TransitIn/Search/Direct/PrecisionLand are internal strategies, live-lock gates descent, and all earlier camera/plan/persistence/authority slices still pass.
+- [x] Checkpoint F — After Task 12: ensure payload unknown/failure behavior is non-retrying, second takeoff/TransitOut/ReturnStrategy are explicit, and the complete sequence is durably ordered.
+- [x] Checkpoint G — After Task 15: run the exact acceptance command, full regression/security/source scans, clean-install test, and confirm only the production package is in the runtime graph.
 
 ## Notes
 
