@@ -1345,9 +1345,97 @@ colcon test-result --all --verbose
 
 ---
 
-## 15. Subsequent Task Sections (To Be Extended by Other Tasks)
+## 15. Section 14: Negative Security Boundaries, Resource Limits & Observability Safety (Task 14)
 
-* **Section 14: End-to-End Mission Rehearsal & Live Mission Acceptance (Tasks 14, 15)** — Full mission soak testing, multi-sortie cycle validation, and final acceptance verification.
+### 15.1 Overview & Negative Safety Model
+
+Task 14 establishes comprehensive negative security boundary proofs, resource exhaustion protections, adapter failure resilience, and observability noninterference across the entire repository.
+
+```
++---------------------------------------------------------------------------------------------------+
+|                                 FSD AUTONOMY SAFETY SHIELD (TASK 14)                                |
++---------------------------------------------------------------------------------------------------+
+|  1. Property 25: Observability Noninterference & Truthfulness                                     |
+|     - Bounded async telemetry / logging; exporter stalls cannot jitter or seize flight loop.      |
+|     - Zero QGC presence inference; stale projections cannot claim authority.                     |
+|                                                                                                   |
+|  2. Repository-Wide Production Boundary Scan (production_boundary_scan.py)                        |
+|     - Zero prototype imports/links/launches (`px4_roscon_25`, `transit_in`, `aruco_tracker`).     |
+|     - Zero raw Offboard topics (`/fmu/in/offboard_control_mode`, `/fmu/in/trajectory_setpoint`).   |
+|     - Strict ROS message bounding (`string<=N`, `sequence[<=N]`).                                |
+|                                                                                                   |
+|  3. Gateway Negative Security & Fuzzing (fsd_gateway_security_test)                               |
+|     - Clock skew & future timestamp drift rejection (`ERROR_CLOCK_SKEW`).                         |
+|     - Retained command rejection (`ERROR_RETAINED_COMMAND_FORBIDDEN`).                            |
+|     - Malformed JSON, oversized payloads (>1MiB), shell & path injection fuzzing.                 |
+|                                                                                                   |
+|  4. Resource Bounds & Adapter Failure Proof (fsd_resource_failure_test)                           |
+|     - Failing payload hardware adapter fails closed (`RESULT_HARDWARE_ERROR`).                    |
+|     - In-flight payload delivery timeouts record `RESULT_UNKNOWN` and safe recovery climb.        |
+|     - Observation / evidence queue drop backpressure without memory leaks or flight stalls.      |
++---------------------------------------------------------------------------------------------------+
+```
+
+### 15.2 Safety Property 25: Observability Noninterference and Truthfulness
+
+- **Validates**: Requirements 7.1, 7.5.
+- Logging, diagnostics, metrics, and traces operate via bounded asynchronous buffers.
+- Even under maximum persistence journal backlog, storage reserve warnings, or exporter stalls, the real-time flight mode execution loop completes in bounded time (< 50ms).
+- Observability and telemetry components cannot select modes, alter flight phases, disarm the vehicle, or publish raw actuator commands.
+- Telemetry never infers QGroundControl GUI presence from network traffic alone; authority shifts only upon verified PX4 failsafe or RC trigger.
+
+### 15.3 Repository-Wide Production Boundary Scan
+
+- Automated AST and static analysis scanner ([`test/security/production_boundary_scan.py`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/security/production_boundary_scan.py)):
+  1. Scans all source, headers, launch files, schemas, and configurations.
+  2. Verifies zero occurrence of prototype package dependencies (`px4_roscon_25`, `aruco_tracker`, `transit_in`, `precision_land`, etc.).
+  3. Verifies zero raw Offboard symbols (`OffboardControlMode`, `/fmu/in/trajectory_setpoint`, `/fmu/in/offboard_control_mode`).
+  4. Enforces bounded fields across all 20 `.msg` and 10 `.srv` definition files.
+  5. Includes negative self-test validating that injected forbidden patterns fail the scan.
+
+### 15.4 Gateway Negative Security & Fuzzing Test Suite
+
+- Integration test ([`test/security/gateway_security_test.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/security/gateway_security_test.cpp)):
+  1. **Clock Skew**: Rejects commands with timestamps skewed into the future (`ERROR_CLOCK_SKEW`) or stale in the past (`ERROR_STALE_REQUEST`).
+  2. **Retained Messages**: Rejects MQTT retained messages with `ERROR_RETAINED_COMMAND_FORBIDDEN`.
+  3. **Fuzzing & Malformed Payloads**: Tests non-JSON garbage, truncated JSON, oversized payloads (`ERROR_PAYLOAD_TOO_LARGE`), and deep recursion.
+  4. **Command & Path Injection**: Proves shell injections (`$(rm -rf /)`), path traversals (`../../../../etc/passwd`), and SQL injections produce zero physical actuation or state mutation.
+  5. **Zero Side Effect Invariant**: Vehicle remains disarmed, coordinator strategy is unchanged, and payload operation counts do not increment.
+
+### 15.5 Resource Bounds & Adapter Failure Proof
+
+- Integration test ([`test/integration/resource_failure_test.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/integration/resource_failure_test.cpp)):
+  1. **Hardware Error Fault Mode**: Adapter hardware error during sortie preparation returns `accepted=false`, sets `RESULT_HARDWARE_ERROR`, and prevents arming.
+  2. **Timeout Fault Mode**: In-flight release timeout records explicit `RESULT_UNKNOWN` and triggers safe recovery transition.
+  3. **Unhealthy / Power Loss Adapter**: Blocks mission preparation and fails closed.
+  4. **Emergency Stop Interlock**: Immediately forces coordinator into `EMERGENCY_STOP` strategy and blocks further flight transitions.
+  5. **Queue Backpressure**: High-frequency pad observation ingestion handles queue drops gracefully without memory growth or assertion failures.
+
+### 15.6 How to Run and Verify (Task 14)
+
+```bash
+cd /home/ubuntu/roscon-25-workshop_ws
+source /opt/ros/humble/setup.bash
+source /home/ubuntu/px4_ros_ws/install/setup.bash
+source install/setup.bash
+
+# 1. Run Task 14 specific test targets
+ctest --test-dir build/full_self_driving -R fsd_property_25_observability_noninterference --output-on-failure
+ctest --test-dir build/full_self_driving -R fsd_gateway_security_test --output-on-failure
+ctest --test-dir build/full_self_driving -R fsd_resource_failure_test --output-on-failure
+pytest-3 src/roscon-25-workshop/full_self_driving/test/security/production_boundary_scan.py -v
+
+# 2. Run complete test suite across all units, properties, and integrations
+colcon test --packages-select full_self_driving
+colcon test-result --all --verbose
+```
+
+---
+
+## 16. Subsequent Task Sections (To Be Extended by Other Tasks)
+
+* **Section 15: End-to-End Mission Rehearsal & Live Mission Acceptance (Task 15)** — Full mission soak testing, multi-sortie cycle validation, and final acceptance verification.
+
 
 
 

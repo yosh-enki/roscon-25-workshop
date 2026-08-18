@@ -35,6 +35,7 @@ ALLOWED_EXCEPTION_PATHS = [
     "test/fixtures/prototype_behavior_map.yaml",
     "test/launch/launch_manifest_test.cpp",
     "test/security/forbidden_dependency_scan.py",
+    "test/security/production_boundary_scan.py",
     "simulation/manifests/kmitl_airfield.yaml",
 ]
 

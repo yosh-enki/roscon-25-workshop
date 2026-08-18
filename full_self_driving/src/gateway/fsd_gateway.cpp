@@ -209,14 +209,23 @@ GatewayResponse FsdGateway::process_envelope(
     return resp;
   }
 
-  // 4. Check request age
+  // 4. Check request age & clock skew
   if (current_unix_ms > 0 && env.sent_at_unix_ms > 0) {
-    if (current_unix_ms > env.sent_at_unix_ms) {
+    if (current_unix_ms >= env.sent_at_unix_ms) {
       double age_s = (current_unix_ms - env.sent_at_unix_ms) / 1000.0;
       if (age_s > policy_.max_request_age_s) {
         security_violations_count_++;
         resp.error_code = "ERROR_STALE_REQUEST";
         resp.error_message = "Command timestamp exceeds maximum request age";
+        resp.severity = 2;
+        return resp;
+      }
+    } else {
+      double skew_s = (env.sent_at_unix_ms - current_unix_ms) / 1000.0;
+      if (skew_s > policy_.max_request_age_s) {
+        security_violations_count_++;
+        resp.error_code = "ERROR_CLOCK_SKEW";
+        resp.error_message = "Command timestamp is in the future beyond clock skew tolerance";
         resp.severity = 2;
         return resp;
       }

@@ -1198,12 +1198,92 @@ if(BUILD_TESTING)
     geometry_msgs
   )
 
+  ament_add_gtest(fsd_property_25_observability_noninterference
+    test/property/property_25_observability_noninterference.cpp
+  )
+  target_include_directories(fsd_property_25_observability_noninterference PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_25_observability_noninterference
+    fsd_flight_core
+    fsd_payload_core
+    fsd_adapters_core
+    fsd_persistence_core
+    fsd_domain_core
+    fsd_registry_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_25_observability_noninterference
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+    builtin_interfaces
+  )
+
+  ament_add_gtest(fsd_gateway_security_test
+    test/security/gateway_security_test.cpp
+  )
+  target_include_directories(fsd_gateway_security_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_gateway_security_test
+    fsd_gateway_core
+    fsd_flight_core
+    fsd_payload_core
+    fsd_domain_core
+    fsd_persistence_core
+    fsd_registry_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_gateway_security_test
+    rclcpp
+    geometry_msgs
+    builtin_interfaces
+  )
+
+  ament_add_gtest(fsd_resource_failure_test
+    test/integration/resource_failure_test.cpp
+  )
+  target_include_directories(fsd_resource_failure_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_resource_failure_test
+    fsd_flight_core
+    fsd_payload_core
+    fsd_adapters_core
+    fsd_domain_core
+    fsd_persistence_core
+    fsd_registry_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_resource_failure_test
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+    builtin_interfaces
+  )
+
   ament_add_pytest_test(fsd_property_21_ros_interface_boundary
     test/property/property_21_ros_interface_boundary.py
   )
 
   ament_add_pytest_test(forbidden_dependency_scan
     test/security/forbidden_dependency_scan.py
+  )
+
+  ament_add_pytest_test(production_boundary_scan
+    test/security/production_boundary_scan.py
   )
 
   ament_add_pytest_test(security_policy_enforcement_test

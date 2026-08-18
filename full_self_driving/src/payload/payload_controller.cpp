@@ -93,6 +93,9 @@ bool PayloadController::prepare(
 
   bool ok = adapter_->execute_command(commanded_state, request_id, out_status);
   idempotency_records_[request_id] = out_status;
+  if (!ok && out_error && out_error->empty()) {
+    *out_error = "PayloadAdapter command execution failed";
+  }
   return ok;
 }
 
