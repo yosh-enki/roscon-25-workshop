@@ -87,7 +87,7 @@ TEST_F(Property12CoordinatorTransitionsTest, Property12_CoordinatorOwnsTransitio
   EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::TRANSIT_IN);
 
   EXPECT_TRUE(coordinator_->request_transition(flight::StrategyType::ACQUIRE_TARGET));
-  EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::ACQUIRE_TARGET);
+  EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::SEARCH);
 
   EXPECT_TRUE(coordinator_->request_transition(flight::StrategyType::SEARCH));
   EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::SEARCH);

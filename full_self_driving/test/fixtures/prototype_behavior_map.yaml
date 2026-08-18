@@ -100,8 +100,11 @@ mappings:
   - prototype_symbol: "DIRECT_PROTOTYPE_BASELINE"
     production_component: "full_self_driving/flight/direct_strategy"
     preserved_algorithm: "ABSENT"
-    test_fixture: "test/flight/direct_strategy_test.cpp"
+    test_fixture: "test/flight/acquisition_branch_test.cpp"
     intentional_changes:
       - safety_change_id: "CHG_DIR_001"
         requirement: "3.3"
         description: "Direct navigation to trusted registry coordinate followed by visual acquisition search"
+      - safety_change_id: "CHG_DIR_002"
+        requirement: "5.9"
+        description: "Coordinator gates Direct navigation with age, quality, uncertainty, path, and energy checks, falling back to Search"

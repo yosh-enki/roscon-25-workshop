@@ -400,8 +400,8 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 9.1 live Search and 8.1 TransitIn smoke.
     - **Requirements:** 2.3–2.7, 5.1, 5.8.
 
-- [ ] 10. Add Direct navigation and explicit Search fallback
-  - [ ] 10.1 Implement the design-approved Direct internal strategy and acquisition fallback
+- [x] 10. Add Direct navigation and explicit Search fallback
+  - [x] 10.1 Implement the design-approved Direct internal strategy and acquisition fallback
     - **Prerequisites:** 3.2, 4.3, 8.1, and 9.1. The current repository contains no Direct prototype source; record that absence in the behavior map and do not invent a replacement perception/landing algorithm.
     - **Production files/components:** Add `src/flight/strategies/direct_strategy.hpp/.cpp`, trusted-record/path/energy gate evaluation in `MissionCoordinator`, and the branch transitions `ACQUIRE_TARGET` → `DIRECT` or `SEARCH`.
     - **Implementation:** Use a current, trusted registry record matching locked map/scenario/identity only for a configured safe navigation position above the record. Apply path/clearance/energy/route gates; on stale/unsafe/timeout stop Direct and select Search only when the working plan is valid. Direct completion enters `PRECISION_LAND.SEARCH` and never creates a live lock, authorizes descent, verifies target, or releases payload.
@@ -411,7 +411,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat Search/TransitIn manual smoke, registry scope tests, live-lock qualification, authority takeover, and persistence checkpoints.
     - **Requirements:** 3.1, 3.3, 3.5, 5.9, 5.10, 6.7.
 
-  - [ ]* 10.2 Add the Direct-never-substitutes-for-live-lock property test
+  - [x]* 10.2 Add the Direct-never-substitutes-for-live-lock property test
     - **Prerequisites:** 10.1.
     - **Production files/components:** Add `test/property/property_8_direct_lock_separation.cpp` and register `fsd_property_8_direct_lock_separation`.
     - **Implementation:** Generate valid/stale/cross-scope trusted records and acquisition states; assert Direct may navigate only, cannot emit a live lock, enter descent, verify landing target, or authorize payload operation.
@@ -421,7 +421,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 10.1 Direct/Search smoke and 3.4 live-lock separation.
     - **Requirements:** 3.3, 5.9, 5.10; **Property 8: Direct never substitutes for visual lock**.
 
-  - [ ]* 10.3 Add acquisition branch integration tests for trusted Direct, stale fallback, and no-plan failure
+  - [x]* 10.3 Add acquisition branch integration tests for trusted Direct, stale fallback, and no-plan failure
     - **Prerequisites:** 10.1.
     - **Production files/components:** Add `test/flight/acquisition_branch_test.cpp` with deterministic registry, plan, path, energy, and lock fixtures.
     - **Implementation:** Exercise every branch and assert event IDs, strategy selection, checkpoint reason, and readiness/action error. Include the no-valid-working-plan case, which must hold/abort explicitly rather than guess.

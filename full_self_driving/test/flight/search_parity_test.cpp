@@ -519,8 +519,8 @@ TEST_F(SearchParityTest, CoordinatorAcquireTargetToSearchTransition)
   bool trans_ok = coordinator_->request_transition(flight::StrategyType::ACQUIRE_TARGET);
   EXPECT_TRUE(trans_ok);
 
-  // In Task 9, ACQUIRE_TARGET sets mode to SearchStrategy (Direct fallback)
-  EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::ACQUIRE_TARGET);
+  // In Task 10, ACQUIRE_TARGET evaluates acquisition branch and selects SearchStrategy (Direct fallback)
+  EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::SEARCH);
   EXPECT_EQ(mode_->get_current_strategy_name(), "SEARCH");
 
   // Subsequent transition to SEARCH explicitly
@@ -532,7 +532,7 @@ TEST_F(SearchParityTest, CoordinatorAcquireTargetToSearchTransition)
   bool found_acquire = false;
   bool found_search_fallback = false;
   for (const auto & step : trace) {
-    if (step.find("ACQUIRE_TARGET") != std::string::npos) found_acquire = true;
+    if (step.find("ACQUIRE") != std::string::npos || step.find("ACQUISITION") != std::string::npos) found_acquire = true;
     if (step.find("SEARCH") != std::string::npos) found_search_fallback = true;
   }
   EXPECT_TRUE(found_acquire);

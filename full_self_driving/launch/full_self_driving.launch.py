@@ -31,6 +31,7 @@ def launch_setup(context, *args, **kwargs):
     test_fault_child = LaunchConfiguration("test_fault_child").perform(context)
     replay_fixture = LaunchConfiguration("replay_fixture").perform(context).lower()
     flight_fixture = LaunchConfiguration("flight_fixture").perform(context).lower()
+    acquisition_fixture = LaunchConfiguration("acquisition_fixture").perform(context).lower()
     dictionary_name = LaunchConfiguration("dictionary").perform(context)
     marker_size_val = float(LaunchConfiguration("marker_size").perform(context))
 
@@ -349,6 +350,10 @@ def launch_setup(context, *args, **kwargs):
             "simulation": True,
             "world": world_name,
             "flight_fixture": flight_fixture,
+            "acquisition_fixture": acquisition_fixture,
+            "target_marker_id": selected_marker_id if selected_marker_id >= 0 else 7,
+            "target_dictionary": selected_dict,
+            "target_namespace": selected_ns,
         }],
     )
 
@@ -461,6 +466,11 @@ def generate_launch_description():
             "flight_fixture",
             default_value="none",
             description="Flight replay fixture test mode ('none', 'transit_in', 'search')",
+        ),
+        DeclareLaunchArgument(
+            "acquisition_fixture",
+            default_value="none",
+            description="Acquisition branch fixture mode ('none', 'direct', 'trusted_direct', 'stale_direct', 'cross_scope_direct', 'unsafe_direct', 'search_fallback', 'no_plan_hold')",
         ),
         DeclareLaunchArgument(
             "test_selection",

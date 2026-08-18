@@ -983,8 +983,99 @@ ctest --test-dir build/full_self_driving -R search_parity_test --output-on-failu
 
 ---
 
-## 11. Subsequent Task Sections (To Be Extended by Other Tasks)
+## 11. Section 10: Direct Target Acquisition Strategy & Fallback (Task 10)
 
-* **Section 10: Direct Target Acquisition Strategy (Task 10)** — Direct navigation to trusted pad registry coordinate, search fallback.
+### 11.1 Overview & Architecture
+
+Task 10 implements the design-approved `DirectStrategy` internal flight strategy and deterministic target acquisition fallback in `MissionCoordinator`:
+
+1. **Direct Strategy (`DirectStrategy`)**:
+   - Implemented in [`src/flight/strategies/direct_strategy.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/strategies/direct_strategy.hpp) as an internal strategy of the single registered `FullSelfDrivingMode`.
+   - **Trusted Pad Record Navigation**: Uses the current trusted `PadRecord` matching the locked `(map_id, scenario_id, target_identity)` for safe navigation positioning directly above the target pad coordinates.
+   - **Safe Position Settle Gate**: Reaches and settles above the target coordinate at configured search/cruise altitude ($15.0\text{ m}$ above home) with horizontal speed $\le 0.5\text{ m/s}$, vertical speed $\le 0.5\text{ m/s}$, and altitude tolerance $\le 1.0\text{ m}$ for the configured duration ($1.0\text{ s}$).
+   - **Completion & Transition**: On settling (`is_settled() == true`), persists durable journal checkpoint `EVT_DIRECT_COMPLETE` and returns control to the coordinator, transitioning to `PRECISION_LAND` (specifically `PRECISION_LAND.SEARCH`).
+
+2. **Deterministic Coordinator Gating & Fallback (`MissionCoordinator`)**:
+   - Evaluates acquisition branch criteria on transition to `ACQUIRE_TARGET`:
+     1. **Pad Registry Gate**: Record exists matching locked map, scenario, target namespace, dictionary, and marker ID.
+     2. **Freshness Gate**: `(now - recorded_monotonic_ns) <= trusted_record_max_age_s` ($3600.0\text{ s}$).
+     3. **Quality & Uncertainty Gates**: `quality >= minimum_record_quality` and `uncertainty <= max_record_uncertainty_m` ($50.0\text{ m}$).
+     4. **Path & Clearance Gates**: Coordinates are finite and within valid geographic bounds.
+     5. **Energy Gate**: Battery percentage $\ge \text{min\_battery\_percentage}$ ($20.0\%$).
+     6. **Direct Policy Gate**: `direct_enabled == true`.
+   - **Branch Selection**:
+     - If all Direct gates pass $\rightarrow$ Selects `DIRECT` (`FLY-004 / EVT_ACQUISITION_DIRECT_SELECTED`).
+     - If any Direct gate fails and a valid `WorkingPlan` exists $\rightarrow$ Selects `SEARCH` (`FLY-005 / EVT_ACQUISITION_SEARCH_SELECTED`).
+     - If Direct gates fail and NO valid working plan exists $\rightarrow$ Fails closed to `HOLD` (`ACQUISITION_FAILED_HOLD`) with explicit error message.
+   - **In-Flight Fallback**: If Direct navigation encounters a timeout ($30.0\text{ s}$) or flight failure, triggers `EVT_DIRECT_FALLBACK` $\rightarrow$ falls back to `SEARCH` (when plan valid) or `HOLD`.
+
+```mermaid
+graph TD
+    ACQ[ACQUIRE_TARGET] --> GATES{Evaluate Direct Gates:<br/>Scope, Age, Quality,<br/>Uncertainty, Energy, Path}
+    GATES -->|All Pass| DIR[DIRECT Strategy<br/>FLY-004 / EVT_ACQUISITION_DIRECT_SELECTED]
+    GATES -->|Gate Fails| PLAN_CHECK{Valid WorkingPlan<br/>Available?}
+    PLAN_CHECK -->|Yes| SRCH[SEARCH Strategy<br/>FLY-005 / EVT_ACQUISITION_SEARCH_SELECTED]
+    PLAN_CHECK -->|No| FAIL[HOLD Fail-Closed<br/>ACQUISITION_FAILED_HOLD]
+    
+    DIR --> ARRIVE{Arrived & Settled<br/>Above Pad?}
+    ARRIVE -->|Yes| PLAND[PRECISION_LAND.SEARCH<br/>FLY-006 / EVT_DIRECT_COMPLETE]
+    ARRIVE -->|Timeout / Fault| FALLBACK{Valid WorkingPlan?}
+    FALLBACK -->|Yes| SRCH_FB[SEARCH Strategy<br/>FLY-007 / EVT_DIRECT_FALLBACK]
+    FALLBACK -->|No| HOLD_FB[HOLD Fail-Closed]
+```
+
+### 11.2 Property 8 Invariant: Direct Never Substitutes for Live Lock
+
+Under **Design Property 8 (Validates Requirement 3.3)**:
+- Direct navigation assistance navigates the aircraft to a safe holding position above the trusted pad record, but **NEVER** creates a visual target lock, **NEVER** verifies the landing target, **NEVER** enters descent to the ground, and **NEVER** authorizes payload operations.
+- The `LiveTargetLock` topic and status remain strictly unqualified (`is_qualified() == false`) throughout Direct navigation and upon Direct completion until fresh, qualified visual observations are processed.
+
+### 11.3 Production Components & Files Added
+
+1. **Strategy Implementation**:
+   - [`src/flight/strategies/direct_strategy.hpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/strategies/direct_strategy.hpp): Header definition of `DirectStrategy` internal strategy.
+   - [`src/flight/strategies/direct_strategy.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/strategies/direct_strategy.cpp): Global goto navigation, geodesic arrival distance, velocity settle gates, timeout, and safe completion.
+   - Built directly into `fsd_flight_core`.
+
+2. **Domain Coordinator & Runtime**:
+   - [`src/domain/mission_coordinator.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/domain/mission_coordinator.hpp): Complete gate evaluation (`is_direct_eligible`), search validation (`is_search_plan_valid`), acquisition branching (`EVT_ACQUISITION_DIRECT_SELECTED`, `EVT_ACQUISITION_SEARCH_SELECTED`), Direct completion (`EVT_DIRECT_COMPLETE`), and fallback (`EVT_DIRECT_FALLBACK`).
+   - [`src/runtime/flight_runtime_node.hpp/.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/runtime/flight_runtime_node.hpp): Wired `PadRegistry`, added `acquisition_fixture` parameter handling (`direct`, `stale_direct`, `cross_scope_direct`, `unsafe_direct`, `search_fallback`, `no_plan_hold`), and wired Direct completion to `PRECISION_LAND`.
+   - [`launch/full_self_driving.launch.py`](file:///home/yosh/roscon-25-workshop/full_self_driving/launch/full_self_driving.launch.py): Added `acquisition_fixture` launch argument and forwarded to `fsd_flight_runtime`.
+
+3. **Property & Integration Tests**:
+   - [`test/property/property_8_direct_lock_separation.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/property/property_8_direct_lock_separation.cpp): 6-part test suite verifying Property 8 (`fsd_property_8_direct_lock_separation`).
+   - [`test/flight/acquisition_branch_test.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/flight/acquisition_branch_test.cpp): 11-part integration test suite verifying deterministic acquisition branching across all criteria (`acquisition_branch_test`).
+   - [`test/fixtures/prototype_behavior_map.yaml`](file:///home/yosh/roscon-25-workshop/full_self_driving/test/fixtures/prototype_behavior_map.yaml): Updated mapping with safety change IDs (`CHG_DIR_001`, `CHG_DIR_002`).
+
+### 11.4 How to Run and Verify (Task 10)
+
+```bash
+cd /home/ubuntu/roscon-25-workshop_ws
+source /opt/ros/humble/setup.bash
+source /home/ubuntu/px4_ros_ws/install/setup.bash
+
+# 1. Build package
+colcon build --packages-select full_self_driving --symlink-install \
+  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+
+# 2. Source workspace
+source install/setup.bash
+
+# 3. Run all test suites
+colcon test --packages-select full_self_driving --event-handlers console_direct+
+colcon test-result --all --verbose
+
+# 4. Run Property 8 test directly
+ctest --test-dir build/full_self_driving -R fsd_property_8_direct_lock_separation --output-on-failure
+
+# 5. Run Acquisition Branch test directly
+ctest --test-dir build/full_self_driving -R acquisition_branch_test --output-on-failure
+```
+
+---
+
+## 12. Subsequent Task Sections (To Be Extended by Other Tasks)
+
 * **Section 11: Precision Landing & Delivery Strategies (Tasks 11, 12)** — Visual descent, payload release, transit out, auto land.
 * **Section 12: Security & End-to-End Mission Rehearsal (Tasks 13, 14, 15)** — Multi-machine security, full mission rehearsal, final verification.
+

@@ -250,6 +250,7 @@ add_library(fsd_flight_core
   src/flight/strategies/takeoff_strategy.cpp
   src/flight/strategies/transit_in_strategy.cpp
   src/flight/strategies/search_strategy.cpp
+  src/flight/strategies/direct_strategy.cpp
   src/domain/mission_coordinator.cpp
 )
 target_include_directories(fsd_flight_core PUBLIC
@@ -260,6 +261,7 @@ target_include_directories(fsd_flight_core PUBLIC
 target_link_libraries(fsd_flight_core
   fsd_domain_core
   fsd_persistence_core
+  fsd_registry_core
   fsd_adapters_core
   "${cpp_typesupport_target}"
 )
@@ -415,6 +417,7 @@ target_link_libraries(fsd_flight_runtime
   fsd_adapters_core
   fsd_runtime_core
   fsd_persistence_core
+  fsd_registry_core
   fsd_domain_core
   yaml-cpp
   "${cpp_typesupport_target}"
@@ -904,6 +907,56 @@ if(BUILD_TESTING)
     "${cpp_typesupport_target}"
   )
   ament_target_dependencies(search_parity_test
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+    ament_index_cpp
+  )
+
+  ament_add_gtest(fsd_property_8_direct_lock_separation
+    test/property/property_8_direct_lock_separation.cpp
+  )
+  target_include_directories(fsd_property_8_direct_lock_separation PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_8_direct_lock_separation
+    fsd_flight_core
+    fsd_registry_core
+    fsd_adapters_core
+    fsd_domain_core
+    fsd_persistence_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_8_direct_lock_separation
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+    ament_index_cpp
+  )
+
+  ament_add_gtest(acquisition_branch_test
+    test/flight/acquisition_branch_test.cpp
+  )
+  target_include_directories(acquisition_branch_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(acquisition_branch_test
+    fsd_flight_core
+    fsd_registry_core
+    fsd_adapters_core
+    fsd_domain_core
+    fsd_persistence_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(acquisition_branch_test
     rclcpp
     px4_ros2_cpp
     px4_msgs

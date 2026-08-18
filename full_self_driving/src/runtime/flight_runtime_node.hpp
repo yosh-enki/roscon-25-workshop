@@ -43,6 +43,7 @@ public:
   std::shared_ptr<LifecycleSupervisor> supervisor() const { return supervisor_; }
   std::shared_ptr<persistence::PersistenceManager> persistence() const { return persistence_; }
   std::shared_ptr<PlanManager> plan_manager() const { return plan_manager_; }
+  std::shared_ptr<registry::PadRegistry> pad_registry() const { return pad_registry_; }
   std::shared_ptr<flight::FullSelfDrivingMode> mode() const { return mode_; }
   std::shared_ptr<flight::FullSelfDrivingModeExecutor> executor() const { return executor_; }
 
@@ -73,6 +74,7 @@ private:
   std::shared_ptr<persistence::PersistenceManager> persistence_;
   std::shared_ptr<LifecycleSupervisor> supervisor_;
   std::shared_ptr<PlanManager> plan_manager_;
+  std::shared_ptr<registry::PadRegistry> pad_registry_;
   std::unique_ptr<px4_ros2::Context> px4_context_;
   std::shared_ptr<adapters::Px4StateCache> state_cache_;
   std::shared_ptr<domain::MissionCoordinator> coordinator_;

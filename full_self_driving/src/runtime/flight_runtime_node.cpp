@@ -17,6 +17,10 @@ FlightRuntimeNode::FlightRuntimeNode(const rclcpp::NodeOptions & options)
   this->declare_parameter<bool>("simulation", true);
   this->declare_parameter<std::string>("world", "kmitl_airfield");
   this->declare_parameter<std::string>("flight_fixture", "none");
+  this->declare_parameter<std::string>("acquisition_fixture", "none");
+  this->declare_parameter<int>("target_marker_id", 7);
+  this->declare_parameter<std::string>("target_dictionary", "DICT_4X4_50");
+  this->declare_parameter<std::string>("target_namespace", "aavc2026");
 
   config_path_ = this->get_parameter("engineering_config").as_string();
   manifest_path_ = this->get_parameter("manifest_path").as_string();
@@ -51,7 +55,7 @@ void FlightRuntimeNode::initialize_components()
 
   // Target Lock Subscription
   target_lock_sub_ = this->create_subscription<full_self_driving::msg::LiveTargetLock>(
-    "/full_self_driving/perception/target_lock", 10,
+    "/full_self_driving/perception/live_target_lock", 10,
     [this](full_self_driving::msg::LiveTargetLock::ConstSharedPtr msg) {
       if (coordinator_) {
         coordinator_->handle_target_lock_update(domain::LiveTargetLock::from_msg(*msg));
@@ -116,7 +120,9 @@ void FlightRuntimeNode::initialize_components()
 
   std::string default_artifact_id;
   std::string default_wp_id;
-  if (!default_plan_path.empty()) {
+  std::string acquisition_fixture = this->get_parameter("acquisition_fixture").as_string();
+
+  if (!default_plan_path.empty() && acquisition_fixture != "no_plan_hold") {
     std::ifstream file(default_plan_path, std::ios::binary);
     if (file) {
       std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -142,8 +148,12 @@ void FlightRuntimeNode::initialize_components()
 
   // Pre-commit default simulation context for simulation bringup
   std::string err;
+  int marker_id = this->get_parameter("target_marker_id").as_int();
+  std::string dict = this->get_parameter("target_dictionary").as_string();
+  std::string target_ns = this->get_parameter("target_namespace").as_string();
+
   context_->select_map_scenario("kmitl_airfield", "default_scenario", 0, &err);
-  context_->select_target(domain::TargetIdentity(7, "DICT_4X4_50", "aavc2026"), 1, &err);
+  context_->select_target(domain::TargetIdentity(static_cast<uint32_t>(marker_id), dict, target_ns), 1, &err);
   if (!default_artifact_id.empty()) {
     context_->select_plan_artifact(default_artifact_id, 2, &err);
   }
@@ -163,6 +173,75 @@ void FlightRuntimeNode::initialize_components()
   paths.backup_directory = "/tmp/fsd_backups";
   persistence_ = std::make_shared<persistence::PersistenceManager>(paths);
 
+  // Initialize Pad Registry
+  pad_registry_ = std::make_shared<registry::PadRegistry>();
+
+  // Ingest acquisition fixtures if specified
+  if (acquisition_fixture == "direct" || acquisition_fixture == "trusted_direct") {
+    full_self_driving::msg::PadRecord rec;
+    rec.identity.marker_id = marker_id;
+    rec.identity.dictionary = dict;
+    rec.identity.target_namespace = target_ns;
+    rec.map_id = "kmitl_airfield";
+    rec.scenario_id = "default_scenario";
+    rec.latitude_deg = 13.73132845;
+    rec.longitude_deg = 100.78990948;
+    rec.altitude_m = 2.21;
+    rec.quality = 1.0f;
+    rec.uncertainty_m = 0.05;
+    rec.last_observed_monotonic_ns = this->get_clock()->now().nanoseconds();
+    pad_registry_->insert_record_for_test(rec);
+    RCLCPP_INFO(get_logger(), "[RUNTIME] Injected trusted PadRecord for Direct acquisition fixture (id=%d)", marker_id);
+  } else if (acquisition_fixture == "stale_direct") {
+    full_self_driving::msg::PadRecord rec;
+    rec.identity.marker_id = marker_id;
+    rec.identity.dictionary = dict;
+    rec.identity.target_namespace = target_ns;
+    rec.map_id = "kmitl_airfield";
+    rec.scenario_id = "default_scenario";
+    rec.latitude_deg = 13.73132845;
+    rec.longitude_deg = 100.78990948;
+    rec.altitude_m = 2.21;
+    rec.quality = 1.0f;
+    rec.uncertainty_m = 0.05;
+    rec.last_observed_monotonic_ns = 1;
+    pad_registry_->insert_record_for_test(rec);
+    RCLCPP_INFO(get_logger(), "[RUNTIME] Injected stale PadRecord for Direct acquisition fixture (id=%d)", marker_id);
+  } else if (acquisition_fixture == "cross_scope_direct") {
+    full_self_driving::msg::PadRecord rec;
+    rec.identity.marker_id = marker_id;
+    rec.identity.dictionary = dict;
+    rec.identity.target_namespace = target_ns;
+    rec.map_id = "other_airfield";
+    rec.scenario_id = "other_scenario";
+    rec.latitude_deg = 13.73132845;
+    rec.longitude_deg = 100.78990948;
+    rec.altitude_m = 2.21;
+    rec.quality = 1.0f;
+    rec.uncertainty_m = 0.05;
+    rec.last_observed_monotonic_ns = this->get_clock()->now().nanoseconds();
+    pad_registry_->insert_record_for_test(rec);
+    RCLCPP_INFO(get_logger(), "[RUNTIME] Injected cross-scope PadRecord for Direct acquisition fixture");
+  } else if (acquisition_fixture == "unsafe_direct") {
+    full_self_driving::msg::PadRecord rec;
+    rec.identity.marker_id = marker_id;
+    rec.identity.dictionary = dict;
+    rec.identity.target_namespace = target_ns;
+    rec.map_id = "kmitl_airfield";
+    rec.scenario_id = "default_scenario";
+    rec.latitude_deg = 999.0;
+    rec.longitude_deg = 999.0;
+    rec.altitude_m = -100.0;
+    rec.quality = 1.0f;
+    rec.uncertainty_m = 0.05;
+    rec.last_observed_monotonic_ns = this->get_clock()->now().nanoseconds();
+    pad_registry_->insert_record_for_test(rec);
+    RCLCPP_INFO(get_logger(), "[RUNTIME] Injected unsafe PadRecord for Direct acquisition fixture");
+  } else if (acquisition_fixture == "search" || acquisition_fixture == "search_fallback" || acquisition_fixture == "not_found") {
+    RCLCPP_INFO(get_logger(), "[RUNTIME] Acquisition fixture '%s': Target not in registry data (Search fallback scenario)",
+      acquisition_fixture.c_str());
+  }
+
   // Initialize Supervisor
   supervisor_ = std::make_shared<LifecycleSupervisor>();
   supervisor_->configure_all();
@@ -175,6 +254,12 @@ void FlightRuntimeNode::initialize_components()
   // Initialize Coordinator
   coordinator_ = std::make_shared<domain::MissionCoordinator>(context_);
   coordinator_->set_plan_manager(plan_manager_);
+  coordinator_->set_pad_registry(pad_registry_);
+
+  if (acquisition_fixture == "stale_direct") {
+    coordinator_->set_trusted_record_max_age_s(0.001); // Set max age to 1ms so fixture record is immediately stale in sim
+    RCLCPP_INFO(get_logger(), "[RUNTIME] Set trusted_record_max_age_s to 0.001s for stale_direct fixture");
+  }
 
   // Start periodic evaluation timer at 10Hz
   periodic_timer_ = this->create_wall_timer(
@@ -183,6 +268,10 @@ void FlightRuntimeNode::initialize_components()
 
 void FlightRuntimeNode::trigger_evaluation_cycle()
 {
+  if (coordinator_) {
+    coordinator_->set_current_monotonic_ns(this->get_clock()->now().nanoseconds());
+  }
+
   check_and_register_mode();
 
   if (mode_ && mode_->isActive() && state_cache_ && state_cache_->is_armed()) {
@@ -262,6 +351,11 @@ void FlightRuntimeNode::check_and_register_mode()
         RCLCPP_INFO(get_logger(), "[RUNTIME] TransitIn completed. Transitioning to ACQUIRE_TARGET...");
         if (coordinator_) {
           coordinator_->request_transition(flight::StrategyType::ACQUIRE_TARGET);
+        }
+      } else if (completed_type == flight::StrategyType::DIRECT) {
+        RCLCPP_INFO(get_logger(), "[RUNTIME] Direct navigation completed. Transitioning to PRECISION_LAND...");
+        if (coordinator_) {
+          coordinator_->request_transition(flight::StrategyType::PRECISION_LAND);
         }
       } else if (completed_type == flight::StrategyType::SEARCH) {
         RCLCPP_INFO(get_logger(), "[RUNTIME] Search completed. Holding over final search waypoint...");
