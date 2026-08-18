@@ -35,7 +35,7 @@ public:
     std::shared_ptr<adapters::Px4StateCache> state_cache,
     std::shared_ptr<runtime::PlanManager> plan_manager,
     domain::WorkingPlan working_plan,
-    double search_altitude_m = 13.0,
+    double search_altitude_m = 15.0,
     float max_horizontal_speed_m_s = 5.0f,
     float waypoint_reach_radius_m = 4.0f,
     float max_yaw_rate_rad_s = 0.785398163f,  // 45 deg/s
@@ -48,7 +48,7 @@ public:
     std::shared_ptr<adapters::Px4StateCache> state_cache,
     std::shared_ptr<runtime::PlanManager> plan_manager,
     domain::WorkingPlan working_plan,
-    double search_altitude_m = 13.0,
+    double search_altitude_m = 15.0,
     float max_horizontal_speed_m_s = 5.0f,
     float waypoint_reach_radius_m = 4.0f,
     float max_yaw_rate_rad_s = 0.785398163f,
@@ -60,7 +60,7 @@ public:
     std::shared_ptr<px4_ros2::GotoGlobalSetpointType> goto_setpoint,
     std::shared_ptr<adapters::Px4StateCache> state_cache,
     domain::CanonicalSearchRoute route,
-    double search_altitude_m = 13.0,
+    double search_altitude_m = 15.0,
     float max_horizontal_speed_m_s = 5.0f,
     float waypoint_reach_radius_m = 4.0f,
     float max_yaw_rate_rad_s = 0.785398163f);
@@ -102,7 +102,7 @@ private:
   domain::CanonicalSearchRoute route_;
   std::size_t current_waypoint_index_{0};
 
-  double search_altitude_m_{13.0};
+  double search_altitude_m_{15.0};
   double target_altitude_amsl_m_{0.0};
   double home_altitude_msl_m_{0.0};
 

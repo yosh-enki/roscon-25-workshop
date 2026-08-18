@@ -14,7 +14,7 @@ struct SearchWaypoint
 {
   double latitude_deg{0.0};
   double longitude_deg{0.0};
-  double altitude_m{13.0};
+  double altitude_m{15.0};
   uint32_t source_index{0};
 
   bool operator==(const SearchWaypoint & other) const
@@ -29,7 +29,7 @@ struct SearchWaypoint
 struct CanonicalSearchRoute
 {
   std::vector<SearchWaypoint> waypoints;
-  float default_altitude_m{13.0f};
+  float default_altitude_m{15.0f};
   float cruise_speed_m_s{5.0f};
   std::string canonical_route_sha256;
 

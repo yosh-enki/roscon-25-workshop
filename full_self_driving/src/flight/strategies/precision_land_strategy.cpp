@@ -194,7 +194,16 @@ void PrecisionLandStrategy::update_target_lock(const domain::LiveTargetLock & lo
   if (lock.is_qualified()) {
     if (state_cache_) {
       auto snapshot = state_cache_->capture_snapshot();
-      last_world_tag_ = compute_world_tag(lock.pose, snapshot);
+      WorldTargetTag new_tag = compute_world_tag(lock.pose, snapshot);
+
+      // Low-pass EMA filter (alpha = 0.75) to smooth out pixel discretization jitter at 15m
+      if (last_world_tag_.valid && target_acquired_) {
+        const double alpha = 0.75;
+        new_tag.position = alpha * new_tag.position + (1.0 - alpha) * last_world_tag_.position;
+        new_tag.orientation = last_world_tag_.orientation.slerp(alpha, new_tag.orientation);
+      }
+
+      last_world_tag_ = new_tag;
       target_acquired_ = true;
 
       // When target is acquired during SEARCH, initiate the zero-velocity hover brake phase

@@ -25,6 +25,18 @@ void ArucoDetector::initialize_detector()
   int dict_id = dictionary_name_to_id(config_.dictionary_name);
   auto dictionary = cv::aruco::getPredefinedDictionary(dict_id);
   auto detector_params = cv::aruco::DetectorParameters();
+
+  // Pi 4 + 720p / 15m high-altitude detection tuning:
+  detector_params.minMarkerPerimeterRate = 0.01;           // Detect small/distant markers at 15m
+  detector_params.maxMarkerPerimeterRate = 4.0;
+  detector_params.adaptiveThreshWinSizeMin = 3;
+  detector_params.adaptiveThreshWinSizeMax = 23;
+  detector_params.adaptiveThreshWinSizeStep = 5;           // Balanced step for Pi 4 CPU budget
+  detector_params.adaptiveThreshConstant = 7.0;
+  detector_params.polygonalApproxAccuracyRate = 0.05;      // Robust polygon fitting during vehicle tilt
+  detector_params.cornerRefinementMethod = cv::aruco::CORNER_REFINE_CONTOUR; // Fast & light sub-pixel corner refinement
+  detector_params.maxErroneousBitsInBorderRate = 0.35;     // Error tolerance on outer black border
+
   detector_ = std::make_unique<cv::aruco::ArucoDetector>(dictionary, detector_params);
 }
 
@@ -215,11 +227,18 @@ DetectionResult ArucoDetector::process_image(
     return result;
   }
 
+  cv::Mat gray_image;
+  if (bgr_image.channels() == 3) {
+    cv::cvtColor(bgr_image, gray_image, cv::COLOR_BGR2GRAY);
+  } else {
+    gray_image = bgr_image;
+  }
+
   std::vector<int> ids;
   std::vector<std::vector<cv::Point2f>> corners;
   std::vector<std::vector<cv::Point2f>> rejected;
 
-  detector_->detectMarkers(bgr_image, corners, ids, rejected);
+  detector_->detectMarkers(gray_image, corners, ids, rejected);
   result.total_detected = ids.size();
 
   if (!ids.empty()) {

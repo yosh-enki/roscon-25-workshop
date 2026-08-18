@@ -80,7 +80,7 @@ public:
     float delta_position = 0.25f,        // STRICT PROTOTYPE PARITY: 0.25 m
     float delta_velocity = 0.25f,        // STRICT PROTOTYPE PARITY: 0.25 m/s
     float stabilize_duration_s = 1.0f,   // Hover settle dwell duration: 1.0 s
-    double search_altitude_m = 13.0,     // Search/cruise altitude AGL
+    double search_altitude_m = 15.0,     // Search/cruise altitude AGL
     double approach_altitude_m = 5.0,    // Approach altitude AGL
     std::shared_ptr<persistence::PersistenceManager> persistence = nullptr);
 
@@ -97,7 +97,7 @@ public:
     float delta_position = 0.25f,        // STRICT PROTOTYPE PARITY: 0.25 m
     float delta_velocity = 0.25f,        // STRICT PROTOTYPE PARITY: 0.25 m/s
     float stabilize_duration_s = 1.0f,   // Hover settle dwell duration: 1.0 s
-    double search_altitude_m = 13.0,     // Search/cruise altitude AGL
+    double search_altitude_m = 15.0,     // Search/cruise altitude AGL
     double approach_altitude_m = 5.0,    // Approach altitude AGL
     std::shared_ptr<persistence::PersistenceManager> persistence = nullptr);
 
@@ -173,7 +173,7 @@ private:
   float delta_position_{0.25f};
   float delta_velocity_{0.25f};
   float stabilize_duration_s_{1.0f};
-  double search_altitude_m_{13.0};
+  double search_altitude_m_{15.0};
   double approach_altitude_m_{5.0};
 
   // Internal State
@@ -184,7 +184,7 @@ private:
 
   // Altitude & GPS references
   double home_altitude_msl_m_{0.0};
-  double search_altitude_amsl_m_{13.0};
+  double search_altitude_amsl_m_{15.0};
   double approach_altitude_amsl_m_{5.0};
   double descend_altitude_amsl_m_{5.0};
   bool altitude_references_set_{false};

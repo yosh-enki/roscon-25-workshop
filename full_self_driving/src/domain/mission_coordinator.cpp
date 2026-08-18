@@ -267,7 +267,7 @@ bool MissionCoordinator::is_direct_eligible(
     }
     if (out_lat) *out_lat = rec.latitude_deg;
     if (out_lon) *out_lon = rec.longitude_deg;
-    double direct_alt = 13.0;
+    double direct_alt = 15.0;
     if (context_ && context_->get_resolved_config()) {
       direct_alt = context_->get_resolved_config()->routes.search_altitude_m;
     }
@@ -355,7 +355,7 @@ bool MissionCoordinator::is_direct_eligible(
 
   if (out_lat) *out_lat = record.latitude_deg;
   if (out_lon) *out_lon = record.longitude_deg;
-  double direct_alt = 13.0;
+  double direct_alt = 15.0;
   if (context_ && context_->get_resolved_config()) {
     direct_alt = context_->get_resolved_config()->routes.search_altitude_m;
   }
@@ -420,7 +420,7 @@ void MissionCoordinator::instantiate_direct_strategy(double lat, double lon, dou
 void MissionCoordinator::instantiate_search_strategy()
 {
   if (!mode_) return;
-  double search_alt = 13.0;
+  double search_alt = 15.0;
   float max_h_speed = 5.0f;
   float reach_rad = 4.0f;
   float max_yaw_rate = 0.785398163f;
@@ -501,7 +501,7 @@ void MissionCoordinator::instantiate_precision_land_strategy()
   float delta_pos = 0.25f;
   float delta_vel = 0.25f;
   float stabilize_duration = 1.0f;
-  double search_alt = 13.0;
+  double search_alt = 15.0;
   double approach_alt = 5.0;
 
   if (context_ && context_->get_resolved_config()) {
@@ -549,7 +549,7 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
   // Branch evaluation for ACQUIRE_TARGET
   if (next_strategy == flight::StrategyType::ACQUIRE_TARGET) {
     std::string direct_rejection_reason;
-    double direct_lat = 0.0, direct_lon = 0.0, direct_alt = 13.0;
+    double direct_lat = 0.0, direct_lon = 0.0, direct_alt = 15.0;
     bool direct_ok = is_direct_eligible(&direct_rejection_reason, &direct_lat, &direct_lon, &direct_alt);
 
     if (direct_ok) {

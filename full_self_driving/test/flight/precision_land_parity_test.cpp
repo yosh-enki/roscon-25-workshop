@@ -176,7 +176,7 @@ TEST_F(PrecisionLandParityTest, StrictPrototypeParametersParity)
   EXPECT_FLOAT_EQ(strategy.delta_position(), 0.25f);     // Prototype delta_position
   EXPECT_FLOAT_EQ(strategy.delta_velocity(), 0.25f);     // Prototype delta_velocity
   EXPECT_FLOAT_EQ(strategy.stabilize_duration(), 1.0f);  // Settle dwell duration
-  EXPECT_DOUBLE_EQ(strategy.search_altitude_m(), 13.0);  // Search altitude
+  EXPECT_DOUBLE_EQ(strategy.search_altitude_m(), 15.0);  // Search altitude
   EXPECT_DOUBLE_EQ(strategy.approach_altitude_m(), 5.0); // Approach altitude
 }
 

@@ -1074,8 +1074,91 @@ ctest --test-dir build/full_self_driving -R acquisition_branch_test --output-on-
 
 ---
 
-## 12. Subsequent Task Sections (To Be Extended by Other Tasks)
+## 12. Section 11: Precision Land Strategy & Vision-Guided Touchdown (Task 11)
 
-* **Section 11: Precision Landing & Delivery Strategies (Tasks 11, 12)** — Visual descent, payload release, transit out, auto land.
-* **Section 12: Security & End-to-End Mission Rehearsal (Tasks 13, 14, 15)** — Multi-machine security, full mission rehearsal, final verification.
+### 12.1 Overview & State Machine Architecture
+
+The **Precision Land Strategy** (`flight::PrecisionLandStrategy`) delivers visual precision descent and touchdown directly onto the detected ArUco landing pad while maintaining strict prototype parity, smooth momentum neutralization, and high-altitude (15.0 m) detection stability.
+
+```mermaid
+stateDiagram-v2
+    [*] --> SEARCH: Enter at Cruise/Search Altitude (15.0m AGL)
+    SEARCH --> HOVER_BRAKE: Target Acquired (LiveTargetLock Qualified)
+    HOVER_BRAKE --> APPROACH: Forward Momentum Decelerated to 0 m/s (Dwell 1.0s)
+    APPROACH --> DESCEND: Position Centered over Pad at 5.0m AGL (delta_pos < 0.25m, vel < 0.25m/s)
+    DESCEND --> LANDED_VERIFY: Touchdown (is_landed == true) via 3D Velocity Vector Control (vz = 1.0 m/s)
+    LANDED_VERIFY --> FINISHED: Stability Dwell (0.5s) on Ground Contact Complete
+    FINISHED --> [*]
+```
+
+### 12.2 Key Architectural Features & Innovations
+
+1. **Zero-Velocity Coasting Brake (`HOVER_BRAKE`)**:
+   * When the target pad is visually acquired at high forward speed ($5.0\text{ m/s}$), the controller actively neutralizes forward momentum without commanding reverse flight.
+   * Dynamically tracks instantaneous position until horizontal and vertical velocity drop below $\Delta v = 0.25\text{ m/s}$ for a $1.0\text{ s}$ stabilization dwell, then locks position and triggers `APPROACH`.
+
+2. **Trajectory Velocity Vector Guidance (`TrajectorySetpointType`)**:
+   * Operates directly with PX4's internal velocity trajectory tracking via `px4_ros2::TrajectorySetpointType`.
+   * Computes signed lateral velocity setpoint $(v_x, v_y)$ via prototype proportional gain ($K_p = 1.5$, max velocity $3.0\text{ m/s}$) with discrete time integral scaling ($\Delta\text{pos} \times dt\_s$).
+   * Descends steadily at constant vertical rate ($v_z = 1.0\text{ m/s}$) with yaw heading tracking aligned to the landing pad orientation.
+
+3. **Full 3D Odometry Attitude Compensation**:
+   * Uses 3D attitude quaternions from `px4_ros2::OdometryAttitude` to de-rotate camera optical rays into World NED coordinates.
+   * Completely eliminates attitude-position positive feedback oscillation loops caused by drone pitching and rolling during flight.
+
+4. **Raspberry Pi 4 & 720p / 15m Perception Tuning**:
+   * **`minMarkerPerimeterRate = 0.01`**: Detects small/distant markers at 15–20m altitude without dropping frames.
+   * **`cornerRefinementMethod = CORNER_REFINE_CONTOUR`**: Fast, lightweight sub-pixel corner refinement designed for ARM CPU efficiency.
+   * **`adaptiveThreshWinSizeStep = 5`**: Optimized adaptive threshold search window for Raspberry Pi 4 CPU budget.
+   * **Grayscale Pre-conversion**: Single-channel grayscale conversion avoids redundant BGR checks.
+   * **Target EMA Low-Pass Filter ($\alpha = 0.75$)**: Smooths marker coordinates against high-altitude pixel discretization jitter.
+
+### 12.3 Prototype Parity Parameter Reference
+
+| Parameter | Authoritative Value | Description |
+|---|---|---|
+| `max_velocity` | `3.0 m/s` | Maximum lateral correction velocity limit |
+| `descent_vel` | `1.0 m/s` | Constant vertical descent speed |
+| `vel_p_gain` | `1.5` | Proportional gain for lateral velocity correction |
+| `vel_i_gain` | `0.0` | Integral gain |
+| `target_timeout` | `3.0 s` | Visual target loss threshold before fail-closed trigger |
+| `delta_position` | `0.25 m` | Position convergence tolerance for `APPROACH` $\rightarrow$ `DESCEND` |
+| `delta_velocity` | `0.25 m/s` | Velocity convergence tolerance for `APPROACH` $\rightarrow$ `DESCEND` |
+| `search_altitude_m` | `15.0 m` | Search, cruise, and direct navigation altitude AGL |
+| `approach_altitude_m`| `5.0 m` | Approach and centering altitude AGL |
+| `stabilize_duration_s`| `1.0 s` | Hover brake dwell time |
+
+### 12.4 How to Run and Verify (Task 11)
+
+```bash
+cd /home/ubuntu/roscon-25-workshop_ws
+source /opt/ros/humble/setup.bash
+source /home/ubuntu/px4_ros_ws/install/setup.bash
+source install/setup.bash
+
+# 1. Build and test all suites (205 tests)
+colcon build --packages-select full_self_driving --symlink-install \
+  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+colcon test --packages-select full_self_driving --event-handlers console_direct+
+colcon test-result --all --verbose
+
+# 2. Run Precision Land Parity Test directly
+ctest --test-dir build/full_self_driving -R precision_land_parity_test --output-on-failure
+
+# 3. Launch Simulation with Direct Navigation to Pad ID 2 at 15m
+ros2 launch full_self_driving full_self_driving.launch.py \
+  simulation:=true \
+  world:=kmitl_airfield \
+  headless:=false \
+  test_selection:=2 \
+  acquisition_fixture:=trusted_direct
+```
+
+---
+
+## 13. Subsequent Task Sections (To Be Extended by Other Tasks)
+
+* **Section 12: Payload Delivery & Sortie Completion (Task 12)** — Winch/servo release mechanism, transit out, auto land at home.
+* **Section 13: Security & End-to-End Mission Rehearsal (Tasks 13, 14, 15)** — Multi-machine DDS security, end-to-end rehearsal, final compliance verification.
+
 
