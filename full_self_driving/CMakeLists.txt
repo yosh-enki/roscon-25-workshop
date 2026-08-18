@@ -1224,6 +1224,32 @@ if(BUILD_TESTING)
     builtin_interfaces
   )
 
+  ament_add_gtest(fsd_property_24_adapter_invariance
+    test/property/property_24_adapter_invariance.cpp
+  )
+  target_include_directories(fsd_property_24_adapter_invariance PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_24_adapter_invariance
+    fsd_flight_core
+    fsd_payload_core
+    fsd_adapters_core
+    fsd_persistence_core
+    fsd_domain_core
+    fsd_registry_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_24_adapter_invariance
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+    builtin_interfaces
+  )
+
   ament_add_gtest(fsd_gateway_security_test
     test/security/gateway_security_test.cpp
   )
