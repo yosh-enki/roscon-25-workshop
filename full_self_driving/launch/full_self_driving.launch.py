@@ -34,18 +34,40 @@ def launch_setup(context, *args, **kwargs):
     acquisition_fixture = LaunchConfiguration("acquisition_fixture").perform(context).lower()
     dictionary_name = LaunchConfiguration("dictionary").perform(context)
     marker_size_val = float(LaunchConfiguration("marker_size").perform(context))
+    hardware_manifest_arg = LaunchConfiguration("hardware_manifest").perform(context).strip()
 
     simulation = simulation_arg in ["true", "1", "yes"]
     headless = headless_arg in ["true", "1", "yes"]
 
     # Explicit Hardware Profile Deferral Gate
     if not simulation:
-        print(
-            "\n[ERROR] HARDWARE_PROFILE_NOT_CONFIGURED: Hardware bringup for Raspberry Pi 4 is "
-            "explicitly deferred pending an approved hardware manifest and validation evidence.\n",
-            file=sys.stderr,
-        )
-        raise RuntimeError("HARDWARE_PROFILE_NOT_CONFIGURED")
+        if not hardware_manifest_arg or not os.path.exists(hardware_manifest_arg):
+            print(
+                "\n[ERROR] HARDWARE_PROFILE_NOT_CONFIGURED: Hardware bringup for Raspberry Pi 4 is "
+                "explicitly deferred pending an approved hardware manifest and validation evidence.\n",
+                file=sys.stderr,
+            )
+            raise RuntimeError("HARDWARE_PROFILE_NOT_CONFIGURED")
+
+        try:
+            with open(hardware_manifest_arg, "r", encoding="utf-8") as f:
+                manifest_data = yaml.safe_load(f)
+            approval = manifest_data.get("approval", {})
+            if not approval.get("approved", False) or not approval.get("approval_evidence_sha256", ""):
+                print(
+                    "\n[ERROR] HARDWARE_PROFILE_NOT_CONFIGURED: Hardware manifest validation failed. "
+                    "Physical bringup remains deferred because approval.approved is false or missing evidence.\n",
+                    file=sys.stderr,
+                )
+                raise RuntimeError("HARDWARE_PROFILE_NOT_CONFIGURED: Bringup deferred")
+        except Exception as exc:
+            if "HARDWARE_PROFILE_NOT_CONFIGURED" in str(exc):
+                raise
+            print(
+                f"\n[ERROR] HARDWARE_PROFILE_NOT_CONFIGURED: Manifest parse error: {exc}\n",
+                file=sys.stderr,
+            )
+            raise RuntimeError(f"HARDWARE_PROFILE_NOT_CONFIGURED: {exc}")
 
     pkg_share = FindPackageShare("full_self_driving").find("full_self_driving")
 
@@ -493,6 +515,11 @@ def generate_launch_description():
             "marker_size",
             default_value="0.4",
             description="Marker side length in meters",
+        ),
+        DeclareLaunchArgument(
+            "hardware_manifest",
+            default_value="",
+            description="Path to approved hardware profile manifest (required when simulation:=false)",
         ),
         DeclareLaunchArgument(
             "test_fault_child",

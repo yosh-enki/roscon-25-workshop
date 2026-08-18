@@ -36,6 +36,33 @@ class TestLaunchBoundary(unittest.TestCase):
         combined_output = result.stdout + result.stderr
         self.assertIn("HARDWARE_PROFILE_NOT_CONFIGURED", combined_output)
 
+    def test_hardware_profile_deferral_with_unapproved_manifest(self):
+        """Test that simulation:=false with an unapproved manifest fails with HARDWARE_PROFILE_NOT_CONFIGURED."""
+        manifest_path = os.path.join(
+            self.pkg_share, "test", "fixtures", "manifests", "unapproved_hardware_manifest.yaml"
+        )
+        if not os.path.exists(manifest_path):
+            manifest_path = "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/test/fixtures/manifests/unapproved_hardware_manifest.yaml"
+        cmd = [
+            "ros2", "launch", "full_self_driving", "full_self_driving.launch.py",
+            "simulation:=false", f"hardware_manifest:={manifest_path}"
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0, "Launch must fail when hardware profile is unapproved")
+        combined_output = result.stdout + result.stderr
+        self.assertIn("HARDWARE_PROFILE_NOT_CONFIGURED", combined_output)
+
+    def test_hardware_profile_deferral_with_nonexistent_manifest(self):
+        """Test that simulation:=false with non-existent manifest fails with HARDWARE_PROFILE_NOT_CONFIGURED."""
+        cmd = [
+            "ros2", "launch", "full_self_driving", "full_self_driving.launch.py",
+            "simulation:=false", "hardware_manifest:=/tmp/non_existent_hw_manifest.yaml"
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0, "Launch must fail when manifest does not exist")
+        combined_output = result.stdout + result.stderr
+        self.assertIn("HARDWARE_PROFILE_NOT_CONFIGURED", combined_output)
+
     def test_invalid_world_rejection(self):
         """Test that invalid/unlisted world is rejected."""
         cmd = [

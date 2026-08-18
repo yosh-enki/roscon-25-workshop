@@ -57,6 +57,22 @@ TEST_F(LaunchManifestTest, TestKmitlAirfieldManifestAndProvenance)
   ASSERT_TRUE(fs::exists(sdf_path)) << "World SDF file must exist at: " << sdf_path;
 }
 
+TEST_F(LaunchManifestTest, TestHardwareSchemaManifestExistsAndValid)
+{
+  fs::path schema_path = fs::path(pkg_share_dir_) / "simulation" / "manifests" / "hardware_schema.yaml";
+  ASSERT_TRUE(fs::exists(schema_path)) << "Hardware schema manifest must exist at: " << schema_path;
+
+  std::ifstream f(schema_path);
+  std::stringstream buffer;
+  buffer << f.rdbuf();
+  std::string content = buffer.str();
+
+  EXPECT_NE(content.find("profile: \"hardware_rpi4_pixhawk6c\""), std::string::npos);
+  EXPECT_NE(content.find("px4_hardware_uart_serial"), std::string::npos);
+  EXPECT_NE(content.find("v4l2_hardware_camera"), std::string::npos);
+  EXPECT_NE(content.find("gpio_pwm_payload_actuator"), std::string::npos);
+}
+
 TEST_F(LaunchManifestTest, TestBridgesAndUrdfExistWithoutPrototypeReferences)
 {
   fs::path clock_bridge = fs::path(pkg_share_dir_) / "simulation" / "bridges" / "clock.yaml";
