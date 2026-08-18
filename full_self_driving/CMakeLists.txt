@@ -372,6 +372,9 @@ ament_target_dependencies(fsd_pad_registry
   rclcpp_lifecycle
   lifecycle_msgs
   geometry_msgs
+  tf2
+  tf2_ros
+  px4_msgs
 )
 
 add_executable(fsd_evidence
