@@ -431,8 +431,8 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat Search/Direct manual smoke and all earlier context/plan/registry tests.
     - **Requirements:** 3.1, 3.3, 5.9, 5.10.
 
-- [ ] 11. Port PrecisionLand as a live-lock-gated internal hierarchy
-  - [ ] 11.1 Implement production PrecisionLand Search/Approach/Descend/Landed_Verify
+- [x] 11. Port PrecisionLand as a live-lock-gated internal hierarchy
+  - [x] 11.1 Implement production PrecisionLand Search/Approach/Descend/Landed_Verify
     - **Prerequisites:** 2.2, 3.1, 7.2, 9.1, and 10.1. Read-only behavior baseline: `precision_land/PrecisionLand.cpp/.hpp`.
     - **Production files/components:** Add `src/flight/strategies/precision_land_strategy.hpp/.cpp`, production camera/body/world transform adapter, bounded controller state, and coordinator transitions into/out of the hierarchy.
     - **Implementation:** Port the proven spiral search generation, target pose world transform (optical → vehicle/body → NED/world), approach altitude hold, P/PI lateral correction with clamping, descent velocity, position/velocity settle logic, target timeout, and land detection. Refactor input from legacy `/target_pose` to the production qualified `LiveTargetLock`; enforce identity/scope/freshness/quality/covariance/spatial gates. During Approach hold safe altitude on loss; during Descend stop descent and follow configured reacquisition/abort policy; complete only after stable landed verification. Emit only library-managed setpoint abstractions from the owning `FullSelfDrivingMode`.
@@ -442,7 +442,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat Direct/Search/TransitIn, all-ID/lock/registry, QGC authority, persistence, and lifecycle tests.
     - **Requirements:** 3.3, 3.7–3.10, 5.1–5.3, 5.10, 6.7.
 
-  - [ ]* 11.2 Add PrecisionLand replay/parity tests for spiral, transforms, controller, and state flow
+  - [x]* 11.2 Add PrecisionLand replay/parity tests for spiral, transforms, controller, and state flow
     - **Prerequisites:** 11.1. Use copied/golden inputs from the prototype and synthetic deterministic odometry/target traces.
     - **Production files/components:** Add `test/fixtures/prototype_behavior/precision_land/`, PrecisionLand entry in `prototype_behavior_map.yaml`, and `test/flight/precision_land_parity_test.cpp`.
     - **Implementation:** Compare spiral waypoint order, optical/body/world transform, approach altitude capture, P/PI/clamp outputs, target timeout, position/velocity settle gates, land completion, and target-loss transitions. Record production lock/persistence/authority differences as safety changes.
@@ -452,7 +452,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 11.1 live-lock-gated landing smoke and all previous flight slices.
     - **Requirements:** 5.3, 7.1.
 
-  - [ ]* 11.3 Add the precision-landing freshness property test
+  - [x]* 11.3 Add the precision-landing freshness property test
     - **Prerequisites:** 11.1.
     - **Production files/components:** Add `test/property/property_13_precision_land_freshness.cpp` and register `fsd_property_13_precision_land_freshness`.
     - **Implementation:** Generate lock age, quality, covariance, identity, spatial consistency, target-loss timing, and phase sequences; assert only valid fresh locks drive Approach/Descend and loss stops/reverses descent according to policy.
@@ -462,8 +462,8 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 11.1 live lock and 10.2 Direct separation tests.
     - **Requirements:** 3.7–3.9, 5.3; **Property 13: Precision landing freshness**.
 
-- [ ] 12. Add payload safety, second takeoff, TransitOut, and ReturnStrategy
-  - [ ] 12.1 Implement the named payload adapter/controller and disarmed preparation feedback
+- [x] 12. Add payload safety, second takeoff, TransitOut, and ReturnStrategy
+  - [x] 12.1 Implement the named payload adapter/controller and disarmed preparation feedback
     - **Prerequisites:** 4.1, 4.3, 6.3, and 11.1. Use a deterministic simulation/fault-injection adapter; do not expose GPIO/servo/pulse fields.
     - **Production files/components:** Add `src/payload/payload_controller.hpp/.cpp`, `src/payload/simulation_payload_adapter.cpp`, `msg/PayloadStatus`, `PreparePayload.srv` integration, and named operation/state validators.
     - **Implementation:** Support only configured named preparation operations, commanded-versus-feedback state, `cargo_loaded`/`secured`, adapter health, bounded latency, and preparation idempotency. Keep all physical mapping inside the adapter and all gateway operations disarmed-only; internal release remains inaccessible to Node-RED.
@@ -473,7 +473,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat context/readiness, gateway boundary, persistence, lifecycle, and perception/registry launch tests.
     - **Requirements:** 2.1, 4.2, 4.4, 5.4, 7.1, 7.9.
 
-  - [ ] 12.2 Implement durable internal payload operation, idempotency, unknown-result handling, and sequence transition
+  - [x] 12.2 Implement durable internal payload operation, idempotency, unknown-result handling, and sequence transition
     - **Prerequisites:** 12.1, 6.1, and 11.1. The operation is requested only by the coordinator after `LANDED_VERIFIED`.
     - **Production files/components:** Add `src/flight/payload_operation_strategy.cpp`, durable payload intent/result records, `PayloadOperationRequest/Result` domain types, and executor transitions to `TAKEOFF_AFTER_DELIVERY` or configured safe return/abort.
     - **Implementation:** Gate landing/stability/target identity/live-lock/policy/count/adapter/feedback; persist intent before command and result after feedback; return the prior durable result for duplicate operation ID; mark timeout/contradictory/power-loss outcome `UNKNOWN` and never auto-retry or generate a new operation ID.
@@ -483,7 +483,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 11.1 landing, gateway negative commands, persistence fault/restart, and authority takeover tests.
     - **Requirements:** 5.1, 5.4, 5.11, 6.2, 6.7, 6.9.
 
-  - [ ] 12.3 Add second takeoff and port TransitOut as a distinct internal route strategy
+  - [x] 12.3 Add second takeoff and port TransitOut as a distinct internal route strategy
     - **Prerequisites:** 8.1, 8.2, and 12.2. Read-only behavior baseline: `transit_out/TransitOut.cpp/.hpp`; do not reverse TransitIn automatically.
     - **Production files/components:** Add `src/flight/strategies/transit_out_strategy.hpp/.cpp`, outbound route value/config validation, and the transition `TAKEOFF_AFTER_DELIVERY` → `TRANSIT_OUT`.
     - **Implementation:** Port TransitOut's proven fresh land/home/odometry/heading/waypoint/settle/timeout behavior into new production names and the common adapter, but load a distinct snapshot outbound route/altitude/policy. Persist result/checkpoint before each boundary and require second-takeoff gates before route progression.
@@ -493,7 +493,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat TransitIn parity/manual smoke, payload unknown/failure cases, PrecisionLand lock-loss, and authority tests.
     - **Requirements:** 5.1, 5.5, 5.8, 5.11, 6.7.
 
-  - [ ] 12.4 Implement explicit ReturnStrategy and verified recovery landing
+  - [x] 12.4 Implement explicit ReturnStrategy and verified recovery landing
     - **Prerequisites:** 12.3 and 7.1. Use only the verified documented library RTL/land action when configured; otherwise use the configured internal route strategy.
     - **Production files/components:** Add `src/flight/return_strategy.cpp`, configured route/route-then-library-RTL/library-RTL adapters, recovery target/landing verification, and final sortie completion/reset transitions.
     - **Implementation:** Resolve ReturnStrategy from the locked snapshot, verify route/action/reference/energy/geofence gates, handle payload failure/unknown and health degradation, preserve PX4 authority, and finalize only after recovery landing/evidence/durable completion. Never assume one RTL behavior or one field home coordinate.
@@ -503,7 +503,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat the full nominal path through 12.3 and all authority/persistence/lock tests.
     - **Requirements:** 5.5, 5.12, 6.2, 6.7, 6.9.
 
-  - [ ]* 12.5 Add the payload-operation safety property test
+  - [x]* 12.5 Add the payload-operation safety property test
     - **Prerequisites:** 12.1 and 12.2.
     - **Production files/components:** Add `test/property/property_14_payload_safety.cpp` and register `fsd_property_14_payload_safety`.
     - **Implementation:** Generate landing/stability/target/policy/count/feedback/idempotency/unknown sequences; assert operation only follows all gates, duplicate IDs cause at most one side effect, and unknown never automatically retries.
@@ -513,7 +513,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 12.2 payload and 11.1 landing smoke.
     - **Requirements:** 5.4; **Property 14: Payload operation safety**.
 
-  - [ ]* 12.6 Add the explicit ReturnStrategy property test
+  - [x]* 12.6 Add the explicit ReturnStrategy property test
     - **Prerequisites:** 12.4.
     - **Production files/components:** Add `test/property/property_15_return_strategy.cpp` and register `fsd_property_15_return_strategy`.
     - **Implementation:** Generate route, configured library-action, energy, geofence, and failure/unknown combinations; assert outbound/recovery behavior always comes from the locked snapshot and never assumes inbound reversal or implicit RTL.
@@ -523,7 +523,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 12.3/12.4 full return smoke.
     - **Requirements:** 5.5; **Property 15: Return-strategy explicitness**.
 
-  - [ ]* 12.7 Add the end-to-end mission sequence ordering property/integration test
+  - [x]* 12.7 Add the end-to-end mission sequence ordering property/integration test
     - **Prerequisites:** 8.1, 9.1, 10.1, 11.1, 12.2, 12.3, and 12.4.
     - **Production files/components:** Add `test/property/property_11_mission_sequence.cpp` and `test/integration/nominal_sortie_sequence_test.cpp`, registering `fsd_property_11_mission_sequence`.
     - **Implementation:** Generate valid/invalid event/action sequences and assert each transition requires its guards and durable boundary in the order takeoff → TransitIn → Direct/Search → live-lock-gated PrecisionLand → landed verification → payload → second takeoff → TransitOut/return route → ReturnStrategy/recovery landing.
@@ -533,8 +533,8 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat each individual flight slice and authority/persistence fault test.
     - **Requirements:** 5.1–5.5; **Property 11: Mission sequence ordering**.
 
-- [ ] 13. Add truthful status, durable evidence, and noninterfering observability
-  - [ ] 13.1 Complete the DashboardStatus/read-model projection and operator-safe status paths
+- [x] 13. Add truthful status, durable evidence, and noninterfering observability
+  - [x] 13.1 Complete the DashboardStatus/read-model projection and operator-safe status paths
     - **Prerequisites:** 4.1, 4.3, 6.3, and the flight slices through 12.4.
     - **Production files/components:** Complete `src/runtime/dashboard_status.cpp`, `/full_self_driving/status` and related status publishers, gateway read-model mapping, and QGC application-presence adapter state.
     - **Implementation:** Publish complete consistent snapshots containing config/flight state, health, registration/Ownmode/armed/landed/takeoff, executor phase/action, plan/checkpoint/progress, selected target/registry/live lock, payload, persistence, recovery, failures, and safe action. Distinguish ground-link health from optional QGC GUI presence; never infer GUI presence from telemetry. Status is read-only and cannot authorize a mutation.
@@ -544,7 +544,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat nominal/fault sequence, gateway boundary, lifecycle, and persistence tests.
     - **Requirements:** 4.3, 4.4, 7.1, 7.3, 7.4, 7.8.
 
-  - [ ] 13.2 Implement ordered MissionEvent/evidence recording and final manifest correlation
+  - [x] 13.2 Implement ordered MissionEvent/evidence recording and final manifest correlation
     - **Prerequisites:** 6.1 and 13.1. Evidence must not block the mode-update path.
     - **Production files/components:** Complete `src/evidence/evidence_sink.hpp/.cpp`, `fsd_evidence` lifecycle node, `MissionEvent`/manifest writers, event correlation helpers, bounded drop/gap reporting, and final manifest generation.
     - **Implementation:** Record config/commit/lock, lifecycle, action intent/result, route checkpoint, target-lock transitions, landing verification, payload intent/feedback/result, takeover/deactivation, recovery decision, and completion with mission ID, sortie ID, snapshot hash, event/durable sequence, source/component, and idempotency key. Use asynchronous bounded queues and explicitly mark non-durable/dropped records.
@@ -554,7 +554,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat persistence fault/recovery, full mission, gateway disconnect, and takeover tests.
     - **Requirements:** 6.1–6.7, 7.2, 7.8, 7.9.
 
-  - [ ] 13.3 Add bounded asynchronous logging, diagnostics, metrics, and optional tracing
+  - [x] 13.3 Add bounded asynchronous logging, diagnostics, metrics, and optional tracing
     - **Prerequisites:** 13.1 and 13.2. Observability may gate readiness only when the resolved policy says so.
     - **Production files/components:** Add `src/observability/structured_logger.cpp`, diagnostics publishers, fixed metric definitions/labels, asynchronous exporters, bounded rotating logs, and optional trace adapters configured by ID.
     - **Implementation:** Implement the design metric set for registration/activation, library-managed update/setpoint abstraction rate, action duration/result, persistence/checkpoint, queues/drops, lifecycle, PX4 freshness, resources, payload feedback, and target-lock latency. Exclude raw images/PX4 loops/secrets/paths from logs/traces; never block the mode update path.
@@ -564,7 +564,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat the full sequence, lifecycle, resource, persistence, and gateway security tests.
     - **Requirements:** 7.1, 7.2, 7.4, 7.5, 7.8.
 
-  - [ ]* 13.4 Add the status-observability truthfulness property test
+  - [x]* 13.4 Add the status-observability truthfulness property test
     - **Prerequisites:** 13.1.
     - **Production files/components:** Add `test/property/property_18_status_truthfulness.cpp` and register `fsd_property_18_status_truthfulness`.
     - **Implementation:** Generate component health, PX4/ground-link, QGC-presence, stale/retained status, flight, target, payload, persistence, and recovery states; assert complete truthful snapshots and no GUI-presence inference.
@@ -574,7 +574,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 13.1 status smoke and 7.5 authority test.
     - **Requirements:** 7.1, 7.4; **Property 18: Status observability truthfulness**.
 
-  - [ ]* 13.5 Add the evidence-correlation property test
+  - [x]* 13.5 Add the evidence-correlation property test
     - **Prerequisites:** 13.2.
     - **Production files/components:** Add `test/property/property_19_evidence_correlation.cpp` and register `fsd_property_19_evidence_correlation`.
     - **Implementation:** Generate mission boundaries, event duplicates, queue drops, restarts, locks, payload results, recovery decisions, and completion; assert correlation IDs/sequences and ordered durable/non-durable truth.
@@ -584,7 +584,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat persistence and full-sortie evidence smoke.
     - **Requirements:** 7.2; **Property 19: Evidence correlation**.
 
-  - [ ]* 13.6 Add the observability noninterference property test
+  - [x]* 13.6 Add the observability noninterference property test
     - **Prerequisites:** 13.3.
     - **Production files/components:** Add `test/property/property_25_observability_noninterference.cpp` and register `fsd_property_25_observability_noninterference`.
     - **Implementation:** Generate exporter stalls, evidence backlog, log rotation/storage failures, diagnostics drops, and metrics load; assert mode updates remain bounded and no observability component can select a mode or emit control.
@@ -594,8 +594,8 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 13.3 metrics smoke and 7.3 authority smoke.
     - **Requirements:** 7.1, 7.5; **Property 25: Observability noninterference and truthfulness**.
 
-- [ ] 14. Harden the implementation and prove negative/security boundaries
-  - [ ] 14.1 Add repository-wide source, dependency, generated-interface, and launch compliance scans
+- [x] 14. Harden the implementation and prove negative/security boundaries
+  - [x] 14.1 Add repository-wide source, dependency, generated-interface, and launch compliance scans
     - **Prerequisites:** All implementation slices through 13.3. This task must scan production files, test fixtures, manifests, generated interfaces, and installed launch metadata.
     - **Production files/components:** Add `test/security/production_boundary_scan.py`, CMake/CTest registration, dependency allowlist, and a generated report fixture used only by CI.
     - **Implementation:** Fail on prototype imports/links/launches/contracts, `gazebo_models` runtime paths, old package/topic/parameter names, Offboard symbols/topics, direct flight-control publishers, generic setpoint services, raw GPIO/servo/path/executable/JSON fields, second schedulers/modes/executors, and unbounded public fields. Allow prototype names only in explicitly marked read-only parity fixture metadata.
@@ -605,7 +605,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Run the complete prior CTest suite and live nominal simulation smoke.
     - **Requirements:** 1.3, 1.4, 4.2, 5.6, 5.7, 7.1, 7.7.
 
-  - [ ] 14.2 Add TLS/MQTT ACL/DDS-Security and typed-input negative integration tests
+  - [x] 14.2 Add TLS/MQTT ACL/DDS-Security and typed-input negative integration tests
     - **Prerequisites:** 6.3, 13.1, and 14.1. Use test certificates/broker identities and local protected secret fixtures; never use real credentials.
     - **Production files/components:** Add `test/security/gateway_security_test.cpp`, broker/TLS fixtures, DDS-Security permission fixtures where supported, manifest/config/plan sanitization tests, and certificate rotation/revocation checks.
     - **Implementation:** Test wrong issuer/SAN/expiry/revocation/clock, broker ACL violations, retained/replayed commands, unauthorized DDS participants, malformed bounded requests, traversal/symlink/oversized plans/configs/manifests, evidence rollback, secret permissions/redaction, and security failure behavior. Rejections must not mutate state or create alternate control.
@@ -615,7 +615,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat gateway allowed-command, lifecycle, status, persistence, and exact launch smoke.
     - **Requirements:** 4.2, 4.3, 7.6, 7.7, 7.8.
 
-  - [ ] 14.3 Add resource, queue, storage, evidence, and adapter-failure proof
+  - [x] 14.3 Add resource, queue, storage, evidence, and adapter-failure proof
     - **Prerequisites:** 6.1, 12.1, 13.2, and 13.3.
     - **Production files/components:** Add deterministic slow/failing adapter fakes, image/event/MQTT flood fixtures, storage reserve checks, CPU/memory/temperature/queue tests, and `test/integration/resource_failure_test.cpp`.
     - **Implementation:** Exercise bounded latest-image queues, ordered event backpressure, MQTT size/rate/age limits, artifact/JSON bounds, storage reserve, slow payload/camera/PX4/evidence/metrics adapters, and resource degradation. Affected operations must hold/fail closed without blocking the registered mode update path or adding a fallback.
@@ -625,7 +625,7 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat full nominal sequence, observability noninterference, persistence fault, and authority takeover tests.
     - **Requirements:** 6.3, 7.1, 7.5, 7.6, 7.7.
 
-  - [ ]* 14.4 Add the security-rejection-no-side-effect property test
+  - [x]* 14.4 Add the security-rejection-no-side-effect property test
     - **Prerequisites:** 14.1 and 14.2.
     - **Production files/components:** Add `test/property/property_26_security_rejection.cpp` and register `fsd_property_26_security_rejection`.
     - **Implementation:** Generate invalid identity/ACL/certificate/replay/bounds/path/config/plan/manifest/resource/raw-control requests; assert rejection/audit, unchanged authoritative revision, no PX4/flight/payload/filesystem side effect, and no alternate control path.
