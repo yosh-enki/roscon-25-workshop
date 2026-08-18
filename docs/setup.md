@@ -348,13 +348,15 @@ Launch your Foxglove client and open a connection of type _Foxglove WebSocket_ w
 
 ### Recompiling the ROS 2 workspace
 
-To recompile the ROS 2 workspace
+To recompile the ROS 2 workspace:
 
 ```sh
 cd ~/roscon-25-workshop_ws/
-source source ~/px4_ros_ws/install/setup.bash
-colcon build --symlink-install
+source ~/px4_ros_ws/install/setup.bash
+colcon build --symlink-install --parallel-workers 2 --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF
 ```
+
+> **Note:** Limiting `--parallel-workers 2` and `CMAKE_BUILD_PARALLEL_LEVEL=2` prevents high CPU core machines from overloading RAM (OOM freeze/crash) during C++ compilation.
 
 ## Troubleshooting
 
@@ -362,7 +364,15 @@ colcon build --symlink-install
 
 A1: Make sure you're running the container with GPU support.
 
-### T2: on WSL2 I'm getting `docker: Error response from daemon: error gathering device information while adding custom device "/dev/dri": no such file or directory`
+### T2: Machine freezes or crashes during `colcon build` (Out of Memory)
+
+A2: Heavy C++ compilation across many CPU threads exhausts available system RAM. Always restrict parallel workers:
+```sh
+colcon build --symlink-install --parallel-workers 2 --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DBUILD_TESTING=OFF
+```
+Or build only the specific package you are working on with `--packages-select <pkg_name>`.
+
+### T3: on WSL2 I'm getting `docker: Error response from daemon: error gathering device information while adding custom device "/dev/dri": no such file or directory`
 
 A2: Only `./docker/docker_run.sh --nvidia` combined with NVIDIA Container Toolkit works out of the box on WSL2.
 If you don't have nvidia drivers or NVIDIA Container Toolkit installed on WSL2 you can run it headless `./docker/docker_run.sh --no-gui` or you can try removing `DOCKER_CMD="$DOCKER_CMD --device /dev/dri:/dev/dri"` from `./docker/docker_run.sh`.

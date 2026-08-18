@@ -2,11 +2,17 @@
     "name": "px4_roscon_25_linux",
     "image": "dronecode/roscon-25-workshop:latest",
     "forwardPorts": [8765],
+    "containerEnv": {
+        "MAKEFLAGS": "-j2",
+        "CMAKE_BUILD_PARALLEL_LEVEL": "2"
+    },
     "remoteEnv": {
         "DISPLAY": "${localEnv:DISPLAY}"
     },
     "runArgs": [
-        "--device", "/dev/dri:/dev/dri"
+        "--device", "/dev/dri:/dev/dri",
+        "--ipc=host",
+        "--shm-size=2g"
     ],
     "mounts": [
         {
@@ -15,6 +21,7 @@
             "type": "bind"
         }
     ],
+    "postCreateCommand": "mkdir -p /home/ubuntu/.colcon && printf 'build:\\n  parallel-workers: 2\\n  cmake-args:\\n    - -DCMAKE_BUILD_PARALLEL_LEVEL=2\\n    - -DCMAKE_BUILD_TYPE=RelWithDebInfo\\n    - -DBUILD_TESTING=OFF\\n' > /home/ubuntu/.colcon/defaults.yaml",
     "customizations": {
         "vscode": {
             "settings": {

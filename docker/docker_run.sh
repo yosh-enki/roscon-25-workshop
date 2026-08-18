@@ -42,6 +42,8 @@ if [ "$NO_GUI" = false ]; then
 fi
 
 # Add common options
+DOCKER_CMD="$DOCKER_CMD --ipc=host --shm-size=2g"
+DOCKER_CMD="$DOCKER_CMD -e MAKEFLAGS=-j2 -e CMAKE_BUILD_PARALLEL_LEVEL=2"
 DOCKER_CMD="$DOCKER_CMD -p 18570:18570/udp"
 DOCKER_CMD="$DOCKER_CMD -p 8765:8765"
 DOCKER_CMD="$DOCKER_CMD -v ${SCRIPTPATH}/..:/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop"

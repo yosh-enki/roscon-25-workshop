@@ -4,13 +4,17 @@
     "forwardPorts": [8765],
     "containerEnv": {
         "NVIDIA_VISIBLE_DEVICES": "all",
-        "NVIDIA_DRIVER_CAPABILITIES": "all"
+        "NVIDIA_DRIVER_CAPABILITIES": "all",
+        "MAKEFLAGS": "-j2",
+        "CMAKE_BUILD_PARALLEL_LEVEL": "2"
     },
     "remoteEnv": {
         "DISPLAY": "${localEnv:DISPLAY}"
     },
     "runArgs": [
-        "--runtime", "nvidia"
+        "--runtime", "nvidia",
+        "--ipc=host",
+        "--shm-size=2g"
     ],
     "mounts": [
         {
@@ -19,6 +23,7 @@
             "type": "bind"
         }
     ],
+    "postCreateCommand": "mkdir -p /home/ubuntu/.colcon && printf 'build:\\n  parallel-workers: 2\\n  cmake-args:\\n    - -DCMAKE_BUILD_PARALLEL_LEVEL=2\\n    - -DCMAKE_BUILD_TYPE=RelWithDebInfo\\n    - -DBUILD_TESTING=OFF\\n' > /home/ubuntu/.colcon/defaults.yaml",
     "customizations": {
         "vscode": {
             "settings": {

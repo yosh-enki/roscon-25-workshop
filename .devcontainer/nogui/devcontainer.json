@@ -2,6 +2,15 @@
     "name": "px4_roscon_25_nogui",
     "image": "dronecode/roscon-25-workshop:latest",
     "forwardPorts": [8765, 18570],
+    "containerEnv": {
+        "MAKEFLAGS": "-j2",
+        "CMAKE_BUILD_PARALLEL_LEVEL": "2"
+    },
+    "runArgs": [
+        "--ipc=host",
+        "--shm-size=2g"
+    ],
+    "postCreateCommand": "mkdir -p /home/ubuntu/.colcon && printf 'build:\\n  parallel-workers: 2\\n  cmake-args:\\n    - -DCMAKE_BUILD_PARALLEL_LEVEL=2\\n    - -DCMAKE_BUILD_TYPE=RelWithDebInfo\\n    - -DBUILD_TESTING=OFF\\n' > /home/ubuntu/.colcon/defaults.yaml",
     "customizations": {
         "vscode": {
             "settings": {
