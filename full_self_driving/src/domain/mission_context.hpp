@@ -67,6 +67,24 @@ public:
 
   bool is_locked() const { return locked_; }
 
+  struct OriginHomePosition
+  {
+    double latitude_deg{0.0};
+    double longitude_deg{0.0};
+    double altitude_msl_m{0.0};
+    bool valid{false};
+  };
+
+  bool has_origin_home_position() const { return origin_home_.valid; }
+  OriginHomePosition get_origin_home_position() const { return origin_home_; }
+  void set_origin_home_position(double lat_deg, double lon_deg, double alt_msl_m)
+  {
+    origin_home_.latitude_deg = lat_deg;
+    origin_home_.longitude_deg = lon_deg;
+    origin_home_.altitude_msl_m = alt_msl_m;
+    origin_home_.valid = true;
+  }
+
   const OperatorSelection & get_selection() const { return selection_; }
   uint64_t get_selection_revision() const { return selection_.selection_revision; }
   uint64_t get_committed_revision() const { return committed_revision_; }
@@ -142,6 +160,7 @@ private:
   std::string resolved_config_hash_;
   std::shared_ptr<const EngineeringConfig> resolved_config_;
   std::string validation_token_;
+  OriginHomePosition origin_home_;
 };
 
 }  // namespace full_self_driving::domain

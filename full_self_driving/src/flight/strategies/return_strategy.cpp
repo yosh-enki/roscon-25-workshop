@@ -80,7 +80,17 @@ void ReturnStrategy::on_update(float dt_s)
   auto snapshot = state_cache_->capture_snapshot();
 
   if (!home_initialized_) {
-    if (snapshot.home_pos_valid) {
+    if (mission_ctx_ && mission_ctx_->has_origin_home_position()) {
+      auto origin = mission_ctx_->get_origin_home_position();
+      home_lat_ = origin.latitude_deg;
+      home_lon_ = origin.longitude_deg;
+      home_alt_msl_ = origin.altitude_msl_m;
+      home_initialized_ = true;
+      RCLCPP_INFO(
+        node_.get_logger(),
+        "[RETURN_STRATEGY] Using locked Sortie Origin Home Base: lat=%.6f, lon=%.6f, alt=%.2f m",
+        home_lat_, home_lon_, home_alt_msl_);
+    } else if (snapshot.home_pos_valid) {
       home_lat_ = snapshot.home_global_position.x();
       home_lon_ = snapshot.home_global_position.y();
       home_alt_msl_ = snapshot.home_global_position.z();
@@ -108,8 +118,11 @@ void ReturnStrategy::on_update(float dt_s)
       goto_setpoint_->update(target, std::nullopt, 3.0f, 1.0f, 0.785f);
 
       float h_dist = px4_ros2::horizontalDistanceToGlobalPosition(snapshot.global_position, target);
-      if (std::isfinite(h_dist) && h_dist <= 2.0f) {
-        RCLCPP_INFO(node_.get_logger(), "[RETURN_STRATEGY] Arrived over home. Starting descent...");
+      float h_speed = std::sqrt(snapshot.local_velocity_ned.x() * snapshot.local_velocity_ned.x() +
+                                snapshot.local_velocity_ned.y() * snapshot.local_velocity_ned.y());
+      if (std::isfinite(h_dist) && h_dist <= 2.0f && h_speed <= 0.75f) {
+        RCLCPP_INFO(node_.get_logger(), "[RETURN_STRATEGY] Arrived and settled over Sortie Home Base (dist=%.2f m, speed=%.2f m/s). Starting descent...",
+          h_dist, h_speed);
         sub_phase_ = SubPhase::DESCEND_HOME;
       }
     } else {
@@ -124,10 +137,14 @@ void ReturnStrategy::on_update(float dt_s)
         Eigen::Vector3f{0.0f, 0.0f, 1.0f},
         std::nullopt,
         std::nullopt);
+    } else if (goto_setpoint_ && home_initialized_) {
+      Eigen::Vector3d target{home_lat_, home_lon_, home_alt_msl_};
+      goto_setpoint_->update(target, std::nullopt, 1.0f);
     }
 
-    if (snapshot.land_detected_valid && snapshot.is_landed) {
-      RCLCPP_INFO(node_.get_logger(), "[RETURN_STRATEGY] Touchdown detected. Dwell verification starting...");
+    float vz = snapshot.local_velocity_ned.z();
+    if (snapshot.is_landed || (snapshot.local_position_ned.z() >= -0.3f && std::abs(vz) < 0.25f)) {
+      RCLCPP_INFO(node_.get_logger(), "[RETURN_STRATEGY] Touchdown at Home Base detected! Dwell verification starting...");
       sub_phase_ = SubPhase::TOUCHDOWN_DWELL;
       dwell_timer_s_ = 0.0f;
     }

@@ -382,6 +382,29 @@ void FlightRuntimeNode::check_and_register_mode()
         if (coordinator_) {
           if (coordinator_->get_current_strategy() == flight::StrategyType::WAITING_FOR_MODE) {
             auto snapshot = state_cache_->capture_snapshot();
+            if (context_ && !context_->has_origin_home_position()) {
+              if (snapshot.home_pos_valid) {
+                context_->set_origin_home_position(
+                  snapshot.home_global_position.x(),
+                  snapshot.home_global_position.y(),
+                  snapshot.home_global_position.z());
+                RCLCPP_INFO(get_logger(),
+                  "[RUNTIME] Locked Sortie Origin Home Base from home_pos: lat=%.6f, lon=%.6f, alt=%.2f m",
+                  snapshot.home_global_position.x(),
+                  snapshot.home_global_position.y(),
+                  snapshot.home_global_position.z());
+              } else if (snapshot.global_pos_valid) {
+                context_->set_origin_home_position(
+                  snapshot.global_position.x(),
+                  snapshot.global_position.y(),
+                  snapshot.global_position.z());
+                RCLCPP_INFO(get_logger(),
+                  "[RUNTIME] Locked Sortie Origin Home Base from global_pos: lat=%.6f, lon=%.6f, alt=%.2f m",
+                  snapshot.global_position.x(),
+                  snapshot.global_position.y(),
+                  snapshot.global_position.z());
+              }
+            }
             if (snapshot.is_landed) {
               RCLCPP_INFO(get_logger(), "[RUNTIME] Mode activated on ground. Transitioning to TAKEOFF...");
               coordinator_->request_transition(flight::StrategyType::TAKEOFF);
@@ -448,9 +471,16 @@ void FlightRuntimeNode::check_and_register_mode()
           coordinator_->request_transition(flight::StrategyType::RETURN_STRATEGY);
         }
       } else if (completed_type == flight::StrategyType::RETURN_STRATEGY) {
-        RCLCPP_INFO(get_logger(), "[RUNTIME] ReturnStrategy completed. Transitioning to RETURN_LANDED...");
+        RCLCPP_INFO(get_logger(), "[RUNTIME] ReturnStrategy completed at Home Base. Transitioning to RETURN_LANDED and disarming...");
         if (coordinator_) {
           coordinator_->request_transition(flight::StrategyType::RETURN_LANDED);
+        }
+        if (executor_) {
+          executor_->disarm([](px4_ros2::Result result) {
+            RCLCPP_INFO(rclcpp::get_logger("FlightRuntimeNode"),
+              "[RUNTIME] Final mission disarm completed with result: %s",
+              px4_ros2::resultToString(result));
+          });
         }
       }
     });
