@@ -1552,6 +1552,220 @@ colcon test-result --all --verbose
   - 14-stage autonomous sortie and 5 fault injection branches verified.
   - Complete SROS2 PKI, signed permissions, and negative security protection active.
 
+---
+
+## 17. Section 17: Hardware Profile Manifest, Validation Gate & Hardware Installation Manual (Task 16)
+
+### 17.1 Architectural Overview & Deferral Boundary
+
+Physical hardware deployment on the companion computer (Raspberry Pi 4 Model B) and flight management unit (Pixhawk 6C / FMUv6X) is **explicitly deferred** behind a formal Hardware Manifest Gate. The software architecture enforces strict fail-closed validation:
+* Without a valid, signed, and approved hardware manifest, invoking `simulation:=false` immediately halts before node initialization with `HARDWARE_PROFILE_NOT_CONFIGURED`.
+* The system introduces zero fake runtime mocks and zero fallback to Gazebo when running in hardware mode.
+* Domain rules, coordinator state machines, ROS 2 message contracts, persistence schemas, and mode ownership remain 100% invariant across profiles (proven by Property 24).
+
+```mermaid
+graph TD
+    subgraph Launch & Validation Gate
+        CMD[ros2 launch full_self_driving full_self_driving.launch.py simulation:=false]
+        GATE[Hardware Validation Gate]
+        VAL[fsd_hardware_manifest_validator]
+    end
+
+    subgraph Validation Checks
+        CHK_SCHEMA[1. YAML Schema & Bounds]
+        CHK_APP[2. Approval Signed & Evidence SHA-256]
+        CHK_CKSUM[3. Camera Calibration SHA-256]
+        CHK_DEV[4. Device Nodes: /dev/ttyAMA0, /dev/video0, /dev/gpiochip0]
+        CHK_KEY[5. SROS2 Keystore & Security Config]
+    end
+
+    subgraph Fail-Closed Outcome
+        REJECT[Reject Startup: HARDWARE_PROFILE_NOT_CONFIGURED]
+    end
+
+    CMD --> GATE
+    GATE --> VAL
+    VAL --> CHK_SCHEMA --> CHK_APP --> CHK_CKSUM --> CHK_DEV --> CHK_KEY
+    CHK_SCHEMA -- Incomplete --> REJECT
+    CHK_APP -- Unapproved / Deferred --> REJECT
+    CHK_CKSUM -- Hash Mismatch --> REJECT
+    CHK_DEV -- Inaccessible --> REJECT
+```
+
+---
+
+### 17.2 Physical Hardware Bill of Materials (BOM)
+
+| Subsystem | Component | Model / Specification | Interface / Connector |
+|---|---|---|---|
+| **Companion Computer** | Raspberry Pi 4 Model B | 4GB / 8GB LPDDR4, Quad-core Cortex-A72 @ 1.5GHz | USB-C 5V/3A Power, MicroSD / NVMe |
+| **Autopilot / FMU** | Pixhawk 6C / FMUv6X | STM32H753 @ 480MHz, PX4 Autopilot v1.14+ | `TELEM2` JST-GH 6-pin UART (921600 baud) |
+| **Downward Camera** | Sony IMX219 / Pi Camera v2 | 8MP Sensor (1280x720 @ 30 FPS, 70° FOV) | 15-pin CSI Ribbon Cable or USB UVC V4L2 |
+| **Payload Actuator** | Digital PWM Cargo Mechanism | 50Hz PWM Servo / Electromagnetic Release | GPIO Pin 18 (PWM), GPIO Pin 24 (Sense) |
+| **Power Distribution** | Companion BEC / Step-down | 5V 3.5A Clean Power Supply | Connected directly to Pi 4 GPIO 5V/GND |
+| **Telemetry Interconnect**| JST-GH to DuPont Cable | 6-pin JST-GH to 4-pin DuPont Female | TXD, RXD, GND (No 5V back-feed) |
+
+---
+
+### 17.3 Electrical & Interconnect Wiring Pinout
+
+#### 1. FMU Telemetry UART Link (`TELEM2` $\leftrightarrow$ Raspberry Pi 4)
+* **Pixhawk `TELEM2` Port (JST-GH 6-pin)**:
+  * Pin 1 (`VCC 5V`): **DO NOT CONNECT** (Prevent ground loop / reverse current)
+  * Pin 2 (`TX`): Connect to Raspberry Pi **Pin 10 (`GPIO 15 / RXD0`)**
+  * Pin 3 (`RX`): Connect to Raspberry Pi **Pin 8 (`GPIO 14 / TXD0`)**
+  * Pin 4 (`CTS`): Optional (leave disconnected if `flow_control: "none"`)
+  * Pin 5 (`RTS`): Optional (leave disconnected if `flow_control: "none"`)
+  * Pin 6 (`GND`): Connect to Raspberry Pi **Pin 6 (`GND`)**
+
+#### 2. Payload Actuator GPIO / PWM Link
+* **Signal Pin**: Raspberry Pi **Pin 12 (`GPIO 18 / PWM0`)**
+* **Feedback Sense Pin**: Raspberry Pi **Pin 18 (`GPIO 24`)**
+* **Actuator Power**: Connect to external 5V/6V BEC power rail and common ground.
+
+---
+
+### 17.4 Companion Computer OS, Toolchain & Permissions Setup
+
+1. **Operating System**:
+   * Flash **Ubuntu 22.04.4 LTS Server (64-bit aarch64)** to a High-Endurance MicroSD card (U3/A2) or USB 3.0 SSD.
+   * Enable hardware serial UART in `/boot/firmware/config.txt`:
+     ```ini
+     enable_uart=1
+     dtoverlay=disable-bt
+     camera_auto_detect=1
+     ```
+   * Disable the serial console service on `/dev/ttyAMA0`:
+     ```bash
+     sudo systemctl stop serial-getty@ttyAMA0.service
+     sudo systemctl disable serial-getty@ttyAMA0.service
+     ```
+
+2. **Linux User Group & Permission Configuration**:
+   ```bash
+   sudo usermod -a -G dialout,video,gpio ubuntu
+   ```
+
+3. **Install Core Robotics Dependencies**:
+   ```bash
+   sudo apt-get update && sudo apt-get install -y \
+     ros-humble-ros-base \
+     ros-humble-px4-ros2-cpp \
+     ros-humble-cv-bridge \
+     ros-humble-image-transport \
+     ros-humble-v4l2-camera \
+     libyaml-cpp-dev \
+     libssl-dev
+   ```
+
+---
+
+### 17.5 Deterministic `udev` Rules Configuration
+
+To guarantee deterministic device naming across reboots and USB reconnection, create `/etc/udev/rules.d/99-fsd-hardware.rules`:
+
+```udev
+# Deterministic Pixhawk FMU UART Serial Symlink
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", SYMLINK+="fsd_fmu_serial", MODE="0666", GROUP="dialout"
+KERNEL=="ttyAMA0", SYMLINK+="fsd_fmu_serial", MODE="0666", GROUP="dialout"
+
+# Deterministic Downward Camera Device Symlink
+SUBSYSTEM=="video4linux", ATTRS{name}=="*imx219*", SYMLINK+="fsd_camera", MODE="0666", GROUP="video"
+SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0c45", SYMLINK+="fsd_camera", MODE="0666", GROUP="video"
+```
+
+Reload udev rules:
+```bash
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+---
+
+### 17.6 Camera Sensor Calibration & SHA-256 Checksum Generation
+
+1. **Execute OpenCV Camera Calibration**:
+   Capture checkerboard images (e.g. 8x6 grid with 25mm squares) using `v4l2-camera` and compute camera matrix $K$ and distortion coefficients $D$:
+   ```bash
+   ros2 run camera_calibration cameracalibrator \
+     --size 8x6 --square 0.025 \
+     image:=/fsd/camera \
+     camera:=/fsd
+   ```
+
+2. **Store Calibration Artifact**:
+   Save calibration YAML to `config/camera_calibrations/imx219_720p.yaml`.
+
+3. **Generate Authoritative SHA-256 Checksum**:
+   ```bash
+   sha256sum config/camera_calibrations/imx219_720p.yaml
+   # Output: c283de9385125caf9014576a6fa7e7e1cd4497a90f3087f4060da9ea71770299
+   ```
+   Paste this exact SHA-256 digest into `camera.calibration_sha256` in your hardware manifest.
+
+---
+
+### 17.7 SROS2 Security Keystore & Permissions Setup
+
+1. **Deploy SROS2 Keystore on Companion Computer**:
+   ```bash
+   mkdir -p /home/ubuntu/fsd_keystore
+   ros2 security create_keystore /home/ubuntu/fsd_keystore
+   ros2 security create_enclave /home/ubuntu/fsd_keystore /full_self_driving
+   ```
+
+2. **Export Security Environment Variables in `~/.bashrc`**:
+   ```bash
+   export ROS_SECURITY_ENABLE=true
+   export ROS_SECURITY_STRATEGY=Enforce
+   export ROS_SECURITY_KEYSTORE=/home/ubuntu/fsd_keystore
+   export ROS_SECURITY_ENCLAVE_OVERRIDE=/full_self_driving
+   ```
+
+---
+
+### 17.8 Hardware Manifest Approval & Safety Sign-Off Gate
+
+The hardware profile manifest (`simulation/manifests/hardware_schema.yaml`) acts as the gatekeeper for flight safety. The fields `approval.approved` and `approval.approval_evidence_sha256` require formal engineering sign-off after completing the ground testing checklist:
+
+```yaml
+approval:
+  approved: true # Only set to true after ground & tethered flight sign-off
+  approval_authority: "safety-board@fsd.roscon25.org"
+  approval_evidence_sha256: "<sha256_of_ground_test_report>"
+  approval_timestamp_utc: "2026-08-18T12:00:00Z"
+```
+
+---
+
+### 17.9 Hardware Manifest CLI Validator & Launch Execution
+
+#### 1. Validate Hardware Manifest using CLI Tool:
+```bash
+# Basic validation
+fsd_hardware_manifest_validator --manifest /path/to/hardware_manifest.yaml
+
+# Full validation including live device node accessibility
+fsd_hardware_manifest_validator --manifest /path/to/hardware_manifest.yaml --check-devices
+
+# Output JSON for automated CI/preflight checks
+fsd_hardware_manifest_validator --manifest /path/to/hardware_manifest.yaml --json
+```
+
+#### 2. Launch with Explicit Hardware Manifest:
+```bash
+ros2 launch full_self_driving full_self_driving.launch.py \
+  simulation:=false \
+  hardware_manifest:=/path/to/approved_hardware_manifest.yaml
+```
+
+#### 3. Verification of Fail-Closed Deferral:
+```bash
+# Launching without manifest fails closed immediately
+ros2 launch full_self_driving full_self_driving.launch.py simulation:=false
+# Output: [ERROR] HARDWARE_PROFILE_NOT_CONFIGURED: Hardware bringup for Raspberry Pi 4 is explicitly deferred pending an approved hardware manifest.
+```
+
+
 
 
 

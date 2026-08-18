@@ -666,8 +666,8 @@ Every task's regression check includes the previously completed slices, `colcon 
     - **Regression checks:** Repeat 15.1/15.2 exact launch and source scan.
     - **Requirements:** 1.1, 1.8; **Property 24: Simulation/hardware adapter invariance**.
 
-- [ ] 16. Defer Raspberry Pi 4 hardware bringup behind an explicit manifest gate
-  - [ ]* 16.1 Add the deferred hardware manifest/schema and fail-closed `simulation:=false` branch
+- [x] 16. Defer Raspberry Pi 4 hardware bringup behind an explicit manifest gate
+  - [x]* 16.1 Add the deferred hardware manifest/schema and fail-closed `simulation:=false` branch
     - **Prerequisites:** 15.2. This task is **deferred/optional** until an approved real FMU, camera, payload, telemetry, clock/TF, process, resource, permission, calibration, and power-loss validation package exists.
     - **Production files/components:** Add `simulation/manifests/hardware_schema.yaml`, `src/launch/hardware_manifest_validator.cpp`, hardware adapter interface stubs with no fake runtime implementation, and tests for `HARDWARE_PROFILE_NOT_CONFIGURED`.
     - **Implementation:** Validate executable identity, device/resource paths, permissions, adapter IDs, calibration/TF, security material, and approval evidence. Reject incomplete/deferred Raspberry Pi 4 bringup; never silently substitute Gazebo, fake payload/camera, or simulated telemetry. Keep domain contracts and the one launch entry point unchanged.
