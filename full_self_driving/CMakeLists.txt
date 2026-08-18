@@ -1293,6 +1293,10 @@ if(BUILD_TESTING)
   ament_add_pytest_test(launch_boundary_test
     test/launch/launch_boundary_test.py
   )
+
+  ament_add_pytest_test(full_sortie_acceptance
+    test/acceptance/full_sortie_acceptance.py
+  )
 endif()
 
 ament_export_include_directories(include)
