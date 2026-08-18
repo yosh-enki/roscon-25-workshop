@@ -93,6 +93,12 @@ void FsdGateway::set_persistence_manager(std::shared_ptr<persistence::Persistenc
   persistence_ = pm;
 }
 
+void FsdGateway::set_payload_controller(std::shared_ptr<payload::PayloadController> pc)
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  payload_controller_ = pc;
+}
+
 void FsdGateway::reset_idempotency_cache()
 {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -563,6 +569,35 @@ GatewayResponse FsdGateway::handle_prepare_payload(const CommandEnvelope & env)
     resp.accepted = false;
     resp.error_code = "ERROR_DISARMED_REQUIRED";
     resp.error_message = "Payload preparation requires disarmed and unlocked context";
+    return resp;
+  }
+
+  if (payload_controller_) {
+    uint8_t op = full_self_driving::srv::PreparePayload::Request::OP_PREPARE_FOR_SORTIE;
+    if (env.raw_payload_json.find("\"operation\":0") != std::string::npos ||
+        env.raw_payload_json.find("OPEN_FOR_LOADING") != std::string::npos) {
+      op = full_self_driving::srv::PreparePayload::Request::OP_OPEN_FOR_LOADING;
+    } else if (env.raw_payload_json.find("\"operation\":1") != std::string::npos ||
+               env.raw_payload_json.find("VERIFY_SECURED") != std::string::npos) {
+      op = full_self_driving::srv::PreparePayload::Request::OP_VERIFY_SECURED;
+    }
+
+    full_self_driving::msg::PayloadStatus status;
+    std::string err;
+    bool ok = payload_controller_->prepare(op, env.request_id, env.expected_revision, status, &err);
+    if (!ok) {
+      resp.accepted = false;
+      resp.error_code = "ERROR_PAYLOAD_PREPARATION_FAILED";
+      resp.error_message = err.empty() ? "Payload preparation rejected by controller" : err;
+      return resp;
+    }
+
+    resp.accepted = true;
+    resp.response_payload_json = "{\"payload_prepared\":true,\"commanded_state\":" +
+      std::to_string(status.commanded_state) + ",\"feedback_state\":" +
+      std::to_string(status.feedback_state) + ",\"cargo_loaded\":" +
+      (status.cargo_loaded ? "true" : "false") + ",\"secured\":" +
+      (status.secured ? "true" : "false") + "}";
     return resp;
   }
 

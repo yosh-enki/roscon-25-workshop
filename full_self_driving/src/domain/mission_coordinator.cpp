@@ -48,6 +48,30 @@ std::shared_ptr<registry::PadRegistry> MissionCoordinator::get_pad_registry() co
   return pad_registry_;
 }
 
+void MissionCoordinator::set_payload_controller(std::shared_ptr<payload::PayloadController> pc)
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  payload_controller_ = std::move(pc);
+}
+
+std::shared_ptr<payload::PayloadController> MissionCoordinator::get_payload_controller() const
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  return payload_controller_;
+}
+
+void MissionCoordinator::set_persistence_manager(std::shared_ptr<persistence::PersistenceManager> pm)
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  persistence_ = std::move(pm);
+}
+
+std::shared_ptr<persistence::PersistenceManager> MissionCoordinator::get_persistence_manager() const
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  return persistence_;
+}
+
 void MissionCoordinator::handle_target_lock_update(const LiveTargetLock & lock)
 {
   std::lock_guard<std::mutex> guard(mutex_);
@@ -532,6 +556,32 @@ bool MissionCoordinator::handle_direct_fallback(const std::string & reason)
   return request_transition(flight::StrategyType::SEARCH, &err);
 }
 
+bool MissionCoordinator::handle_landing_verified()
+{
+  std::string err;
+  if (!request_transition(flight::StrategyType::LANDED_VERIFIED, &err)) {
+    return false;
+  }
+  return request_transition(flight::StrategyType::PAYLOAD_OPERATION, &err);
+}
+
+bool MissionCoordinator::handle_payload_complete(uint8_t result)
+{
+  std::string err;
+  if (result == full_self_driving::msg::PayloadStatus::RESULT_SUCCESS) {
+    return request_transition(flight::StrategyType::TAKEOFF_AFTER_DELIVERY, &err);
+  } else {
+    return request_transition(flight::StrategyType::RETURN_STRATEGY, &err);
+  }
+}
+
+void MissionCoordinator::instantiate_payload_operation_strategy()
+{
+  if (!mode_) return;
+  mode_->set_strategy(std::make_unique<flight::PayloadOperationStrategy>(
+    mode_->node(), payload_controller_, persistence_, context_));
+}
+
 bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, std::string * out_error)
 {
   std::lock_guard<std::mutex> guard(mutex_);
@@ -602,6 +652,93 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
     }
   }
 
+  // Transition from PRECISION_LAND to LANDED_VERIFIED
+  if (current_strategy_ == flight::StrategyType::PRECISION_LAND && next_strategy == flight::StrategyType::LANDED_VERIFIED) {
+    transition_trace_.push_back("FLY-012 / EVT_LANDING_VERIFIED -> LANDED_VERIFIED");
+    current_strategy_ = flight::StrategyType::LANDED_VERIFIED;
+    return true;
+  }
+
+  // Transition from LANDED_VERIFIED to PAYLOAD_OPERATION
+  if (current_strategy_ == flight::StrategyType::LANDED_VERIFIED && next_strategy == flight::StrategyType::PAYLOAD_OPERATION) {
+    transition_trace_.push_back("FLY-013 / EVT_PAYLOAD_GATES_PASSED -> PAYLOAD_OPERATION");
+    current_strategy_ = flight::StrategyType::PAYLOAD_OPERATION;
+    if (mode_) {
+      instantiate_payload_operation_strategy();
+    }
+    return true;
+  }
+
+  // Transition from PAYLOAD_OPERATION to TAKEOFF_AFTER_DELIVERY
+  if (current_strategy_ == flight::StrategyType::PAYLOAD_OPERATION && next_strategy == flight::StrategyType::TAKEOFF_AFTER_DELIVERY) {
+    transition_trace_.push_back("FLY-014 / EVT_PAYLOAD_SUCCESS -> TAKEOFF_AFTER_DELIVERY");
+    current_strategy_ = flight::StrategyType::TAKEOFF_AFTER_DELIVERY;
+    if (mode_) {
+      double takeoff_alt = 15.0;
+      if (context_ && context_->get_resolved_config()) {
+        takeoff_alt = context_->get_resolved_config()->routes.search_altitude_m;
+      }
+      mode_->set_strategy(std::make_unique<flight::TakeoffStrategy>(
+        mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), takeoff_alt));
+    }
+    return true;
+  }
+
+  // Transition from PAYLOAD_OPERATION to RETURN_STRATEGY (on failure or unknown)
+  if (current_strategy_ == flight::StrategyType::PAYLOAD_OPERATION && next_strategy == flight::StrategyType::RETURN_STRATEGY) {
+    transition_trace_.push_back("FLY-015 / EVT_PAYLOAD_NON_SUCCESS -> RETURN_STRATEGY");
+    current_strategy_ = flight::StrategyType::RETURN_STRATEGY;
+    return true;
+  }
+
+  // Transition from TAKEOFF_AFTER_DELIVERY to TRANSIT_OUT
+  if (current_strategy_ == flight::StrategyType::TAKEOFF_AFTER_DELIVERY && next_strategy == flight::StrategyType::TRANSIT_OUT) {
+    transition_trace_.push_back("FLY-017 / EVT_TAKEOFF_AFTER_DELIVERY_COMPLETE -> TRANSIT_OUT");
+    current_strategy_ = flight::StrategyType::TRANSIT_OUT;
+    if (mode_) {
+      Route route;
+      if (has_custom_transit_out_route_) {
+        route = custom_transit_out_route_;
+      } else {
+        route = Route::create_default_kmitl_transit_out_route();
+        if (context_ && context_->get_resolved_config()) {
+          const auto & cfg = context_->get_resolved_config()->routes;
+          route.set_max_horizontal_speed_m_s(static_cast<float>(cfg.transit_out_speed_m_s));
+          route.set_transit_altitude_above_home_m(cfg.search_altitude_m);
+          route.set_acceptance_radius_m(static_cast<float>(cfg.acceptance_radius_m));
+          route.set_max_yaw_rate_deg_s(static_cast<float>(cfg.max_yaw_rate_deg_s));
+        }
+      }
+      mode_->set_strategy(std::make_unique<flight::TransitOutStrategy>(
+        mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), route, persistence_));
+    }
+    return true;
+  }
+
+  // Transition from TRANSIT_OUT to RETURN_STRATEGY
+  if (current_strategy_ == flight::StrategyType::TRANSIT_OUT && next_strategy == flight::StrategyType::RETURN_STRATEGY) {
+    transition_trace_.push_back("FLY-018 / EVT_TRANSIT_OUT_COMPLETE -> RETURN_STRATEGY");
+    current_strategy_ = flight::StrategyType::RETURN_STRATEGY;
+    if (mode_) {
+      double return_alt = 15.0;
+      if (context_ && context_->get_resolved_config()) {
+        return_alt = context_->get_resolved_config()->routes.search_altitude_m;
+      }
+      mode_->set_strategy(std::make_unique<flight::ReturnStrategy>(
+        mode_->node(), mode_->goto_global_setpoint(), mode_->trajectory_setpoint(),
+        mode_->state_cache(), persistence_, context_,
+        flight::ReturnStrategy::ReturnMode::RETURN_TO_HOME, return_alt));
+    }
+    return true;
+  }
+
+  // Transition from RETURN_STRATEGY to RETURN_LANDED
+  if (current_strategy_ == flight::StrategyType::RETURN_STRATEGY && next_strategy == flight::StrategyType::RETURN_LANDED) {
+    transition_trace_.push_back("FLY-019 / EVT_RETURN_ARRIVED -> RETURN_LANDED");
+    current_strategy_ = flight::StrategyType::RETURN_LANDED;
+    return true;
+  }
+
   std::string trace_entry = flight::strategy_type_to_string(current_strategy_) +
     " -> " + flight::strategy_type_to_string(next_strategy);
   transition_trace_.push_back(trace_entry);
@@ -642,6 +779,40 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
       instantiate_search_strategy();
     } else if (next_strategy == flight::StrategyType::PRECISION_LAND) {
       instantiate_precision_land_strategy();
+    } else if (next_strategy == flight::StrategyType::PAYLOAD_OPERATION) {
+      instantiate_payload_operation_strategy();
+    } else if (next_strategy == flight::StrategyType::TAKEOFF_AFTER_DELIVERY) {
+      double takeoff_alt = 15.0;
+      if (context_ && context_->get_resolved_config()) {
+        takeoff_alt = context_->get_resolved_config()->routes.search_altitude_m;
+      }
+      mode_->set_strategy(std::make_unique<flight::TakeoffStrategy>(
+        mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), takeoff_alt));
+    } else if (next_strategy == flight::StrategyType::TRANSIT_OUT) {
+      Route route;
+      if (has_custom_transit_out_route_) {
+        route = custom_transit_out_route_;
+      } else {
+        route = Route::create_default_kmitl_transit_out_route();
+        if (context_ && context_->get_resolved_config()) {
+          const auto & cfg = context_->get_resolved_config()->routes;
+          route.set_max_horizontal_speed_m_s(static_cast<float>(cfg.transit_out_speed_m_s));
+          route.set_transit_altitude_above_home_m(cfg.search_altitude_m);
+          route.set_acceptance_radius_m(static_cast<float>(cfg.acceptance_radius_m));
+          route.set_max_yaw_rate_deg_s(static_cast<float>(cfg.max_yaw_rate_deg_s));
+        }
+      }
+      mode_->set_strategy(std::make_unique<flight::TransitOutStrategy>(
+        mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), route, persistence_));
+    } else if (next_strategy == flight::StrategyType::RETURN_STRATEGY) {
+      double return_alt = 15.0;
+      if (context_ && context_->get_resolved_config()) {
+        return_alt = context_->get_resolved_config()->routes.search_altitude_m;
+      }
+      mode_->set_strategy(std::make_unique<flight::ReturnStrategy>(
+        mode_->node(), mode_->goto_global_setpoint(), mode_->trajectory_setpoint(),
+        mode_->state_cache(), persistence_, context_,
+        flight::ReturnStrategy::ReturnMode::RETURN_TO_HOME, return_alt));
     }
   }
 
@@ -671,6 +842,19 @@ void MissionCoordinator::reset_custom_transit_in_route()
 {
   std::lock_guard<std::mutex> guard(mutex_);
   has_custom_transit_in_route_ = false;
+}
+
+void MissionCoordinator::set_custom_transit_out_route(const Route & route)
+{
+  std::lock_guard<std::mutex> guard(mutex_);
+  custom_transit_out_route_ = route;
+  has_custom_transit_out_route_ = true;
+}
+
+void MissionCoordinator::reset_custom_transit_out_route()
+{
+  std::lock_guard<std::mutex> guard(mutex_);
+  has_custom_transit_out_route_ = false;
 }
 
 void MissionCoordinator::set_custom_search_route(const CanonicalSearchRoute & route)

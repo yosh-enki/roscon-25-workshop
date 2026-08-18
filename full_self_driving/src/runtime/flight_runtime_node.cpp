@@ -268,10 +268,44 @@ void FlightRuntimeNode::initialize_components()
   px4_context_ = std::make_unique<px4_ros2::Context>(*this);
   state_cache_ = std::make_shared<adapters::Px4StateCache>(*px4_context_);
 
+  // Initialize Payload Controller
+  payload_controller_ = std::make_shared<payload::PayloadController>(
+    std::make_shared<payload::SimulationPayloadAdapter>("sim_payload_01"), context_);
+
   // Initialize Coordinator
   coordinator_ = std::make_shared<domain::MissionCoordinator>(context_);
   coordinator_->set_plan_manager(plan_manager_);
   coordinator_->set_pad_registry(pad_registry_);
+  coordinator_->set_payload_controller(payload_controller_);
+  coordinator_->set_persistence_manager(persistence_);
+
+  payload_status_pub_ = this->create_publisher<full_self_driving::msg::PayloadStatus>(
+    "/full_self_driving/payload/status", rclcpp::QoS(1).transient_local().reliable());
+
+  prepare_payload_srv_ = this->create_service<full_self_driving::srv::PreparePayload>(
+    "/full_self_driving/prepare_payload",
+    [this](
+      const std::shared_ptr<full_self_driving::srv::PreparePayload::Request> req,
+      std::shared_ptr<full_self_driving::srv::PreparePayload::Response> res)
+    {
+      if (!payload_controller_) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "PAYLOAD_CONTROLLER_UNAVAILABLE";
+        res->error.message = "PayloadController is not available";
+        return;
+      }
+      std::string err;
+      res->accepted = payload_controller_->prepare(
+        req->operation, req->request_id, req->expected_selection_revision, res->status, &err);
+      if (!res->accepted) {
+        res->has_error = true;
+        res->error.code = "PAYLOAD_PREPARATION_REJECTED";
+        res->error.message = err;
+      } else {
+        res->has_error = false;
+      }
+    });
 
   if (acquisition_fixture == "stale_direct") {
     coordinator_->set_trusted_record_max_age_s(0.001); // Set max age to 1ms so fixture record is immediately stale in sim
@@ -376,6 +410,31 @@ void FlightRuntimeNode::check_and_register_mode()
         }
       } else if (completed_type == flight::StrategyType::SEARCH) {
         RCLCPP_INFO(get_logger(), "[RUNTIME] Search completed. Holding over final search waypoint...");
+      } else if (completed_type == flight::StrategyType::PRECISION_LAND) {
+        RCLCPP_INFO(get_logger(), "[RUNTIME] Precision landing completed. Transitioning to LANDED_VERIFIED & PAYLOAD_OPERATION...");
+        if (coordinator_) {
+          coordinator_->handle_landing_verified();
+        }
+      } else if (completed_type == flight::StrategyType::PAYLOAD_OPERATION) {
+        RCLCPP_INFO(get_logger(), "[RUNTIME] Payload operation completed. Transitioning to TAKEOFF_AFTER_DELIVERY...");
+        if (coordinator_) {
+          coordinator_->handle_payload_complete(full_self_driving::msg::PayloadStatus::RESULT_SUCCESS);
+        }
+      } else if (completed_type == flight::StrategyType::TAKEOFF_AFTER_DELIVERY) {
+        RCLCPP_INFO(get_logger(), "[RUNTIME] Second takeoff completed. Transitioning to TRANSIT_OUT...");
+        if (coordinator_) {
+          coordinator_->request_transition(flight::StrategyType::TRANSIT_OUT);
+        }
+      } else if (completed_type == flight::StrategyType::TRANSIT_OUT) {
+        RCLCPP_INFO(get_logger(), "[RUNTIME] TransitOut completed. Transitioning to RETURN_STRATEGY...");
+        if (coordinator_) {
+          coordinator_->request_transition(flight::StrategyType::RETURN_STRATEGY);
+        }
+      } else if (completed_type == flight::StrategyType::RETURN_STRATEGY) {
+        RCLCPP_INFO(get_logger(), "[RUNTIME] ReturnStrategy completed. Transitioning to RETURN_LANDED...");
+        if (coordinator_) {
+          coordinator_->request_transition(flight::StrategyType::RETURN_LANDED);
+        }
       }
     });
 
@@ -517,6 +576,11 @@ void FlightRuntimeNode::publish_status_cycle()
 
       working_plan_status_pub_->publish(wp_msg);
     }
+  }
+
+  // 6. PayloadStatus
+  if (payload_status_pub_ && payload_controller_) {
+    payload_status_pub_->publish(payload_controller_->get_status());
   }
 }
 

@@ -14,6 +14,11 @@
 #include "flight/full_self_driving_mode_executor.hpp"
 #include "flight/strategies/direct_strategy.hpp"
 #include "flight/strategies/precision_land_strategy.hpp"
+#include "flight/strategies/payload_operation_strategy.hpp"
+#include "flight/strategies/transit_out_strategy.hpp"
+#include "flight/strategies/return_strategy.hpp"
+#include "payload/payload_controller.hpp"
+#include "persistence/persistence_manager.hpp"
 #include "full_self_driving/msg/pad_record.hpp"
 #include "registry/pad_registry.hpp"
 #include "runtime/plan_manager.hpp"
@@ -44,6 +49,12 @@ public:
   void set_pad_registry(std::shared_ptr<registry::PadRegistry> registry);
   std::shared_ptr<registry::PadRegistry> get_pad_registry() const;
 
+  void set_payload_controller(std::shared_ptr<payload::PayloadController> pc);
+  std::shared_ptr<payload::PayloadController> get_payload_controller() const;
+
+  void set_persistence_manager(std::shared_ptr<persistence::PersistenceManager> pm);
+  std::shared_ptr<persistence::PersistenceManager> get_persistence_manager() const;
+
   void handle_target_lock_update(const LiveTargetLock & lock);
   void handle_takeover(flight::FullSelfDrivingModeExecutor::DeactivateReason reason);
   void handle_emergency_stop();
@@ -60,6 +71,9 @@ public:
 
   void set_custom_transit_in_route(const Route & route);
   void reset_custom_transit_in_route();
+
+  void set_custom_transit_out_route(const Route & route);
+  void reset_custom_transit_out_route();
 
   void set_custom_search_route(const CanonicalSearchRoute & route);
   void set_custom_search_plan(const WorkingPlan & wp);
@@ -92,6 +106,10 @@ public:
   bool handle_direct_complete();
   bool handle_direct_fallback(const std::string & reason = "direct navigation timed out");
 
+  // Landing verified and payload helpers
+  bool handle_landing_verified();
+  bool handle_payload_complete(uint8_t result);
+
   // Invariant query
   bool is_direct_eligible(
     std::string * out_rejection_reason = nullptr,
@@ -105,11 +123,14 @@ private:
   void instantiate_direct_strategy(double lat, double lon, double alt);
   void instantiate_search_strategy();
   void instantiate_precision_land_strategy();
+  void instantiate_payload_operation_strategy();
 
   mutable std::mutex mutex_;
   std::shared_ptr<MissionContext> context_;
   std::shared_ptr<runtime::PlanManager> plan_manager_;
   std::shared_ptr<registry::PadRegistry> pad_registry_;
+  std::shared_ptr<payload::PayloadController> payload_controller_;
+  std::shared_ptr<persistence::PersistenceManager> persistence_;
   std::shared_ptr<flight::FullSelfDrivingModeExecutor> executor_;
   std::shared_ptr<flight::FullSelfDrivingMode> mode_;
 
@@ -119,6 +140,9 @@ private:
 
   Route custom_transit_in_route_;
   bool has_custom_transit_in_route_{false};
+
+  Route custom_transit_out_route_;
+  bool has_custom_transit_out_route_{false};
 
   WorkingPlan custom_search_plan_;
   CanonicalSearchRoute custom_search_route_;

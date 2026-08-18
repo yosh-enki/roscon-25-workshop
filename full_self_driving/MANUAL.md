@@ -1156,9 +1156,97 @@ ros2 launch full_self_driving full_self_driving.launch.py \
 
 ---
 
-## 13. Subsequent Task Sections (To Be Extended by Other Tasks)
+## 13. Section 12: Payload Delivery & Sortie Completion (Task 12)
 
-* **Section 12: Payload Delivery & Sortie Completion (Task 12)** — Winch/servo release mechanism, transit out, auto land at home.
+### 13.1 Overview & Post-Touchdown Pipeline
+
+Task 12 implements the post-touchdown mission sequence that completes the delivery sortie:
+
+```mermaid
+stateDiagram-v2
+    [*] --> WAITING_FOR_MODE
+    WAITING_FOR_MODE --> TAKEOFF : Armed & Mode Registered
+    TAKEOFF --> TRANSIT_IN : Takeoff Complete (10m AGL)
+    TRANSIT_IN --> DIRECT : Target in Registry (Direct Eligible)
+    TRANSIT_IN --> SEARCH : Fallback Search Plan
+    DIRECT --> PRECISION_LAND : Approach Waypoint Reached
+    SEARCH --> PRECISION_LAND : Target Locked & Qualified
+    PRECISION_LAND --> LANDED_VERIFIED : Touchdown & Stability Dwell (0.5s)
+    LANDED_VERIFIED --> PAYLOAD_OPERATION : Gates Evaluated & Passed
+    PAYLOAD_OPERATION --> TAKEOFF_AFTER_DELIVERY : EVT_PAYLOAD_SUCCESS (Result=1)
+    PAYLOAD_OPERATION --> RETURN_STRATEGY : EVT_PAYLOAD_UNKNOWN / FAILURE
+    TAKEOFF_AFTER_DELIVERY --> TRANSIT_OUT : Climb Complete (15m AGL)
+    TRANSIT_OUT --> RETURN_STRATEGY : Outbound Waypoints Settled
+    RETURN_STRATEGY --> RETURN_LANDED : Touchdown at Home Pad & Disarm
+    RETURN_LANDED --> [*] : EVT_SORTIE_COMPLETED
+```
+
+### 13.2 Architecture & Safety Invariants
+
+#### A. Multi-Layer Safety Model for Payload Actuation
+1. **Preflight Hardware Preparation (`PreparePayload`)**:
+   - Pilot / Operator can open winch/servo for loading (`OP_OPEN_FOR_LOADING`), verify lock (`OP_VERIFY_SECURED`), or perform final preflight check (`OP_PREPARE_FOR_SORTIE`).
+   - Preflight operations are permitted **ONLY when the vehicle is DISARMED and UNLOCKED**.
+   - FSD Preflight Readiness Gate strictly requires `FEEDBACK_SECURED` before arming or mode registration is allowed.
+2. **In-Flight Release Interlock Barrier**:
+   - In-flight release commands via external APIs (Gateway, Node-RED, Web UI, MQTT) are **strictly rejected**.
+   - Physical payload actuation is commanded **ONLY internally** by `PayloadOperationStrategy` after touchdown verification (`LANDED_VERIFIED`).
+3. **Durable Intent & Idempotency**:
+   - Before commanding the physical actuator, `PayloadOperationStrategy` logs a durable intent record `EVT_PAYLOAD_INTENT` with an idempotent operation key into the journal.
+   - Duplicate release requests with the same `operation_id` return the cached result immediately without re-actuating hardware or double-incrementing counters.
+4. **No Auto-Retry on Fault / Unknown**:
+   - In the event of actuator timeout, power loss, or contradictory feedback, the system records `RESULT_UNKNOWN` (`EVT_PAYLOAD_UNKNOWN`).
+   - The mission coordinator **NEVER automatically retries** an unknown release in-flight or on the pad; it safely aborts to `RETURN_STRATEGY`.
+
+#### B. Explicit Return Corridor Deconfliction (Property 15)
+- The outbound transit corridor (`TRANSIT_OUT`) and return strategy mode (`RETURN_TO_HOME`, `LAND_IMMEDIATELY`, `HOLD_AT_FINAL_WAYPOINT`) are explicitly defined in the authoritative mission configuration and snapshots.
+- The system **never assumes automatic inbound route reversal** in memory, guaranteeing dedicated altitude separation (15m AGL transit out vs. 10m AGL transit in) and collision avoidance along congested airfield corridors.
+
+### 13.3 Production Components Added
+
+| Component | Path | Responsibility |
+|---|---|---|
+| `PayloadAdapter` | `full_self_driving/src/payload/payload_adapter.hpp` | Virtual HAL interface for payload release hardware (servos, winches, electro-magnets) |
+| `SimulationPayloadAdapter` | `full_self_driving/src/payload/simulation_payload_adapter.hpp` | Deterministic simulation mock with fault injection modes (`FAULT_TIMEOUT`, `FAULT_CONTRADICTORY_FEEDBACK`, `FAULT_HARDWARE_ERROR`, `FAULT_POWER_LOSS`) |
+| `PayloadController` | `full_self_driving/src/payload/payload_controller.hpp` | Domain controller managing preflight operations, internal release, idempotency records, and readiness queries |
+| `PayloadOperationStrategy` | `full_self_driving/src/flight/strategies/payload_operation_strategy.hpp` | Internal strategy executing pre-drop safety gate checks, durable intent journaling, actuation, and result verification |
+| `TransitOutStrategy` | `full_self_driving/src/flight/strategies/transit_out_strategy.hpp` | Outbound waypoint navigation strategy with course heading alignment, velocity settling gates, and durable progress journaling |
+| `ReturnStrategy` | `full_self_driving/src/flight/strategies/return_strategy.hpp` | Configurable return strategy managing home approach, vertical touchdown descent, dwell verification, and sortie completion |
+
+### 13.4 ROS Interfaces Added
+
+- **Service**: `/full_self_driving/prepare_payload` (`full_self_driving/srv/PreparePayload`)
+  - Request: `uint8 operation`, `string request_id`, `uint64 expected_selection_revision`
+  - Response: `bool accepted`, `PayloadStatus status`, `bool has_error`, `ErrorReport error`
+- **Topic**: `/full_self_driving/payload/status` (`full_self_driving/msg/PayloadStatus`)
+  - Latched publisher (1 Hz) streaming current feedback state, cargo status, operation counts, and hardware health.
+
+### 13.5 How to Run and Verify (Task 12)
+
+```bash
+cd /home/ubuntu/roscon-25-workshop_ws
+source /opt/ros/humble/setup.bash
+source /home/ubuntu/px4_ros_ws/install/setup.bash
+source install/setup.bash
+
+# 1. Run all 240 package tests (100% pass)
+colcon test --packages-select full_self_driving --event-handlers console_direct+
+colcon test-result --all --verbose
+
+# 2. Run Task 12 specific test suites
+ctest --test-dir build/full_self_driving -R payload_controller_test --output-on-failure
+ctest --test-dir build/full_self_driving -R payload_operation_test --output-on-failure
+ctest --test-dir build/full_self_driving -R transit_out_parity_test --output-on-failure
+ctest --test-dir build/full_self_driving -R return_strategy_test --output-on-failure
+ctest --test-dir build/full_self_driving -R fsd_property_14_payload_safety --output-on-failure
+ctest --test-dir build/full_self_driving -R fsd_property_15_return_strategy_explicitness --output-on-failure
+ctest --test-dir build/full_self_driving -R fsd_property_11_mission_sequence --output-on-failure
+```
+
+---
+
+## 14. Subsequent Task Sections (To Be Extended by Other Tasks)
+
 * **Section 13: Security & End-to-End Mission Rehearsal (Tasks 13, 14, 15)** — Multi-machine DDS security, end-to-end rehearsal, final compliance verification.
 
 

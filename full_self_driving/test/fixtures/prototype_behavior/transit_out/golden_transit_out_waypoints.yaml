@@ -1,0 +1,13 @@
+transit_out:
+  ros__parameters:
+    transit_out_alt: 15.0
+    waypoints: [13.730712, 100.788755, 13.730397, 100.788694, 13.730322, 100.787446]
+    arrival_radius_m: 4.0
+    max_horizontal_speed_m_s: 5.0
+    max_vertical_speed_m_s: 1.0
+    max_heading_rate_deg_s: 45.0
+    course_heading_min_speed_m_s: 0.3
+    altitude_tolerance_m: 1.0
+    altitude_settle_speed_m_s: 0.5
+    data_timeout_s: 2.0
+    use_sim_time: true

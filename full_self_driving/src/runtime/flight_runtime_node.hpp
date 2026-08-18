@@ -13,12 +13,16 @@
 #include "full_self_driving/msg/vehicle_telemetry.hpp"
 #include "full_self_driving/msg/live_target_lock.hpp"
 #include "full_self_driving/msg/working_plan_status.hpp"
+#include "full_self_driving/msg/payload_status.hpp"
 #include "full_self_driving/srv/emergency_stop.hpp"
+#include "full_self_driving/srv/prepare_payload.hpp"
 
 #include "domain/engineering_config.hpp"
 #include "domain/mission_context.hpp"
 #include "domain/mission_coordinator.hpp"
 #include "persistence/persistence_manager.hpp"
+#include "payload/payload_controller.hpp"
+#include "payload/simulation_payload_adapter.hpp"
 #include "runtime/lifecycle_supervisor.hpp"
 #include "runtime/plan_manager.hpp"
 #include "adapters/px4_api_capabilities.hpp"
@@ -60,10 +64,12 @@ private:
   rclcpp::Publisher<full_self_driving::msg::FlightSafetyStatus>::SharedPtr safety_pub_;
   rclcpp::Publisher<full_self_driving::msg::VehicleTelemetry>::SharedPtr telemetry_pub_;
   rclcpp::Publisher<full_self_driving::msg::WorkingPlanStatus>::SharedPtr working_plan_status_pub_;
+  rclcpp::Publisher<full_self_driving::msg::PayloadStatus>::SharedPtr payload_status_pub_;
 
   // Subscriptions & Services
   rclcpp::Subscription<full_self_driving::msg::LiveTargetLock>::SharedPtr target_lock_sub_;
   rclcpp::Service<full_self_driving::srv::EmergencyStop>::SharedPtr emergency_stop_srv_;
+  rclcpp::Service<full_self_driving::srv::PreparePayload>::SharedPtr prepare_payload_srv_;
 
   // Timers
   rclcpp::TimerBase::SharedPtr periodic_timer_;
@@ -72,6 +78,7 @@ private:
   std::shared_ptr<domain::EngineeringConfig> config_;
   std::shared_ptr<domain::MissionContext> context_;
   std::shared_ptr<persistence::PersistenceManager> persistence_;
+  std::shared_ptr<payload::PayloadController> payload_controller_;
   std::shared_ptr<LifecycleSupervisor> supervisor_;
   std::shared_ptr<PlanManager> plan_manager_;
   std::shared_ptr<registry::PadRegistry> pad_registry_;

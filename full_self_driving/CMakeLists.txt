@@ -179,6 +179,25 @@ ament_target_dependencies(fsd_registry_core
   builtin_interfaces
 )
 
+# Payload Core Library
+add_library(fsd_payload_core
+  src/payload/simulation_payload_adapter.cpp
+  src/payload/payload_controller.cpp
+)
+target_include_directories(fsd_payload_core PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(fsd_payload_core
+  fsd_domain_core
+  "${cpp_typesupport_target}"
+)
+ament_target_dependencies(fsd_payload_core
+  rclcpp
+  builtin_interfaces
+)
+
 # Gateway Core Library
 add_library(fsd_gateway_core
   src/gateway/fsd_gateway.cpp
@@ -192,6 +211,7 @@ target_link_libraries(fsd_gateway_core
   fsd_domain_core
   fsd_persistence_core
   fsd_registry_core
+  fsd_payload_core
   "${cpp_typesupport_target}"
 )
 ament_target_dependencies(fsd_gateway_core
@@ -252,6 +272,9 @@ add_library(fsd_flight_core
   src/flight/strategies/search_strategy.cpp
   src/flight/strategies/direct_strategy.cpp
   src/flight/strategies/precision_land_strategy.cpp
+  src/flight/strategies/payload_operation_strategy.cpp
+  src/flight/strategies/transit_out_strategy.cpp
+  src/flight/strategies/return_strategy.cpp
   src/domain/mission_coordinator.cpp
 )
 target_include_directories(fsd_flight_core PUBLIC
@@ -264,6 +287,7 @@ target_link_libraries(fsd_flight_core
   fsd_persistence_core
   fsd_registry_core
   fsd_adapters_core
+  fsd_payload_core
   "${cpp_typesupport_target}"
 )
 ament_target_dependencies(fsd_flight_core
@@ -420,6 +444,7 @@ target_link_libraries(fsd_flight_runtime
   fsd_persistence_core
   fsd_registry_core
   fsd_domain_core
+  fsd_payload_core
   yaml-cpp
   "${cpp_typesupport_target}"
 )
@@ -990,6 +1015,158 @@ if(BUILD_TESTING)
     ament_index_cpp
   )
 
+  ament_add_gtest(payload_controller_test
+    test/payload/payload_controller_test.cpp
+  )
+  target_include_directories(payload_controller_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(payload_controller_test
+    fsd_payload_core
+    fsd_domain_core
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(payload_controller_test
+    rclcpp
+    builtin_interfaces
+  )
+
+  ament_add_gtest(payload_operation_test
+    test/flight/payload_operation_test.cpp
+  )
+  target_include_directories(payload_operation_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(payload_operation_test
+    fsd_flight_core
+    fsd_payload_core
+    fsd_persistence_core
+    fsd_domain_core
+    OpenSSL::Crypto
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(payload_operation_test
+    rclcpp
+    builtin_interfaces
+  )
+
+  ament_add_gtest(transit_out_parity_test
+    test/flight/transit_out_parity_test.cpp
+  )
+  target_include_directories(transit_out_parity_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(transit_out_parity_test
+    fsd_flight_core
+    fsd_domain_core
+    fsd_adapters_core
+    fsd_persistence_core
+    OpenSSL::Crypto
+    yaml-cpp
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(transit_out_parity_test
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+    ament_index_cpp
+  )
+
+  ament_add_gtest(return_strategy_test
+    test/flight/return_strategy_test.cpp
+  )
+  target_include_directories(return_strategy_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(return_strategy_test
+    fsd_flight_core
+    fsd_domain_core
+    fsd_adapters_core
+    fsd_persistence_core
+    OpenSSL::Crypto
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(return_strategy_test
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_14_payload_safety
+    test/property/property_14_payload_safety.cpp
+  )
+  target_include_directories(fsd_property_14_payload_safety PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_14_payload_safety
+    fsd_payload_core
+    fsd_gateway_core
+    fsd_flight_core
+    fsd_domain_core
+    fsd_adapters_core
+    fsd_persistence_core
+    OpenSSL::Crypto
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_14_payload_safety
+    rclcpp
+    builtin_interfaces
+    px4_msgs
+    geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_15_return_strategy_explicitness
+    test/property/property_15_return_strategy_explicitness.cpp
+  )
+  target_include_directories(fsd_property_15_return_strategy_explicitness PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_15_return_strategy_explicitness
+    fsd_flight_core
+    fsd_domain_core
+    fsd_adapters_core
+    fsd_persistence_core
+    OpenSSL::Crypto
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_15_return_strategy_explicitness
+    rclcpp
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+  )
+
+  ament_add_gtest(fsd_property_11_mission_sequence
+    test/property/property_11_mission_sequence.cpp
+  )
+  target_include_directories(fsd_property_11_mission_sequence PRIVATE
+    include
+    src
+  )
+  target_link_libraries(fsd_property_11_mission_sequence
+    fsd_payload_core
+    fsd_flight_core
+    fsd_domain_core
+    fsd_adapters_core
+    fsd_persistence_core
+    OpenSSL::Crypto
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(fsd_property_11_mission_sequence
+    rclcpp
+    builtin_interfaces
+    px4_msgs
+    geometry_msgs
+  )
+
   ament_add_pytest_test(fsd_property_21_ros_interface_boundary
     test/property/property_21_ros_interface_boundary.py
   )
@@ -1010,6 +1187,7 @@ ament_export_libraries(
   fsd_perception_core
   fsd_registry_core
   fsd_gateway_core
+  fsd_payload_core
   fsd_runtime_core
   fsd_adapters_core
   fsd_flight_core

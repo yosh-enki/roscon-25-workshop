@@ -202,12 +202,33 @@ Route Route::create_default_kmitl_transit_in_route()
   return route;
 }
 
+Route Route::create_default_kmitl_transit_out_route()
+{
+  Route route;
+  // Default KMITL TransitOut waypoints matching simulation airfield
+  route.add_waypoint(RoutePoint(13.730712, 100.788755, 15.0));
+  route.add_waypoint(RoutePoint(13.730397, 100.788694, 15.0));
+  route.add_waypoint(RoutePoint(13.730322, 100.787446, 15.0));
+  route.set_transit_altitude_above_home_m(15.0);
+  route.set_arrival_radius_m(4.0f);
+  route.set_max_horizontal_speed_m_s(5.0f);
+  route.set_max_vertical_speed_m_s(1.0f);
+  route.set_max_heading_rate_deg_s(45.0f);
+  route.set_course_heading_min_speed_m_s(0.3f);
+  route.set_altitude_tolerance_m(1.0f);
+  route.set_altitude_settle_speed_m_s(0.5f);
+  route.set_data_timeout_s(2.0f);
+  return route;
+}
+
 Route Route::from_yaml(const YAML::Node & node)
 {
   Route route;
 
   if (node["transit_in_alt"]) {
     route.set_transit_altitude_above_home_m(node["transit_in_alt"].as<double>());
+  } else if (node["transit_out_alt"]) {
+    route.set_transit_altitude_above_home_m(node["transit_out_alt"].as<double>());
   }
   if (node["acceptance_radius_m"]) {
     route.set_acceptance_radius_m(node["acceptance_radius_m"].as<float>());
@@ -281,6 +302,9 @@ Route Route::from_yaml_file(const std::string & file_path)
   YAML::Node root = YAML::LoadFile(file_path);
   if (root["transit_in"] && root["transit_in"]["ros__parameters"]) {
     return from_yaml(root["transit_in"]["ros__parameters"]);
+  }
+  if (root["transit_out"] && root["transit_out"]["ros__parameters"]) {
+    return from_yaml(root["transit_out"]["ros__parameters"]);
   }
   return from_yaml(root);
 }

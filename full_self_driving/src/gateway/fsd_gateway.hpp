@@ -12,6 +12,7 @@
 #include "domain/engineering_config.hpp"
 #include "domain/mission_context.hpp"
 #include "domain/target_identity.hpp"
+#include "payload/payload_controller.hpp"
 #include "persistence/persistence_manager.hpp"
 #include "runtime/plan_manager.hpp"
 #include "registry/pad_registry.hpp"
@@ -67,6 +68,7 @@ public:
   void set_plan_manager(std::shared_ptr<runtime::PlanManager> pm);
   void set_pad_registry(std::shared_ptr<registry::PadRegistry> reg);
   void set_persistence_manager(std::shared_ptr<persistence::PersistenceManager> pm);
+  void set_payload_controller(std::shared_ptr<payload::PayloadController> pc);
 
   GatewayResponse process_command_json(
     const std::string & json_envelope,
@@ -111,6 +113,7 @@ private:
   std::shared_ptr<runtime::PlanManager> plan_manager_;
   std::shared_ptr<registry::PadRegistry> registry_;
   std::shared_ptr<persistence::PersistenceManager> persistence_;
+  std::shared_ptr<payload::PayloadController> payload_controller_;
 
   uint64_t forbidden_command_attempts_{0};
   uint64_t security_violations_count_{0};

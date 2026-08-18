@@ -90,6 +90,7 @@ public:
 
   // Factory methods
   static Route create_default_kmitl_transit_in_route();
+  static Route create_default_kmitl_transit_out_route();
   static Route from_yaml(const YAML::Node & node);
   static Route from_yaml_file(const std::string & file_path);
   static Route from_flattened_vector(
