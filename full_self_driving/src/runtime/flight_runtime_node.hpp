@@ -96,6 +96,7 @@ private:
 
   bool mode_registered_{false};
   bool api_manifest_valid_{false};
+  bool was_disarmed_after_return_{true};
   std::string config_path_;
   std::string manifest_path_;
   uint64_t state_sequence_{0};

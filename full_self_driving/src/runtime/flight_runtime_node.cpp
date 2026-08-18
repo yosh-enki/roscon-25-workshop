@@ -377,16 +377,25 @@ void FlightRuntimeNode::trigger_evaluation_cycle()
 
   check_and_register_mode();
 
+  if (state_cache_ && !state_cache_->is_armed()) {
+    was_disarmed_after_return_ = true;
+  }
+
   if (mode_ && mode_->isActive() && state_cache_ && state_cache_->is_armed()) {
-    if (coordinator_ && (coordinator_->get_current_strategy() == flight::StrategyType::WAITING_FOR_MODE ||
-                         coordinator_->get_current_strategy() == flight::StrategyType::RETURN_LANDED)) {
-      auto snapshot = state_cache_->capture_snapshot();
-      if (snapshot.is_landed) {
-        RCLCPP_INFO(get_logger(), "[RUNTIME] Mode active on ground. Transitioning to TAKEOFF...");
+    if (coordinator_) {
+      if (coordinator_->get_current_strategy() == flight::StrategyType::WAITING_FOR_MODE) {
+        auto snapshot = state_cache_->capture_snapshot();
+        if (snapshot.is_landed) {
+          RCLCPP_INFO(get_logger(), "[RUNTIME] Mode active on ground. Transitioning to TAKEOFF...");
+          coordinator_->request_transition(flight::StrategyType::TAKEOFF);
+        } else {
+          RCLCPP_INFO(get_logger(), "[RUNTIME] Mode active airborne. Transitioning to TRANSIT_IN...");
+          coordinator_->request_transition(flight::StrategyType::TRANSIT_IN);
+        }
+      } else if (coordinator_->get_current_strategy() == flight::StrategyType::RETURN_LANDED && was_disarmed_after_return_) {
+        was_disarmed_after_return_ = false;
+        RCLCPP_INFO(get_logger(), "[RUNTIME] Operator armed for new Sortie! Transitioning to TAKEOFF...");
         coordinator_->request_transition(flight::StrategyType::TAKEOFF);
-      } else {
-        RCLCPP_INFO(get_logger(), "[RUNTIME] Mode active airborne. Transitioning to TRANSIT_IN...");
-        coordinator_->request_transition(flight::StrategyType::TRANSIT_IN);
       }
     }
   }
@@ -434,7 +443,8 @@ void FlightRuntimeNode::check_and_register_mode()
       if (is_active && state_cache_->is_armed()) {
         if (coordinator_) {
           if (coordinator_->get_current_strategy() == flight::StrategyType::WAITING_FOR_MODE ||
-              coordinator_->get_current_strategy() == flight::StrategyType::RETURN_LANDED) {
+              (coordinator_->get_current_strategy() == flight::StrategyType::RETURN_LANDED && was_disarmed_after_return_)) {
+            was_disarmed_after_return_ = false;
             auto snapshot = state_cache_->capture_snapshot();
             if (context_ && !context_->has_origin_home_position()) {
               if (snapshot.home_pos_valid) {
@@ -526,6 +536,7 @@ void FlightRuntimeNode::check_and_register_mode()
         }
       } else if (completed_type == flight::StrategyType::RETURN_STRATEGY) {
         RCLCPP_INFO(get_logger(), "[RUNTIME] ReturnStrategy completed at Home Base. Transitioning to RETURN_LANDED and disarming...");
+        was_disarmed_after_return_ = false;
         if (coordinator_) {
           coordinator_->request_transition(flight::StrategyType::RETURN_LANDED);
         }
