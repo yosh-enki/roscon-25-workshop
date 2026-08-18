@@ -107,8 +107,10 @@ void TakeoffStrategy::on_update(float dt_s)
 
   // Command climb setpoint to PX4
   if (target_altitude_set_ && goto_setpoint_) {
-    double target_lat = snapshot.home_pos_valid ? snapshot.home_global_position.x() : snapshot.global_position.x();
-    double target_lon = snapshot.home_pos_valid ? snapshot.home_global_position.y() : snapshot.global_position.y();
+    double target_lat = snapshot.global_pos_valid ? snapshot.global_position.x() :
+      (snapshot.home_pos_valid ? snapshot.home_global_position.x() : 0.0);
+    double target_lon = snapshot.global_pos_valid ? snapshot.global_position.y() :
+      (snapshot.home_pos_valid ? snapshot.home_global_position.y() : 0.0);
     Eigen::Vector3d target_pos{target_lat, target_lon, target_altitude_msl_m_};
     goto_setpoint_->update(target_pos, std::nullopt, 1.0f);
   }

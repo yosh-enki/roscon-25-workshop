@@ -107,6 +107,13 @@ void MissionCoordinator::handle_target_lock_update(const LiveTargetLock & lock)
 void MissionCoordinator::handle_takeover(flight::FullSelfDrivingModeExecutor::DeactivateReason reason)
 {
   std::lock_guard<std::mutex> guard(mutex_);
+  // Do NOT treat normal ground disarm during landing / payload operations as manual takeover
+  if (current_strategy_ == flight::StrategyType::LANDED_VERIFIED ||
+      current_strategy_ == flight::StrategyType::PAYLOAD_OPERATION ||
+      current_strategy_ == flight::StrategyType::TAKEOFF_AFTER_DELIVERY ||
+      current_strategy_ == flight::StrategyType::RETURN_LANDED) {
+    return;
+  }
   takeover_active_ = true;
   std::string reason_str = (reason == flight::FullSelfDrivingModeExecutor::DeactivateReason::FailsafeActivated)
     ? "FailsafeActivated" : "ManualTakeover";

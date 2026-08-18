@@ -379,14 +379,19 @@ void FlightRuntimeNode::check_and_register_mode()
 
     mode_->set_activation_callback([this](bool is_active) {
       if (is_active && state_cache_->is_armed()) {
-        if (coordinator_ && coordinator_->get_current_strategy() == flight::StrategyType::WAITING_FOR_MODE) {
-          auto snapshot = state_cache_->capture_snapshot();
-          if (snapshot.is_landed) {
-            RCLCPP_INFO(get_logger(), "[RUNTIME] Mode activated on ground. Transitioning to TAKEOFF...");
-            coordinator_->request_transition(flight::StrategyType::TAKEOFF);
-          } else {
-            RCLCPP_INFO(get_logger(), "[RUNTIME] Mode activated airborne. Transitioning to TRANSIT_IN...");
-            coordinator_->request_transition(flight::StrategyType::TRANSIT_IN);
+        if (coordinator_) {
+          if (coordinator_->get_current_strategy() == flight::StrategyType::WAITING_FOR_MODE) {
+            auto snapshot = state_cache_->capture_snapshot();
+            if (snapshot.is_landed) {
+              RCLCPP_INFO(get_logger(), "[RUNTIME] Mode activated on ground. Transitioning to TAKEOFF...");
+              coordinator_->request_transition(flight::StrategyType::TAKEOFF);
+            } else {
+              RCLCPP_INFO(get_logger(), "[RUNTIME] Mode activated airborne. Transitioning to TRANSIT_IN...");
+              coordinator_->request_transition(flight::StrategyType::TRANSIT_IN);
+            }
+          } else if (coordinator_->get_current_strategy() == flight::StrategyType::TAKEOFF_AFTER_DELIVERY) {
+            RCLCPP_INFO(get_logger(), "[RUNTIME] Mode activated airborne after second takeoff. Transitioning to TRANSIT_OUT...");
+            coordinator_->request_transition(flight::StrategyType::TRANSIT_OUT);
           }
         }
       }
@@ -419,6 +424,18 @@ void FlightRuntimeNode::check_and_register_mode()
         RCLCPP_INFO(get_logger(), "[RUNTIME] Payload operation completed. Transitioning to TAKEOFF_AFTER_DELIVERY...");
         if (coordinator_) {
           coordinator_->handle_payload_complete(full_self_driving::msg::PayloadStatus::RESULT_SUCCESS);
+        }
+        if (executor_) {
+          RCLCPP_INFO(get_logger(), "[RUNTIME] Re-arming and triggering second takeoff sequence...");
+          executor_->arm([this](px4_ros2::Result result) {
+            if (result == px4_ros2::Result::Success) {
+              RCLCPP_INFO(get_logger(), "[RUNTIME] Re-arm successful for second takeoff. Triggering climb...");
+              executor_->trigger_takeoff_sequence();
+            } else {
+              RCLCPP_ERROR(get_logger(), "[RUNTIME] Re-arm failed for second takeoff: %s",
+                px4_ros2::resultToString(result));
+            }
+          });
         }
       } else if (completed_type == flight::StrategyType::TAKEOFF_AFTER_DELIVERY) {
         RCLCPP_INFO(get_logger(), "[RUNTIME] Second takeoff completed. Transitioning to TRANSIT_OUT...");
