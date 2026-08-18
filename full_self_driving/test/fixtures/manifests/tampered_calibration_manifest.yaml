@@ -1,0 +1,53 @@
+# Tampered Calibration Hardware Manifest Fixture (mismatched SHA-256 hash)
+profile: "hardware_rpi4_pixhawk6c"
+manifest_version: "1.0.0"
+description: "Tampered Calibration Hardware Profile"
+
+approval:
+  approved: true
+  approval_authority: "safety-board@fsd.roscon25.org"
+  approval_evidence_sha256: "a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123"
+  approval_timestamp_utc: "2026-08-18T12:00:00Z"
+
+fmu_transport:
+  adapter_id: "px4_hardware_uart_serial"
+  device_path: "/dev/ttyAMA0"
+  baud_rate: 921600
+  flow_control: "none"
+  dds_agent_protocol: "serial"
+
+camera:
+  adapter_id: "v4l2_hardware_camera"
+  device_path: "/dev/video0"
+  driver: "v4l2"
+  width: 1280
+  height: 720
+  framerate_hz: 30
+  pixel_format: "YUYV"
+  calibration_file: "config/camera_calibrations/imx219_720p.yaml"
+  calibration_sha256: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  tf_camera_to_base_link:
+    translation: [0.0, 0.0, -0.05]
+    rotation_xyzw: [-0.7071068, 0.7071068, 0.0, 0.0]
+
+payload:
+  adapter_id: "gpio_pwm_payload_actuator"
+  device_path: "/dev/gpiochip0"
+  pwm_pin: 18
+  pwm_frequency_hz: 50
+  disarmed_pwm_us: 1000
+  armed_pwm_us: 1500
+  release_pwm_us: 2000
+  feedback_sense_pin: 24
+  max_pulse_duration_ms: 2500
+
+security:
+  sros2_keystore_path: "/home/ubuntu/fsd_keystore"
+  require_encryption: true
+  require_access_control: true
+
+system_resources:
+  max_cpu_percent: 75.0
+  max_memory_mb: 2048
+  storage_reserve_mb: 1024
+  power_loss_recovery_enabled: true
