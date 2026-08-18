@@ -14,6 +14,8 @@
 #include "full_self_driving/msg/live_target_lock.hpp"
 #include "full_self_driving/msg/working_plan_status.hpp"
 #include "full_self_driving/msg/payload_status.hpp"
+#include "full_self_driving/msg/pad_registry_snapshot.hpp"
+#include "full_self_driving/msg/target_identity.hpp"
 #include "full_self_driving/srv/emergency_stop.hpp"
 #include "full_self_driving/srv/prepare_payload.hpp"
 
@@ -68,6 +70,8 @@ private:
 
   // Subscriptions & Services
   rclcpp::Subscription<full_self_driving::msg::LiveTargetLock>::SharedPtr target_lock_sub_;
+  rclcpp::Subscription<full_self_driving::msg::PadRegistrySnapshot>::SharedPtr pad_registry_sub_;
+  rclcpp::Subscription<full_self_driving::msg::TargetIdentity>::SharedPtr target_selection_sub_;
   rclcpp::Service<full_self_driving::srv::EmergencyStop>::SharedPtr emergency_stop_srv_;
   rclcpp::Service<full_self_driving::srv::PreparePayload>::SharedPtr prepare_payload_srv_;
 

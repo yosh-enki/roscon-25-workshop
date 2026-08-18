@@ -62,6 +62,37 @@ void FlightRuntimeNode::initialize_components()
       }
     });
 
+  // Pad Registry Snapshot Subscription (Sync discovered pads for Direct Acquisition across Sorties)
+  pad_registry_sub_ = this->create_subscription<full_self_driving::msg::PadRegistrySnapshot>(
+    "/full_self_driving/pad_registry", rclcpp::QoS(1).reliable().transient_local(),
+    [this](full_self_driving::msg::PadRegistrySnapshot::ConstSharedPtr msg) {
+      if (pad_registry_) {
+        for (const auto & rec : msg->records) {
+          pad_registry_->insert_record_for_test(rec);
+        }
+      }
+    });
+
+  // Target Selection Subscription (Update MissionContext target for next Sortie when disarmed)
+  target_selection_sub_ = this->create_subscription<full_self_driving::msg::TargetIdentity>(
+    "/full_self_driving/target_selection", rclcpp::QoS(1).reliable(),
+    [this](full_self_driving::msg::TargetIdentity::ConstSharedPtr msg) {
+      if (context_ && !context_->is_locked() && !context_->is_armed()) {
+        std::string err;
+        uint64_t next_rev = context_->get_selection_revision() + 1;
+        context_->select_target(
+          domain::TargetIdentity(msg->marker_id, msg->dictionary, msg->target_namespace),
+          next_rev, &err);
+        auto vreport = context_->validate_selection(next_rev + 1);
+        if (vreport.is_valid) {
+          context_->commit(vreport.token, next_rev + 1, &err);
+          RCLCPP_INFO(get_logger(),
+            "[RUNTIME] Target selection updated for Sortie: ID %u (%s), context committed",
+            msg->marker_id, msg->dictionary.c_str());
+        }
+      }
+    });
+
   // Emergency Stop Service
   emergency_stop_srv_ = this->create_service<full_self_driving::srv::EmergencyStop>(
     "/full_self_driving/emergency_stop",
@@ -326,7 +357,8 @@ void FlightRuntimeNode::trigger_evaluation_cycle()
   check_and_register_mode();
 
   if (mode_ && mode_->isActive() && state_cache_ && state_cache_->is_armed()) {
-    if (coordinator_ && coordinator_->get_current_strategy() == flight::StrategyType::WAITING_FOR_MODE) {
+    if (coordinator_ && (coordinator_->get_current_strategy() == flight::StrategyType::WAITING_FOR_MODE ||
+                         coordinator_->get_current_strategy() == flight::StrategyType::RETURN_LANDED)) {
       auto snapshot = state_cache_->capture_snapshot();
       if (snapshot.is_landed) {
         RCLCPP_INFO(get_logger(), "[RUNTIME] Mode active on ground. Transitioning to TAKEOFF...");
