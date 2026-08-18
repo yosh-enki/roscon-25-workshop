@@ -70,6 +70,9 @@ void FlightRuntimeNode::initialize_components()
         for (const auto & rec : msg->records) {
           pad_registry_->insert_record_for_test(rec);
         }
+        RCLCPP_INFO(get_logger(),
+          "[RUNTIME] Synced %zu PadRecord(s) from snapshot into flight runtime",
+          msg->records.size());
       }
     });
 
@@ -79,17 +82,35 @@ void FlightRuntimeNode::initialize_components()
     [this](full_self_driving::msg::TargetIdentity::ConstSharedPtr msg) {
       if (context_ && !context_->is_locked() && !context_->is_armed()) {
         std::string err;
-        uint64_t next_rev = context_->get_selection_revision() + 1;
-        context_->select_target(
-          domain::TargetIdentity(msg->marker_id, msg->dictionary, msg->target_namespace),
-          next_rev, &err);
-        auto vreport = context_->validate_selection(next_rev + 1);
-        if (vreport.is_valid) {
-          context_->commit(vreport.token, next_rev + 1, &err);
-          RCLCPP_INFO(get_logger(),
-            "[RUNTIME] Target selection updated for Sortie: ID %u (%s), context committed",
-            msg->marker_id, msg->dictionary.c_str());
+        uint64_t current_rev = context_->get_selection_revision();
+        if (context_->select_target(
+              domain::TargetIdentity(msg->marker_id, msg->dictionary, msg->target_namespace),
+              current_rev, &err))
+        {
+          uint64_t validate_rev = context_->get_selection_revision();
+          auto vreport = context_->validate_selection(validate_rev);
+          if (vreport.is_valid) {
+            context_->commit(vreport.token, validate_rev, &err);
+            RCLCPP_INFO(get_logger(),
+              "[RUNTIME] Target selection updated for Sortie: ID %u (%s), context committed (rev=%lu)",
+              msg->marker_id, msg->dictionary.c_str(), validate_rev);
+          } else {
+            std::string viol_str;
+            for (const auto & v : vreport.violations) {
+              if (!viol_str.empty()) viol_str += "; ";
+              viol_str += v;
+            }
+            RCLCPP_WARN(get_logger(), "[RUNTIME] Target selection validation failed: %s",
+              viol_str.c_str());
+          }
+        } else {
+          RCLCPP_WARN(get_logger(), "[RUNTIME] Target selection failed: %s", err.c_str());
         }
+      } else {
+        RCLCPP_WARN(get_logger(),
+          "[RUNTIME] Target selection ignored (locked=%d, armed=%d)",
+          context_ ? context_->is_locked() : -1,
+          context_ ? context_->is_armed() : -1);
       }
     });
 

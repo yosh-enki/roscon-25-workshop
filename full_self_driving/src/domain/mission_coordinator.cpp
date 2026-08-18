@@ -609,6 +609,18 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
     double direct_lat = 0.0, direct_lon = 0.0, direct_alt = 15.0;
     bool direct_ok = is_direct_eligible(&direct_rejection_reason, &direct_lat, &direct_lon, &direct_alt);
 
+    if (mode_) {
+      if (direct_ok) {
+        RCLCPP_INFO(mode_->node().get_logger(),
+          "[COORDINATOR] Direct Acquisition ELIGIBLE! Navigating straight to target: lat=%.7f, lon=%.7f, alt=%.2f m",
+          direct_lat, direct_lon, direct_alt);
+      } else {
+        RCLCPP_INFO(mode_->node().get_logger(),
+          "[COORDINATOR] Direct Acquisition INELIGIBLE: %s. Branching to Search.",
+          direct_rejection_reason.c_str());
+      }
+    }
+
     if (direct_ok) {
       transition_trace_.push_back("FLY-004 / EVT_ACQUISITION_DIRECT_SELECTED (lat=" +
         std::to_string(direct_lat) + ", lon=" + std::to_string(direct_lon) + ")");
