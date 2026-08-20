@@ -37,4 +37,4 @@ docker run --rm -it \
     -v "${WORKSPACE_DIR}:/home/ubuntu/roscon-25-workshop" \
     -w /home/ubuntu/roscon-25-workshop \
     dronecode/roscon-25-workshop:latest \
-    bash -c "source /opt/ros/humble/setup.bash && source /home/ubuntu/px4_ros_ws/install/setup.bash && source install/setup.bash && ros2 launch full_self_driving sitl.launch.py world:=${WORLD} payload_adapter:=px4_uorb_gripper_actuator"
+    bash -c "source /opt/ros/humble/setup.bash && source /home/ubuntu/px4_ros_ws/install/setup.bash && source install/setup.bash && python3 full_self_driving/scripts/esp32_gripper_bridge.py --ros-args -p port:=${SERIAL_PORT} & ros2 launch full_self_driving full_self_driving.launch.py simulation:=true world:=${WORLD} headless:=false payload_adapter:=px4_uorb_gripper_actuator"
