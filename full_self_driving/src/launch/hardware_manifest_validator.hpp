@@ -75,6 +75,8 @@ struct PayloadConfig
 {
   std::string adapter_id;
   std::string device_path;
+  std::string transport_interface{"vehicle_command"};
+  int gripper_instance{1};
   int pwm_pin{18};
   int pwm_frequency_hz{50};
   int disarmed_pwm_us{1000};

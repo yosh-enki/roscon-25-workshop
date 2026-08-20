@@ -8,6 +8,7 @@
 #include "gateway/fsd_gateway.hpp"
 #include "payload/payload_controller.hpp"
 #include "payload/simulation_payload_adapter.hpp"
+#include "payload/px4_gripper_payload_adapter.hpp"
 #include "persistence/persistence_manager.hpp"
 
 using namespace full_self_driving;
@@ -179,4 +180,44 @@ TEST_F(Property14PayloadSafetyTest, ReadinessRequiresSecuredFeedback)
     context_->get_selection_revision(),
     status);
   EXPECT_TRUE(controller_->is_ready_for_sortie());
+}
+
+// 7. Property 14.7: Px4GripperPayloadAdapter enforces gating & idempotency identically
+TEST_F(Property14PayloadSafetyTest, Px4GripperAdapterEnforcesGatingAndIdempotency)
+{
+  auto px4_adapter = std::make_shared<payload::Px4GripperPayloadAdapter>(*node_);
+  auto px4_controller = std::make_shared<payload::PayloadController>(px4_adapter, context_);
+
+  // Must reject preflight when context is armed
+  context_->set_armed(true);
+  msg::PayloadStatus status;
+  std::string err;
+  bool ok = px4_controller->prepare(
+    srv::PreparePayload::Request::OP_PREPARE_FOR_SORTIE,
+    "px4_armed_prep",
+    context_->get_selection_revision(),
+    status,
+    &err);
+  EXPECT_FALSE(ok);
+  EXPECT_FALSE(err.empty());
+
+  context_->set_armed(false);
+  ok = px4_controller->prepare(
+    srv::PreparePayload::Request::OP_PREPARE_FOR_SORTIE,
+    "px4_prep_01",
+    context_->get_selection_revision(),
+    status,
+    &err);
+  EXPECT_TRUE(ok);
+  EXPECT_TRUE(px4_controller->is_ready_for_sortie());
+
+  // Test idempotency on release
+  msg::PayloadStatus rel_status1;
+  uint8_t res1 = px4_controller->execute_internal_release("px4_op_rel_01", rel_status1);
+  EXPECT_EQ(res1, msg::PayloadStatus::RESULT_SUCCESS);
+
+  msg::PayloadStatus rel_status2;
+  uint8_t res2 = px4_controller->execute_internal_release("px4_op_rel_01", rel_status2);
+  EXPECT_EQ(res2, msg::PayloadStatus::RESULT_SUCCESS);
+  EXPECT_EQ(rel_status1.last_operation_id, rel_status2.last_operation_id);
 }

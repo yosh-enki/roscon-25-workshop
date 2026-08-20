@@ -21,6 +21,8 @@ FlightRuntimeNode::FlightRuntimeNode(const rclcpp::NodeOptions & options)
   this->declare_parameter<int>("target_marker_id", 0);
   this->declare_parameter<std::string>("target_dictionary", "DICT_4X4_50");
   this->declare_parameter<std::string>("target_namespace", "aavc2026");
+  this->declare_parameter<std::string>("payload_adapter", "simulation_payload_stub");
+  this->declare_parameter<int>("gripper_instance", 1);
 
   config_path_ = this->get_parameter("engineering_config").as_string();
   manifest_path_ = this->get_parameter("manifest_path").as_string();
@@ -331,8 +333,19 @@ void FlightRuntimeNode::initialize_components()
   state_cache_ = std::make_shared<adapters::Px4StateCache>(*px4_context_);
 
   // Initialize Payload Controller
-  payload_controller_ = std::make_shared<payload::PayloadController>(
-    std::make_shared<payload::SimulationPayloadAdapter>("sim_payload_01"), context_);
+  std::string payload_adapter_type = this->get_parameter("payload_adapter").as_string();
+  int gripper_inst = this->get_parameter("gripper_instance").as_int();
+
+  std::shared_ptr<payload::PayloadAdapter> payload_adapter;
+  if (payload_adapter_type == "px4_uorb_gripper_actuator") {
+    payload::Px4GripperPayloadAdapter::Config cfg;
+    cfg.gripper_instance = static_cast<uint8_t>(gripper_inst);
+    payload_adapter = std::make_shared<payload::Px4GripperPayloadAdapter>(*this, cfg);
+  } else {
+    payload_adapter = std::make_shared<payload::SimulationPayloadAdapter>("sim_payload_01");
+  }
+
+  payload_controller_ = std::make_shared<payload::PayloadController>(payload_adapter, context_);
 
   // Initialize Coordinator
   coordinator_ = std::make_shared<domain::MissionCoordinator>(context_);

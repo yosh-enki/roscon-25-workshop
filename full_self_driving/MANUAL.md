@@ -1208,6 +1208,8 @@ stateDiagram-v2
 |---|---|---|
 | `PayloadAdapter` | `full_self_driving/src/payload/payload_adapter.hpp` | Virtual HAL interface for payload release hardware (servos, winches, electro-magnets) |
 | `SimulationPayloadAdapter` | `full_self_driving/src/payload/simulation_payload_adapter.hpp` | Deterministic simulation mock with fault injection modes (`FAULT_TIMEOUT`, `FAULT_CONTRADICTORY_FEEDBACK`, `FAULT_HARDWARE_ERROR`, `FAULT_POWER_LOSS`) |
+| `HardwarePayloadAdapter` | `full_self_driving/src/payload/hardware_payload_adapter.hpp` | Direct Linux GPIO/PWM HAL adapter (`/dev/gpiochip0`, PWM pin 18, feedback sense pin 24) |
+| `Px4GripperPayloadAdapter` | `full_self_driving/src/payload/px4_gripper_payload_adapter.hpp` | PX4 Autopilot native gripper HAL adapter bridging commands via `px4_msgs::msg::VehicleCommand` (`VEHICLE_CMD_DO_GRIPPER`) |
 | `PayloadController` | `full_self_driving/src/payload/payload_controller.hpp` | Domain controller managing preflight operations, internal release, idempotency records, and readiness queries |
 | `PayloadOperationStrategy` | `full_self_driving/src/flight/strategies/payload_operation_strategy.hpp` | Internal strategy executing pre-drop safety gate checks, durable intent journaling, actuation, and result verification |
 | `TransitOutStrategy` | `full_self_driving/src/flight/strategies/transit_out_strategy.hpp` | Outbound waypoint navigation strategy with course heading alignment, velocity settling gates, and durable progress journaling |
@@ -1240,8 +1242,21 @@ ctest --test-dir build/full_self_driving -R transit_out_parity_test --output-on-
 ctest --test-dir build/full_self_driving -R return_strategy_test --output-on-failure
 ctest --test-dir build/full_self_driving -R fsd_property_14_payload_safety --output-on-failure
 ctest --test-dir build/full_self_driving -R fsd_property_15_return_strategy_explicitness --output-on-failure
-ctest --test-dir build/full_self_driving -R fsd_property_11_mission_sequence --output-on-failure
 ```
+
+### 13.6 PX4 Native Gripper Peripheral Integration
+
+The `Px4GripperPayloadAdapter` allows direct offloading of servo/gripper actuation to the Pixhawk FMU via the PX4 native gripper module:
+
+1. **PX4 Actuator Configuration (QGroundControl)**:
+   - In QGC **Actuators** tab, assign the desired AUX port (e.g. `PWM AUX 1`) to function **`Gripper`**.
+   - Configure parameters: `PP_GRIPPER_EN = 1`, `PP_GRIP_TYPE = 0` (Servo), pulse duration `GRIP_PULSE_OPEN = 2000 µs`, `GRIP_PULSE_CLOSE = 1000 µs`.
+2. **Electrical Wiring**:
+   - Signal wire: Connect to Pixhawk AUX 1 Signal pin.
+   - Power rail: Connect dedicated 5V/6V UBEC to Pixhawk AUX servo rail with Common Ground to battery and companion computer.
+3. **ROS 2 Communication Protocol**:
+   - Publishes `px4_msgs::msg::VehicleCommand` (`VEHICLE_CMD_DO_GRIPPER` / Command ID 211) to `/fmu/in/vehicle_command`.
+   - Subscribes to `/fmu/out/vehicle_command_ack` to measure feedback latency and verify execution status while strictly respecting Property 14 idempotency.
 
 ---
 

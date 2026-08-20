@@ -28,6 +28,7 @@
 #include "persistence/persistence_manager.hpp"
 #include "payload/payload_controller.hpp"
 #include "payload/simulation_payload_adapter.hpp"
+#include "payload/px4_gripper_payload_adapter.hpp"
 #include "runtime/lifecycle_supervisor.hpp"
 #include "runtime/plan_manager.hpp"
 #include "adapters/px4_api_capabilities.hpp"

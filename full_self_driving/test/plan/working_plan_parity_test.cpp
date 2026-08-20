@@ -129,6 +129,9 @@ TEST_F(WorkingPlanParityTest, DesktopOriginalPlanVerification)
 {
   std::string desktop_plan = "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/test/fixtures/plans/desktop_aavc2026_mission.plan";
   if (!std::filesystem::is_regular_file(desktop_plan)) {
+    desktop_plan = "/home/ubuntu/roscon-25-workshop/full_self_driving/test/fixtures/plans/aavc2026_mission.plan";
+  }
+  if (!std::filesystem::is_regular_file(desktop_plan)) {
     desktop_plan = "/home/yosh/Desktop/aavc2026_mission.plan";
   }
 

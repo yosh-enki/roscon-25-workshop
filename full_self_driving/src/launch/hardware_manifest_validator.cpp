@@ -247,10 +247,12 @@ ValidationResult HardwareManifestValidator::validate_yaml(
   } else {
     const auto & pay = root["payload"];
     std::string adapter_id = pay["adapter_id"] ? pay["adapter_id"].as<std::string>() : "";
-    if (adapter_id != "gpio_pwm_payload_actuator") {
+    if (adapter_id != "gpio_pwm_payload_actuator" &&
+        adapter_id != "px4_uorb_gripper_actuator" &&
+        adapter_id != "simulation_payload_stub") {
       result.add_violation(
         ValidationStatus::ADAPTER_ID_MISMATCH,
-        "payload.adapter_id must be 'gpio_pwm_payload_actuator', found: '" + adapter_id + "'");
+        "payload.adapter_id must be 'gpio_pwm_payload_actuator', 'px4_uorb_gripper_actuator', or 'simulation_payload_stub', found: '" + adapter_id + "'");
     }
   }
 
@@ -307,6 +309,8 @@ HardwareManifest HardwareManifestValidator::parse_yaml(const YAML::Node & root)
     const auto & p = root["payload"];
     if (p["adapter_id"]) m.payload.adapter_id = p["adapter_id"].as<std::string>();
     if (p["device_path"]) m.payload.device_path = p["device_path"].as<std::string>();
+    if (p["transport_interface"]) m.payload.transport_interface = p["transport_interface"].as<std::string>();
+    if (p["gripper_instance"]) m.payload.gripper_instance = p["gripper_instance"].as<int>();
     if (p["pwm_pin"]) m.payload.pwm_pin = p["pwm_pin"].as<int>();
     if (p["pwm_frequency_hz"]) m.payload.pwm_frequency_hz = p["pwm_frequency_hz"].as<int>();
     if (p["disarmed_pwm_us"]) m.payload.disarmed_pwm_us = p["disarmed_pwm_us"].as<int>();

@@ -184,6 +184,7 @@ ament_target_dependencies(fsd_registry_core
 add_library(fsd_payload_core
   src/payload/simulation_payload_adapter.cpp
   src/payload/hardware_payload_adapter.cpp
+  src/payload/px4_gripper_payload_adapter.cpp
   src/payload/payload_controller.cpp
 )
 target_include_directories(fsd_payload_core PUBLIC
@@ -197,6 +198,7 @@ target_link_libraries(fsd_payload_core
 )
 ament_target_dependencies(fsd_payload_core
   rclcpp
+  px4_msgs
   builtin_interfaces
 )
 
@@ -560,6 +562,10 @@ if(BUILD_TESTING)
   target_include_directories(launch_manifest_test PRIVATE
     include
     src
+  )
+  target_link_libraries(launch_manifest_test
+    fsd_launch_core
+    ament_index_cpp::ament_index_cpp
   )
   ament_target_dependencies(launch_manifest_test
     ament_index_cpp
@@ -1089,6 +1095,24 @@ if(BUILD_TESTING)
   )
   ament_target_dependencies(payload_controller_test
     rclcpp
+    builtin_interfaces
+  )
+
+  ament_add_gtest(px4_gripper_payload_adapter_test
+    test/payload/px4_gripper_payload_adapter_test.cpp
+  )
+  target_include_directories(px4_gripper_payload_adapter_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(px4_gripper_payload_adapter_test
+    fsd_payload_core
+    fsd_domain_core
+    "${cpp_typesupport_target}"
+  )
+  ament_target_dependencies(px4_gripper_payload_adapter_test
+    rclcpp
+    px4_msgs
     builtin_interfaces
   )
 

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 #include <ament_index_cpp/get_package_share_directory.hpp>
+#include <yaml-cpp/yaml.h>
+#include "launch/hardware_manifest_validator.hpp"
 
 #include <fstream>
 #include <string>
@@ -92,6 +94,45 @@ TEST_F(LaunchManifestTest, TestBridgesAndUrdfExistWithoutPrototypeReferences)
 
   EXPECT_EQ(urdf_content.find("px4_roscon_25"), std::string::npos)
     << "Production URDF must not reference prototype package px4_roscon_25";
+}
+
+TEST_F(LaunchManifestTest, AcceptsPx4GripperAdapterInManifest)
+{
+  std::string yaml_content = R"(
+profile: "hardware_rpi4_pixhawk6c_gripper"
+manifest_version: "1.0.0"
+description: "Test manifest with PX4 native gripper"
+approval:
+  approved: true
+  approval_authority: "safety-board@fsd.roscon25.org"
+  approval_evidence_sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  approval_timestamp_utc: "2026-08-20T00:00:00Z"
+fmu_transport:
+  adapter_id: "px4_hardware_uart_serial"
+  device_path: "/dev/null"
+camera:
+  adapter_id: "v4l2_hardware_camera"
+  device_path: "/dev/null"
+  calibration_file: "config/camera_calibrations/imx219_720p.yaml"
+  calibration_sha256: "c283de9385125caf9014576a6fa7e7e1cd4497a90f3087f4060da9ea71770299"
+payload:
+  adapter_id: "px4_uorb_gripper_actuator"
+  transport_interface: "vehicle_command"
+  gripper_instance: 1
+security:
+  sros2_keystore_path: "/tmp"
+  require_encryption: false
+  require_access_control: false
+system_resources:
+  max_cpu_percent: 80.0
+  max_memory_mb: 2048
+  storage_reserve_mb: 1024
+  power_loss_recovery_enabled: true
+)";
+
+  YAML::Node root = YAML::Load(yaml_content);
+  auto result = full_self_driving::launch::HardwareManifestValidator::validate_yaml(root, false, pkg_share_dir_);
+  EXPECT_TRUE(result.is_valid) << (result.violations.empty() ? "" : result.violations[0]);
 }
 
 int main(int argc, char ** argv)
