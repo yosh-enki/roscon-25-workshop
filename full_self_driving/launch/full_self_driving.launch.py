@@ -36,7 +36,6 @@ def launch_setup(context, *args, **kwargs):
     marker_size_val = float(LaunchConfiguration("marker_size").perform(context))
     hardware_manifest_arg = LaunchConfiguration("hardware_manifest").perform(context).strip()
     payload_adapter = LaunchConfiguration("payload_adapter").perform(context)
-    serial_port = LaunchConfiguration("serial_port").perform(context)
 
     simulation = simulation_arg in ["true", "1", "yes"]
     headless = headless_arg in ["true", "1", "yes"]
@@ -404,19 +403,6 @@ def launch_setup(context, *args, **kwargs):
         fsd_flight_runtime_node,
     ]
 
-    if payload_adapter == "px4_uorb_gripper_actuator":
-        esp32_gripper_bridge_node = Node(
-            package="full_self_driving",
-            executable="esp32_gripper_bridge.py",
-            name="esp32_gripper_bridge",
-            output="screen",
-            parameters=[{
-                "port": serial_port,
-                "use_sim_time": True,
-            }],
-        )
-        entities.append(esp32_gripper_bridge_node)
-
     if test_selection and test_selection.lower() != "none" and selected_marker_id >= 0:
         selection_provider_node = Node(
             package="full_self_driving",
@@ -547,11 +533,6 @@ def generate_launch_description():
             "payload_adapter",
             default_value="simulation_payload_stub",
             description="Payload HAL adapter ('simulation_payload_stub', 'px4_uorb_gripper_actuator', 'gpio_pwm_payload_actuator')",
-        ),
-        DeclareLaunchArgument(
-            "serial_port",
-            default_value="/dev/ttyACM0",
-            description="Serial port for physical ESP32 Gripper Actuator",
         ),
         OpaqueFunction(function=launch_setup),
     ])

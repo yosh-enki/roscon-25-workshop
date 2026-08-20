@@ -1398,6 +1398,10 @@ if(BUILD_TESTING)
     test/launch/launch_boundary_test.py
   )
 
+  ament_add_pytest_test(test_esp32_gripper_bridge
+    test/payload/test_esp32_gripper_bridge.py
+  )
+
   ament_add_pytest_test(full_sortie_acceptance
     test/acceptance/full_sortie_acceptance.py
   )
