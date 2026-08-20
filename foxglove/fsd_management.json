@@ -1,6 +1,40 @@
 {
   "configById": {
     "fsd-mission-control.fsd-mission-control!fsd_ctrl": {},
+    "fsd-mission-control.fsd-plan-manager!fsd_plan": {},
+    "Image!kl2fqg": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [0, 0, 0],
+        "targetOffset": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "thetaOffset": 60,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {
+        "type": "point",
+        "poseTopic": "/move_base_simple/goal",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "synchronize": false,
+      "imageMode": {
+        "imageTopic": "/camera"
+      },
+      "foxglovePanelTitle": "/camera/compressed"
+    },
     "3D!vehicle_scene": {
       "cameraState": {
         "perspective": true,
@@ -12,17 +46,8 @@
           -0.40064706219038193,
           -8.655175449144414e-16
         ],
-        "target": [
-          0,
-          0,
-          0
-        ],
-        "targetOrientation": [
-          0,
-          0,
-          0,
-          1
-        ],
+        "target": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
         "fovy": 45,
         "near": 0.5,
         "far": 5000
@@ -78,16 +103,8 @@
           "divisions": 50,
           "lineWidth": 1,
           "color": "#248eff",
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ]
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0]
         }
       },
       "publish": {
@@ -103,100 +120,11 @@
       "synchronize": false,
       "imageMode": {}
     },
-    "Plot!altitude": {
-      "paths": [
-        {
-          "timestampMethod": "receiveTime",
-          "value": "/full_self_driving/telemetry.altitude_m",
-          "enabled": true,
-          "color": "#4e98e2"
-        }
-      ],
-      "showXAxisLabels": true,
-      "showYAxisLabels": true,
-      "showLegend": false,
-      "legendDisplay": "floating",
-      "isSynced": true,
-      "xAxisVal": "timestamp",
-      "sidebarDimension": 200,
-      "foxglovePanelTitle": "Altitude (m)",
-      "yAxisLabel": "z [m]"
-    },
-    "Plot!battery_speed": {
-      "paths": [
-        {
-          "timestampMethod": "receiveTime",
-          "value": "/full_self_driving/telemetry.battery_percentage",
-          "enabled": true,
-          "color": "#45bf55"
-        },
-        {
-          "timestampMethod": "receiveTime",
-          "value": "/full_self_driving/telemetry.ground_speed_m_s",
-          "enabled": true,
-          "color": "#e28743"
-        }
-      ],
-      "showXAxisLabels": true,
-      "showYAxisLabels": true,
-      "showLegend": false,
-      "legendDisplay": "floating",
-      "isSynced": true,
-      "xAxisVal": "timestamp",
-      "sidebarDimension": 200,
-      "foxglovePanelTitle": "Battery % & Speed (m/s)"
-    },
     "RawMessages!pad_registry": {
       "topicPath": "/full_self_driving/pad_registry",
       "diffEnabled": false,
       "foxglovePanelTitle": "Discovered Pad Registry",
       "defaultExpanded": false
-    },
-    "Image!kl2fqg": {
-      "cameraState": {
-        "distance": 20,
-        "perspective": true,
-        "phi": 60,
-        "target": [
-          0,
-          0,
-          0
-        ],
-        "targetOffset": [
-          0,
-          0,
-          0
-        ],
-        "targetOrientation": [
-          0,
-          0,
-          0,
-          1
-        ],
-        "thetaOffset": 60,
-        "fovy": 45,
-        "near": 0.5,
-        "far": 5000
-      },
-      "followMode": "follow-pose",
-      "scene": {},
-      "transforms": {},
-      "topics": {},
-      "layers": {},
-      "publish": {
-        "type": "point",
-        "poseTopic": "/move_base_simple/goal",
-        "pointTopic": "/clicked_point",
-        "poseEstimateTopic": "/initialpose",
-        "poseEstimateXDeviation": 0.5,
-        "poseEstimateYDeviation": 0.5,
-        "poseEstimateThetaDeviation": 0.26179939
-      },
-      "synchronize": false,
-      "imageMode": {
-        "imageTopic": "/camera"
-      },
-      "foxglovePanelTitle": "/camera/compressed"
     }
   },
   "globalVariables": {},
@@ -214,12 +142,7 @@
         "splitPercentage": 50
       },
       "second": {
-        "first": {
-          "first": "Plot!altitude",
-          "second": "Plot!battery_speed",
-          "direction": "column",
-          "splitPercentage": 50
-        },
+        "first": "fsd-mission-control.fsd-plan-manager!fsd_plan",
         "second": "RawMessages!pad_registry",
         "direction": "column",
         "splitPercentage": 50
