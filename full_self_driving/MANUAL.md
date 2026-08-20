@@ -1968,6 +1968,37 @@ sequenceDiagram
 }
 ```
 
+---
+
+### 18.6 Foxglove Studio Mission Control Layout
+
+For operators using [Foxglove Studio](https://foxglove.dev/) on the Host workstation, the pre-built mission layout [`foxglove/roscon-25-workshop.json`](file:///home/yosh/roscon-25-workshop/foxglove/roscon-25-workshop.json) provides a single-screen command and monitoring dashboard.
+
+#### 1. Architecture & Connection
+* **Simulation & Bridge (Docker)**: Runs `foxglove_bridge` listening on WebSocket port `8765`.
+* **Foxglove Studio (Host)**: Connects to `ws://localhost:8765` or `ws://127.0.0.1:8765`.
+
+#### 2. Layout Structure & Panels
+* **Left Column (Command & Safety)**:
+  * `Select Target` (`CallService` $\rightarrow$ `/full_self_driving/select_target`): Disarmed target marker selection.
+  * `Prepare Payload` (`CallService` $\rightarrow$ `/full_self_driving/prepare_payload`): Cargo latching and verification.
+  * `EMERGENCY STOP` (`CallService` $\rightarrow$ `/full_self_driving/emergency_stop`): Instant manual failsafe trigger.
+  * `Pre-flight Readiness Gate` (`RawMessages` $\rightarrow$ `/full_self_driving/readiness`): Pre-arm readiness verification.
+* **Center Column (Vision & Spatial 3D)**:
+  * `ArUco Detection & 2D Track Feed` (`ImageView` $\rightarrow$ `/full_self_driving/perception/annotated_image`): 10 Hz annotated camera feed.
+  * `3D Flight Scene & Trajectory` (`3D` $\rightarrow$ URDF `/robot_description`, `/fmu/out/vehicle_odometry`, TF tree).
+* **Right Column (Flight Telemetry & Pad Database)**:
+  * `FSD Flight State Machine` (`RawMessages` $\rightarrow$ `/full_self_driving/state`).
+  * `Live Target Lock` (`RawMessages` $\rightarrow$ `/full_self_driving/perception/live_target_lock`).
+  * `Altitude Profile` & `Battery / Speed Plots` (`Plot` $\rightarrow$ `/full_self_driving/telemetry`).
+  * `Discovered Pad Registry` (`RawMessages` $\rightarrow$ `/full_self_driving/pad_registry`).
+
+#### 3. How to Import Layout in Foxglove Studio
+1. Launch Foxglove Studio on your host machine.
+2. Select **Open Connection** $\rightarrow$ **Foxglove WebSocket** $\rightarrow$ URL: `ws://localhost:8765`.
+3. In the top menu, click **Layout** $\rightarrow$ **Import from file...** $\rightarrow$ Select [`foxglove/roscon-25-workshop.json`](file:///home/yosh/roscon-25-workshop/foxglove/roscon-25-workshop.json).
+
+
 
 
 

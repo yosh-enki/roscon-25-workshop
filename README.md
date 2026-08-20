@@ -81,6 +81,13 @@ For more detailed instructions and exercises, refer to the following demos:
 
 At the end of the workshop, we provide dedicated time for questions, troubleshooting, and hands-on guidance with hardware.
 
+### Foxglove Studio Mission Control Dashboard
+
+For real-time 3D telemetry, annotated perception feeds, and mission service triggers (`/select_target`, `/prepare_payload`, `/emergency_stop`), connect Foxglove Studio on your host machine to `ws://localhost:8765` and import [`foxglove/roscon-25-workshop.json`](foxglove/roscon-25-workshop.json).
+
+See [`full_self_driving/MANUAL.md`](full_self_driving/MANUAL.md) Section 18.6 for full operating instructions.
+
 ### Open Lab & Individual Consultations
 
 Dedicated time for leftover exercises and individual consultation.
+
