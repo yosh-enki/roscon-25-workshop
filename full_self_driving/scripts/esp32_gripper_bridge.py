@@ -7,17 +7,23 @@ translates the command to non-blocking Serial strings sent to ESP32 on /dev/ttyA
 and publishes received hardware acknowledgments to `/fmu/out/vehicle_command_ack`.
 """
 
+import os
 import sys
 import time
 import threading
-import rclpy
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
+
+# Add script directory to path so bundled pyserial is found
+sys.path.insert(0, os.path.dirname(__file__))
 
 try:
     import serial
 except ImportError:
     serial = None
+
+import rclpy
+from rclpy.node import Node
+from rclpy.executors import ExternalShutdownException
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 
 from px4_msgs.msg import VehicleCommand, VehicleCommandAck
 
@@ -190,11 +196,15 @@ def main(args=None):
     node = Esp32GripperBridge()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            try:
+                rclpy.shutdown()
+            except Exception:
+                pass
 
 
 if __name__ == '__main__':
