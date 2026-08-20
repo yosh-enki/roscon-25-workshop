@@ -1,27 +1,49 @@
 {
   "configById": {
-    "3D!3c6twjg": {
+    "CallService!select_target": {
+      "serviceName": "/full_self_driving/select_target",
+      "requestPayload": "{\n  \"target\": {\n    \"marker_id\": 1,\n    \"dictionary\": \"DICT_4X4_50\",\n    \"target_namespace\": \"aavc2026\"\n  },\n  \"expected_selection_revision\": 0\n}",
+      "foxglovePanelTitle": "1. Select Target Identity"
+    },
+    "CallService!prepare_payload": {
+      "serviceName": "/full_self_driving/prepare_payload",
+      "requestPayload": "{\n  \"request_id\": \"sortie_prep\",\n  \"operation\": 2,\n  \"expected_selection_revision\": 0\n}",
+      "foxglovePanelTitle": "2. Prepare Cargo Payload"
+    },
+    "CallService!emergency_stop": {
+      "serviceName": "/full_self_driving/emergency_stop",
+      "requestPayload": "{\n  \"reason\": \"Operator manual emergency stop trigger\"\n}",
+      "foxglovePanelTitle": "🚨 EMERGENCY STOP"
+    },
+    "RawMessages!readiness": {
+      "topicPath": "/full_self_driving/readiness",
+      "diffEnabled": false,
+      "diffMethod": "custom",
+      "diffTopicPath": "",
+      "showFullMessageForDiff": false,
+      "foxglovePanelTitle": "Pre-flight Readiness Gate"
+    },
+    "ImageView!fsd_annotated": {
+      "cameraTopic": "/full_self_driving/perception/annotated_image",
+      "transformMarkers": false,
+      "synchronize": false,
+      "mode": "fit",
+      "pan": {
+        "x": 0,
+        "y": 0
+      },
+      "zoom": 1,
+      "foxglovePanelTitle": "ArUco Detection & 2D Track Feed"
+    },
+    "3D!vehicle_scene": {
       "cameraState": {
         "perspective": true,
-        "distance": 11.376001845525893,
-        "phi": 75.49906642124344,
-        "thetaOffset": 90.92379334829621,
-        "targetOffset": [
-          4.665970937961196,
-          -0.14898348825041471,
-          4.508385905766857e-18
-        ],
-        "target": [
-          0,
-          0,
-          0
-        ],
-        "targetOrientation": [
-          0,
-          0,
-          0,
-          1
-        ],
+        "distance": 15.0,
+        "phi": 70.0,
+        "thetaOffset": 90.0,
+        "targetOffset": [0, 0, 0],
+        "target": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
         "fovy": 45,
         "near": 0.5,
         "far": 5000
@@ -37,53 +59,22 @@
         }
       },
       "transforms": {
-        "frame:motor_3": {
-          "visible": false
-        },
-        "frame:motor_2": {
-          "visible": false
-        },
-        "frame:motor_1": {
-          "visible": false
-        },
-        "frame:motor_0": {
-          "visible": false
-        },
-        "frame:base_link_frd": {
-          "visible": false
-        },
-        "frame:odom_ned": {
-          "visible": false
+        "frame:base_link": {
+          "visible": true
         },
         "frame:odom": {
-          "visible": false
+          "visible": true
         },
-        "frame:x500_lidar_2d_mono_cam_down_0/camera_link/imager": {
-          "visible": false
-        },
-        "frame:x500_mono_cam_down_0/camera_link/imager": {
-          "visible": false
-        },
-        "frame:x500_lidar_2d_0/link/lidar_2d_v2": {
-          "visible": false
+        "frame:map": {
+          "visible": true
         },
         "frame:camera_frame": {
-          "visible": false
+          "visible": true
         }
       },
       "topics": {
         "/robot_description": {
           "visible": true
-        },
-        "/camera": {
-          "visible": false,
-          "cameraInfoTopic": "/camera_info",
-          "distance": 2,
-          "planarProjectionFactor": 0
-        },
-        "/target_pose": {
-          "visible": true,
-          "type": "axis"
         },
         "/point_cloud": {
           "visible": true,
@@ -92,17 +83,8 @@
           "colorMap": "rainbow",
           "pointSize": 8
         },
-        "/world/aruco/model/x500_mono_cam_down_0/link/camera_link/sensor/imager/image/compressed": {
-          "visible": true,
-          "cameraInfoTopic": "/camera_info"
-        },
-        "/image_proc": {
-          "visible": false,
-          "cameraInfoTopic": "/camera_info"
-        },
-        "/camera/compressed": {
-          "visible": true,
-          "cameraInfoTopic": "/camera_info"
+        "/fmu/out/vehicle_odometry": {
+          "visible": true
         }
       },
       "layers": {
@@ -111,92 +93,80 @@
           "drawBehind": false,
           "frameLocked": true,
           "label": "Grid",
-          "instanceId": "9cf0240d-2343-4c01-80d3-ffccdad28340",
+          "instanceId": "grid_world",
           "layerId": "foxglove.Grid",
-          "size": 10,
-          "divisions": 10,
+          "size": 50,
+          "divisions": 50,
           "lineWidth": 1,
           "color": "#248eff",
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ]
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0]
         }
       },
       "publish": {
         "type": "point",
         "poseTopic": "/move_base_simple/goal",
-        "pointTopic": "/clicked_point",
-        "poseEstimateTopic": "/initialpose",
-        "poseEstimateXDeviation": 0.5,
-        "poseEstimateYDeviation": 0.5,
-        "poseEstimateThetaDeviation": 0.26179939
+        "pointTopic": "/clicked_point"
       },
-      "imageMode": {}
+      "foxglovePanelTitle": "3D Flight Scene & Trajectory"
     },
-    "Plot!2kas0az": {
+    "RawMessages!fsd_state": {
+      "topicPath": "/full_self_driving/state",
+      "diffEnabled": false,
+      "foxglovePanelTitle": "FSD Flight State Machine"
+    },
+    "RawMessages!live_lock": {
+      "topicPath": "/full_self_driving/perception/live_target_lock",
+      "diffEnabled": false,
+      "foxglovePanelTitle": "Live Target Lock (Visual Servoing)"
+    },
+    "Plot!altitude": {
       "paths": [
         {
           "timestampMethod": "receiveTime",
-          "value": "/fmu/out/vehicle_odometry.position[0]",
+          "value": "/full_self_driving/telemetry.altitude_m",
           "enabled": true,
-          "color": "#4e98e2",
-          "xValuePath": "/fmu/out/vehicle_odometry.position[1]"
+          "color": "#4e98e2"
         }
       ],
       "showXAxisLabels": true,
       "showYAxisLabels": true,
-      "showLegend": false,
+      "showLegend": true,
       "legendDisplay": "floating",
-      "showPlotValuesInLegend": false,
-      "isSynced": true,
-      "xAxisVal": "custom",
-      "sidebarDimension": 240,
-      "axisScalesMode": "lockedScales",
-      "foxglovePanelTitle": "DRONE XY trajectory (ENU)",
-      "xAxisLabel": "x [m]",
-      "yAxisLabel": "y [m]",
-      "timeRange": "all"
-    },
-    "Plot!1jjgtat": {
-      "paths": [
-        {
-          "timestampMethod": "receiveTime",
-          "value": "/fmu/out/vehicle_odometry.position[2]",
-          "enabled": true,
-          "color": "#4e98e2",
-          "xValuePath": "/fmu/out/vehicle_odometry.position[0]"
-        }
-      ],
-      "showXAxisLabels": true,
-      "showYAxisLabels": true,
-      "showLegend": false,
-      "legendDisplay": "floating",
-      "showPlotValuesInLegend": false,
       "isSynced": true,
       "xAxisVal": "timestamp",
-      "sidebarDimension": 240,
-      "foxglovePanelTitle": "Drone estimated altitude (NED)",
-      "xAxisLabel": "t [s]",
+      "sidebarDimension": 200,
+      "foxglovePanelTitle": "Altitude (m)",
       "yAxisLabel": "z [m]"
     },
-    "ImageView!fsd_annotated": {
-      "cameraTopic": "/full_self_driving/perception/annotated_image",
-      "transformMarkers": false,
-      "synchronize": false,
-      "mode": "fit",
-      "pan": {
-        "x": 0,
-        "y": 0
-      },
-      "zoom": 1,
-      "foxglovePanelTitle": "ArUco Annotated Feed (2D Static)"
+    "Plot!battery_speed": {
+      "paths": [
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/full_self_driving/telemetry.battery_percentage",
+          "enabled": true,
+          "color": "#45bf55"
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/full_self_driving/telemetry.ground_speed_m_s",
+          "enabled": true,
+          "color": "#e28743"
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 200,
+      "foxglovePanelTitle": "Battery % & Speed (m/s)"
+    },
+    "RawMessages!pad_registry": {
+      "topicPath": "/full_self_driving/pad_registry",
+      "diffEnabled": false,
+      "foxglovePanelTitle": "Discovered Pad Registry"
     }
   },
   "globalVariables": {},
@@ -206,15 +176,53 @@
   },
   "layout": {
     "first": {
-      "first": "ImageView!fsd_annotated",
-      "second": "3D!3c6twjg",
-      "direction": "row"
+      "first": {
+        "first": "CallService!select_target",
+        "second": {
+          "first": "CallService!prepare_payload",
+          "second": {
+            "first": "CallService!emergency_stop",
+            "second": "RawMessages!readiness",
+            "direction": "column",
+            "splitPercentage": 45
+          },
+          "direction": "column",
+          "splitPercentage": 40
+        },
+        "direction": "column",
+        "splitPercentage": 35
+      },
+      "second": {
+        "first": "ImageView!fsd_annotated",
+        "second": "3D!vehicle_scene",
+        "direction": "column",
+        "splitPercentage": 50
+      },
+      "direction": "row",
+      "splitPercentage": 28
     },
     "second": {
-      "first": "Plot!2kas0az",
-      "second": "Plot!1jjgtat",
-      "direction": "column"
+      "first": {
+        "first": "RawMessages!fsd_state",
+        "second": "RawMessages!live_lock",
+        "direction": "column",
+        "splitPercentage": 50
+      },
+      "second": {
+        "first": {
+          "first": "Plot!altitude",
+          "second": "Plot!battery_speed",
+          "direction": "column",
+          "splitPercentage": 50
+        },
+        "second": "RawMessages!pad_registry",
+        "direction": "column",
+        "splitPercentage": 50
+      },
+      "direction": "column",
+      "splitPercentage": 40
     },
-    "direction": "column"
+    "direction": "row",
+    "splitPercentage": 68
   }
 }
