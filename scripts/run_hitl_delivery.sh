@@ -26,14 +26,24 @@ else
     DEVICE_FLAG=""
 fi
 
-# Run Docker container with X11 / Wayland forwarding and USB device passthrough
+# NVIDIA GPU Acceleration auto-detection
+if command -v nvidia-smi &>/dev/null && docker run --rm --gpus all dronecode/roscon-25-workshop:latest nvidia-smi &>/dev/null; then
+    echo "[INFO] NVIDIA RTX 4050 GPU detected. Enabling full GPU hardware acceleration."
+    GPU_FLAGS="--gpus all -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all -e __NV_PRIME_RENDER_OFFLOAD=1 -e __GLX_VENDOR_LIBRARY_NAME=nvidia"
+else
+    GPU_FLAGS=""
+fi
+
+# Run Docker container with X11 / Wayland forwarding, GPU passthrough, and USB device
 docker run --rm -it \
     --net=host \
     --ipc=host \
     --group-add dialout \
     ${DEVICE_FLAG} \
+    ${GPU_FLAGS} \
     -v /tmp/.X11-unix:/tmp/.X11-unix:ro \
     -e DISPLAY="${DISPLAY}" \
+    -e QT_X11_NO_MITSHM=1 \
     -v "${WORKSPACE_DIR}:/home/ubuntu/roscon-25-workshop" \
     -w /home/ubuntu/roscon-25-workshop \
     dronecode/roscon-25-workshop:latest \
