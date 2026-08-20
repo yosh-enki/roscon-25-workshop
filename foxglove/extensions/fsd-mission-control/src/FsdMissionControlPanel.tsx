@@ -99,6 +99,17 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
     renderDone?.();
   }, [renderDone]);
 
+  // Safe JSON Stringifier for ROS 2 BigInt fields (uint64)
+  const safeStringify = (obj: unknown): string => {
+    try {
+      return JSON.stringify(obj, (_key, value) =>
+        typeof value === "bigint" ? value.toString() : value
+      );
+    } catch {
+      return String(obj);
+    }
+  };
+
   // Service Caller
   const callRosService = async (serviceName: string, payload: unknown, actionDesc: string) => {
     setIsCalling(true);
@@ -111,7 +122,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
       }
 
       const res = (await callFn(serviceName, payload)) as Record<string, unknown>;
-      addLog("success", `${actionDesc} -> Success: ${JSON.stringify(res)}`);
+      addLog("success", `${actionDesc} -> Success: ${safeStringify(res)}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       addLog("error", `${actionDesc} -> Error: ${msg}`);
