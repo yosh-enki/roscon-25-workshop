@@ -1,24 +1,140 @@
 {
   "configById": {
-    "ServiceCall!select_target": {
-      "service_name": "/full_self_driving/select_target",
-      "serviceName": "/full_self_driving/select_target",
-      "request_payload": "{\n  \"target\": {\n    \"marker_id\": 1,\n    \"dictionary\": \"DICT_4X4_50\",\n    \"target_namespace\": \"aavc2026\"\n  },\n  \"expected_selection_revision\": 0\n}",
-      "requestPayload": "{\n  \"target\": {\n    \"marker_id\": 1,\n    \"dictionary\": \"DICT_4X4_50\",\n    \"target_namespace\": \"aavc2026\"\n  },\n  \"expected_selection_revision\": 0\n}",
-      "button_text": "Call /select_target",
-      "buttonText": "Call /select_target",
-      "editing_mode": true,
-      "foxglovePanelTitle": "1. Select Target Identity"
+    "roscon25.fsd-mission-control.fsd-mission-control!fsd_ctrl": {},
+    "ImageView!fsd_annotated": {
+      "cameraTopic": "/full_self_driving/perception/annotated_image",
+      "transformMarkers": false,
+      "synchronize": false,
+      "mode": "fit",
+      "pan": {
+        "x": 0,
+        "y": 0
+      },
+      "zoom": 1,
+      "foxglovePanelTitle": "ArUco Detection & 2D Track Feed"
     },
-    "ServiceCall!prepare_payload": {
-      "service_name": "/full_self_driving/prepare_payload",
-      "serviceName": "/full_self_driving/prepare_payload",
-      "request_payload": "{\n  \"request_id\": \"sortie_prep\",\n  \"operation\": 2,\n  \"expected_selection_revision\": 0\n}",
-      "requestPayload": "{\n  \"request_id\": \"sortie_prep\",\n  \"operation\": 2,\n  \"expected_selection_revision\": 0\n}",
-      "button_text": "Call /prepare_payload",
-      "buttonText": "Call /prepare_payload",
-      "editing_mode": true,
-      "foxglovePanelTitle": "2. Prepare Cargo Payload"
+    "3D!vehicle_scene": {
+      "cameraState": {
+        "perspective": true,
+        "distance": 15.0,
+        "phi": 70.0,
+        "thetaOffset": 90.0,
+        "targetOffset": [0, 0, 0],
+        "target": [0, 0, 0],
+        "targetOrientation": [0, 0, 0, 1],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "followTf": "map",
+      "scene": {
+        "enableStats": false,
+        "transforms": {
+          "editable": false,
+          "showLabel": true,
+          "lineWidth": 0
+        }
+      },
+      "transforms": {
+        "frame:base_link": {
+          "visible": true
+        },
+        "frame:odom": {
+          "visible": true
+        },
+        "frame:map": {
+          "visible": true
+        },
+        "frame:camera_frame": {
+          "visible": true
+        }
+      },
+      "topics": {
+        "/robot_description": {
+          "visible": true
+        },
+        "/point_cloud": {
+          "visible": true,
+          "colorField": "intensity",
+          "colorMode": "colormap",
+          "colorMap": "rainbow",
+          "pointSize": 8
+        },
+        "/fmu/out/vehicle_odometry": {
+          "visible": true
+        }
+      },
+      "layers": {
+        "grid": {
+          "visible": true,
+          "drawBehind": false,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "grid_world",
+          "layerId": "foxglove.Grid",
+          "size": 50,
+          "divisions": 50,
+          "lineWidth": 1,
+          "color": "#248eff",
+          "position": [0, 0, 0],
+          "rotation": [0, 0, 0]
+        }
+      },
+      "publish": {
+        "type": "point",
+        "poseTopic": "/move_base_simple/goal",
+        "pointTopic": "/clicked_point"
+      },
+      "foxglovePanelTitle": "3D Flight Scene & Trajectory"
+    },
+    "Plot!altitude": {
+      "paths": [
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/full_self_driving/telemetry.altitude_m",
+          "enabled": true,
+          "color": "#4e98e2"
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 200,
+      "foxglovePanelTitle": "Altitude (m)",
+      "yAxisLabel": "z [m]"
+    },
+    "Plot!battery_speed": {
+      "paths": [
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/full_self_driving/telemetry.battery_percentage",
+          "enabled": true,
+          "color": "#45bf55"
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/full_self_driving/telemetry.ground_speed_m_s",
+          "enabled": true,
+          "color": "#e28743"
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 200,
+      "foxglovePanelTitle": "Battery % & Speed (m/s)"
+    },
+    "RawMessages!pad_registry": {
+      "topicPath": "/full_self_driving/pad_registry",
+      "diffEnabled": false,
+      "foxglovePanelTitle": "Discovered Pad Registry"
     }
   },
   "globalVariables": {},
@@ -27,9 +143,29 @@
     "speed": 1
   },
   "layout": {
-    "first": "ServiceCall!select_target",
-    "second": "ServiceCall!prepare_payload",
-    "direction": "column",
-    "splitPercentage": 50
+    "first": "roscon25.fsd-mission-control.fsd-mission-control!fsd_ctrl",
+    "second": {
+      "first": {
+        "first": "ImageView!fsd_annotated",
+        "second": "3D!vehicle_scene",
+        "direction": "column",
+        "splitPercentage": 50
+      },
+      "second": {
+        "first": {
+          "first": "Plot!altitude",
+          "second": "Plot!battery_speed",
+          "direction": "column",
+          "splitPercentage": 50
+        },
+        "second": "RawMessages!pad_registry",
+        "direction": "column",
+        "splitPercentage": 50
+      },
+      "direction": "row",
+      "splitPercentage": 55
+    },
+    "direction": "row",
+    "splitPercentage": 30
   }
 }
