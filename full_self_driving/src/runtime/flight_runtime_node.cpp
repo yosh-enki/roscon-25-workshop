@@ -508,6 +508,15 @@ void FlightRuntimeNode::check_and_register_mode()
         rec_ok,
         supervisor_->is_all_active(),
         &missing);
+
+      if (payload_controller_) {
+        std::string payload_err;
+        if (!payload_controller_->is_ready_for_sortie(&payload_err)) {
+          missing.push_back("PAYLOAD_NOT_SECURED: " + payload_err);
+          ok = false;
+        }
+      }
+
       failure_codes = missing;
       return ok;
     });
@@ -649,8 +658,13 @@ bool FlightRuntimeNode::is_ready_for_ownmode() const
   if (!mode_registered_ || !context_ || !persistence_ || !supervisor_ || !state_cache_) {
     return false;
   }
+  bool payload_ok = true;
+  if (payload_controller_) {
+    payload_ok = payload_controller_->is_ready_for_sortie();
+  }
   return supervisor_->is_all_active() &&
-         state_cache_->is_transport_healthy();
+         state_cache_->is_transport_healthy() &&
+         payload_ok;
 }
 
 void FlightRuntimeNode::publish_status_cycle()
