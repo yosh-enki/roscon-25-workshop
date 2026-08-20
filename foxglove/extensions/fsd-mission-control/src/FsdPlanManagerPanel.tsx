@@ -2,6 +2,15 @@ import { MessageEvent, PanelExtensionContext } from "@foxglove/extension";
 import { ReactElement, useEffect, useLayoutEffect, useState, useRef } from "react";
 import { createRoot } from "react-dom/client";
 
+interface SearchCheckpointMsg {
+  working_plan_id?: string;
+  generation?: number;
+  next_source_index?: number;
+  completed_waypoints?: number;
+  total_waypoints?: number;
+  progress_percent?: number;
+}
+
 interface WorkingPlanStatusMsg {
   state?: number;
   working_plan_id?: string;
@@ -10,6 +19,7 @@ interface WorkingPlanStatusMsg {
   source_artifact_sha256?: string;
   generation?: number;
   durability_state?: number;
+  checkpoint?: SearchCheckpointMsg;
 }
 
 interface LogEntry {
@@ -74,7 +84,7 @@ function FsdPlanManagerPanel({ context }: { context: PanelExtensionContext }): R
       if (renderState.currentFrame) {
         for (const msg of renderState.currentFrame) {
           const m = msg as MessageEvent<unknown>;
-          if (m.topic === "/full_self_driving/plan/working_status") {
+          if (m.topic === "/full_self_driving/working_plan/status") {
             setWorkingPlan(m.message as WorkingPlanStatusMsg);
           }
         }
@@ -85,7 +95,7 @@ function FsdPlanManagerPanel({ context }: { context: PanelExtensionContext }): R
     context.watch("topics");
 
     context.subscribe([
-      { topic: "/full_self_driving/plan/working_status" },
+      { topic: "/full_self_driving/working_plan/status" },
     ]);
   }, [context]);
 
@@ -151,7 +161,7 @@ function FsdPlanManagerPanel({ context }: { context: PanelExtensionContext }): R
       if (uploadRes && uploadRes.accepted && uploadRes.artifact?.artifact_id) {
         const artId = uploadRes.artifact.artifact_id;
         setSelectedPlanName(artId);
-        setAvailablePlans((prev) => (prev.includes(artId) ? prev : [...prev, artId]));
+        setAvailablePlans((prev) => (prev.includes(safeName) ? prev : [...prev, safeName]));
         addLog("success", `Plan uploaded: ${artId}`);
 
         // Automatically select the newly uploaded plan
@@ -185,11 +195,14 @@ function FsdPlanManagerPanel({ context }: { context: PanelExtensionContext }): R
       case 3: return { text: "COMPLETED", color: "#bc8cff", bg: "rgba(188,140,255,0.15)" };
       case 4: return { text: "INVALID", color: "#f85149", bg: "rgba(248,81,73,0.15)" };
       case 5: return { text: "RECOVERY", color: "#d29922", bg: "rgba(210,153,34,0.15)" };
-      default: return { text: "LOADED", color: "#79c0ff", bg: "rgba(88,166,255,0.15)" };
+      default: return { text: "STANDBY", color: "#79c0ff", bg: "rgba(88,166,255,0.15)" };
     }
   };
 
   const planStateInfo = getPlanStateText(workingPlan?.state);
+  const totalWp = workingPlan?.checkpoint?.total_waypoints ?? 0;
+  const doneWp = workingPlan?.checkpoint?.completed_waypoints ?? 0;
+  const progressPct = workingPlan?.checkpoint?.progress_percent ?? 0;
 
   return (
     <div
@@ -248,10 +261,24 @@ function FsdPlanManagerPanel({ context }: { context: PanelExtensionContext }): R
           fontSize: "11px",
         }}
       >
-        <div style={{ color: "#8b949e", marginBottom: "4px" }}>Active Plan ID:</div>
-        <div style={{ color: "#79c0ff", fontWeight: "bold", marginBottom: "6px", wordBreak: "break-all" }}>
-          {workingPlan?.working_plan_id || selectedPlanName || "aavc2026_mission.plan"}
+        <div style={{ color: "#8b949e", marginBottom: "2px" }}>Active Working Plan:</div>
+        <div style={{ color: "#79c0ff", fontWeight: "bold", marginBottom: "8px", wordBreak: "break-all", fontSize: "11px" }}>
+          {workingPlan?.working_plan_id || "Awaiting Plan Selection"}
         </div>
+
+        {/* Waypoint Progress Bar */}
+        {totalWp > 0 && (
+          <div style={{ marginBottom: "8px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#8b949e", marginBottom: "3px" }}>
+              <span>Waypoints Progress:</span>
+              <b style={{ color: "#3fb950" }}>{doneWp} / {totalWp} ({progressPct.toFixed(0)}%)</b>
+            </div>
+            <div style={{ width: "100%", height: "4px", background: "rgba(255,255,255,0.1)", borderRadius: "2px", overflow: "hidden" }}>
+              <div style={{ width: `${progressPct}%`, height: "100%", background: "#2ea043", transition: "width 0.3s ease" }} />
+            </div>
+          </div>
+        )}
+
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", color: "#8b949e", fontSize: "10px" }}>
           <div>Map: <b style={{ color: "#c9d1d9" }}>{workingPlan?.map_id || "kmitl_airfield"}</b></div>
           <div>Scenario: <b style={{ color: "#c9d1d9" }}>{workingPlan?.scenario_id || "default_scenario"}</b></div>
@@ -271,7 +298,7 @@ function FsdPlanManagerPanel({ context }: { context: PanelExtensionContext }): R
         <div style={{ fontSize: "11px", color: "#8b949e", marginBottom: "6px" }}>Available Plans (Click to Switch):</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "10px" }}>
           {availablePlans.map((plan) => {
-            const isActive = selectedPlanName === plan;
+            const isActive = selectedPlanName === plan || workingPlan?.working_plan_id?.includes(plan);
             return (
               <button
                 key={plan}
