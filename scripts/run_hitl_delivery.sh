@@ -34,6 +34,16 @@ else
     GPU_FLAGS=""
 fi
 
+# Foxglove WebSocket Port Selection (Avoid conflict with VSCode port forward on 8765)
+if ss -tulpn 2>/dev/null | grep -q ':8765 '; then
+    FOXGLOVE_PORT="8766"
+    echo "[INFO] Port 8765 is occupied on host (e.g. by VSCode). Auto-switching Foxglove port to ${FOXGLOVE_PORT}."
+    echo "[INFO] 👉 In Foxglove Studio, connect to: ws://localhost:${FOXGLOVE_PORT}"
+else
+    FOXGLOVE_PORT="8765"
+    echo "[INFO] 👉 In Foxglove Studio, connect to: ws://localhost:${FOXGLOVE_PORT}"
+fi
+
 # Run Docker container with X11 / Wayland forwarding, GPU passthrough, and USB device
 docker run --rm -it \
     --net=host \
@@ -47,4 +57,4 @@ docker run --rm -it \
     -v "${WORKSPACE_DIR}:/home/ubuntu/roscon-25-workshop" \
     -w /home/ubuntu/roscon-25-workshop \
     dronecode/roscon-25-workshop:latest \
-    bash -c 'source /opt/ros/humble/setup.bash && source /home/ubuntu/px4_ros_ws/install/setup.bash && source install/setup.bash && (python3 full_self_driving/scripts/esp32_gripper_bridge.py --ros-args -p port:="'"${SERIAL_PORT}"'" &) && ros2 launch full_self_driving full_self_driving.launch.py simulation:=true world:="'"${WORLD}"'" headless:=false payload_adapter:=px4_uorb_gripper_actuator'
+    bash -c 'source /opt/ros/humble/setup.bash && source /home/ubuntu/px4_ros_ws/install/setup.bash && source install/setup.bash && (python3 full_self_driving/scripts/esp32_gripper_bridge.py --ros-args -p port:="'"${SERIAL_PORT}"'" &) && ros2 launch full_self_driving full_self_driving.launch.py simulation:=true world:="'"${WORLD}"'" headless:=false payload_adapter:=px4_uorb_gripper_actuator foxglove_port:="'"${FOXGLOVE_PORT}"'"'

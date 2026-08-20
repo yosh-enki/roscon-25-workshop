@@ -36,6 +36,7 @@ def launch_setup(context, *args, **kwargs):
     marker_size_val = float(LaunchConfiguration("marker_size").perform(context))
     hardware_manifest_arg = LaunchConfiguration("hardware_manifest").perform(context).strip()
     payload_adapter = LaunchConfiguration("payload_adapter").perform(context)
+    foxglove_port_val = int(LaunchConfiguration("foxglove_port").perform(context))
 
     simulation = simulation_arg in ["true", "1", "yes"]
     headless = headless_arg in ["true", "1", "yes"]
@@ -206,7 +207,10 @@ def launch_setup(context, *args, **kwargs):
     foxglove_bridge_node = Node(
         package="foxglove_bridge",
         executable="foxglove_bridge",
-        parameters=[{"use_sim_time": True}],
+        parameters=[{
+            "port": foxglove_port_val,
+            "use_sim_time": True,
+        }],
     )
 
     px4_tf_node = Node(
@@ -533,6 +537,11 @@ def generate_launch_description():
             "payload_adapter",
             default_value="simulation_payload_stub",
             description="Payload HAL adapter ('simulation_payload_stub', 'px4_uorb_gripper_actuator', 'gpio_pwm_payload_actuator')",
+        ),
+        DeclareLaunchArgument(
+            "foxglove_port",
+            default_value="8765",
+            description="Port for Foxglove WebSocket bridge (default: 8765)",
         ),
         OpaqueFunction(function=launch_setup),
     ])
