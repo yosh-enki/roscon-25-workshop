@@ -35,6 +35,8 @@ def launch_setup(context, *args, **kwargs):
     dictionary_name = LaunchConfiguration("dictionary").perform(context)
     marker_size_val = float(LaunchConfiguration("marker_size").perform(context))
     hardware_manifest_arg = LaunchConfiguration("hardware_manifest").perform(context).strip()
+    payload_adapter = LaunchConfiguration("payload_adapter").perform(context)
+    serial_port = LaunchConfiguration("serial_port").perform(context)
 
     simulation = simulation_arg in ["true", "1", "yes"]
     headless = headless_arg in ["true", "1", "yes"]
@@ -378,6 +380,8 @@ def launch_setup(context, *args, **kwargs):
             "target_marker_id": selected_marker_id if selected_marker_id >= 0 else 0,
             "target_dictionary": selected_dict,
             "target_namespace": selected_ns,
+            "payload_adapter": payload_adapter,
+            "gripper_instance": 1,
         }],
     )
 
@@ -399,6 +403,19 @@ def launch_setup(context, *args, **kwargs):
         fsd_gateway_node,
         fsd_flight_runtime_node,
     ]
+
+    if payload_adapter == "px4_uorb_gripper_actuator":
+        esp32_gripper_bridge_node = Node(
+            package="full_self_driving",
+            executable="esp32_gripper_bridge.py",
+            name="esp32_gripper_bridge",
+            output="screen",
+            parameters=[{
+                "port": serial_port,
+                "use_sim_time": True,
+            }],
+        )
+        entities.append(esp32_gripper_bridge_node)
 
     if test_selection and test_selection.lower() != "none" and selected_marker_id >= 0:
         selection_provider_node = Node(
@@ -525,6 +542,16 @@ def generate_launch_description():
             "test_fault_child",
             default_value="none",
             description="Fault injection testing argument ('none' or child name)",
+        ),
+        DeclareLaunchArgument(
+            "payload_adapter",
+            default_value="simulation_payload_stub",
+            description="Payload HAL adapter ('simulation_payload_stub', 'px4_uorb_gripper_actuator', 'gpio_pwm_payload_actuator')",
+        ),
+        DeclareLaunchArgument(
+            "serial_port",
+            default_value="/dev/ttyACM0",
+            description="Serial port for physical ESP32 Gripper Actuator",
         ),
         OpaqueFunction(function=launch_setup),
     ])
