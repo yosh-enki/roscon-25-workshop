@@ -177,7 +177,8 @@ class Esp32GripperBridge(Node):
                                     f"Published VehicleCommandAck(cmd={VEHICLE_CMD_DO_GRIPPER}, result={result_code})"
                                 )
                 except Exception as e:
-                    self.get_logger().error(f"Error reading serial: {e}")
+                    if self.running and rclpy.ok():
+                        self.get_logger().error(f"Error reading serial: {e}")
                     time.sleep(0.5)
             else:
                 time.sleep(1.0)
