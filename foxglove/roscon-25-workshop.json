@@ -1,6 +1,6 @@
 {
   "configById": {
-    "roscon25.fsd-mission-control.fsd-mission-control!fsd_ctrl": {},
+    "fsd-mission-control.fsd-mission-control!fsd_ctrl": {},
     "ImageView!fsd_annotated": {
       "cameraTopic": "/full_self_driving/perception/annotated_image",
       "transformMarkers": false,
@@ -143,7 +143,7 @@
     "speed": 1
   },
   "layout": {
-    "first": "roscon25.fsd-mission-control.fsd-mission-control!fsd_ctrl",
+    "first": "fsd-mission-control.fsd-mission-control!fsd_ctrl",
     "second": {
       "first": {
         "first": "ImageView!fsd_annotated",
