@@ -532,6 +532,7 @@ install(DIRECTORY
 install(PROGRAMS
   scripts/generate_sros2_keystore.py
   scripts/manage_sros2_keystore.sh
+  scripts/esp32_gripper_bridge.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
