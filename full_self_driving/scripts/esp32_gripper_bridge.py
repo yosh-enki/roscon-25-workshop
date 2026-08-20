@@ -114,7 +114,12 @@ class Esp32GripperBridge(Node):
         candidate_ports = [self.port_name, '/dev/ttyACM0', '/dev/ttyUSB0', '/dev/ttyACM1']
         for p in candidate_ports:
             try:
-                self.serial_conn = serial.Serial(p, self.baud_rate, timeout=0.1)
+                conn = serial.Serial(p, self.baud_rate, timeout=0.1)
+                conn.dtr = False
+                conn.rts = False
+                time.sleep(1.5)
+                conn.reset_input_buffer()
+                self.serial_conn = conn
                 self.port_name = p
                 self.get_logger().info(f"Successfully opened serial port: {p}")
                 return

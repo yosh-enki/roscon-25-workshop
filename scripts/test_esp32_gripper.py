@@ -23,13 +23,21 @@ def test_gripper(port="/dev/ttyACM0", baud=115200):
 
     try:
         ser = serial.Serial(port, baud, timeout=2.0)
+        ser.dtr = False
+        ser.rts = False
     except Exception as e:
         print(f"[FAILED] Error opening serial port '{port}': {e}")
         print("Tip: Check USB connection, permissions (sudo chmod 666 /dev/ttyACM0), or try /dev/ttyUSB0.")
         return False
 
-    print("Connected. Waiting 1.5s for ESP32 boot sequence...")
-    time.sleep(1.5)
+    print("Connected. Waiting 2.0s for ESP32 boot sequence...")
+    time.sleep(2.0)
+    
+    # Drain boot logs from ESP32 ROM bootloader
+    while ser.in_waiting:
+        boot_line = ser.readline().decode('utf-8', errors='ignore').strip()
+        if boot_line:
+            print(f"      [Boot Log] {boot_line}")
     ser.reset_input_buffer()
 
     tests = [
