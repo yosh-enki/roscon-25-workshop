@@ -423,9 +423,8 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
             { id: 2, label: "Pad 2" },
             { id: 3, label: "Pad 3" },
             { id: 4, label: "Pad 4" },
-            { id: 5, label: "Pad 5 (Home)" },
+            { id: 5, label: "Pad 5" },
             { id: 6, label: "Pad 6" },
-            { id: 7, label: "Pad 7" },
           ].map((item) => {
             const isSelected = markerId === item.id;
             return (
