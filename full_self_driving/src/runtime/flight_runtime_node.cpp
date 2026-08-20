@@ -724,9 +724,14 @@ void FlightRuntimeNode::check_and_register_mode()
 
     mode_->set_strategy_completed_callback([this](flight::StrategyType completed_type) {
       if (completed_type == flight::StrategyType::TAKEOFF) {
-        RCLCPP_INFO(get_logger(), "[RUNTIME] Takeoff completed. Transitioning to TRANSIT_IN...");
-        if (coordinator_) {
-          coordinator_->request_transition(flight::StrategyType::TRANSIT_IN);
+        if (coordinator_ && coordinator_->get_current_strategy() == flight::StrategyType::TAKEOFF_AFTER_DELIVERY) {
+          RCLCPP_INFO(get_logger(), "[RUNTIME] Second takeoff (TAKEOFF_AFTER_DELIVERY) completed. Transitioning to TRANSIT_OUT...");
+          coordinator_->request_transition(flight::StrategyType::TRANSIT_OUT);
+        } else {
+          RCLCPP_INFO(get_logger(), "[RUNTIME] Takeoff completed. Transitioning to TRANSIT_IN...");
+          if (coordinator_) {
+            coordinator_->request_transition(flight::StrategyType::TRANSIT_IN);
+          }
         }
       } else if (completed_type == flight::StrategyType::TRANSIT_IN) {
         RCLCPP_INFO(get_logger(), "[RUNTIME] TransitIn completed. Transitioning to ACQUIRE_TARGET...");

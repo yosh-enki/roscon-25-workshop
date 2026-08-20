@@ -701,7 +701,8 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
         takeoff_alt = context_->get_resolved_config()->routes.search_altitude_m;
       }
       mode_->set_strategy(std::make_unique<flight::TakeoffStrategy>(
-        mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), takeoff_alt));
+        mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), takeoff_alt,
+        1.0, 0.5, 30.0, flight::StrategyType::TAKEOFF_AFTER_DELIVERY));
     }
     return true;
   }
@@ -809,7 +810,8 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
         takeoff_alt = context_->get_resolved_config()->routes.search_altitude_m;
       }
       mode_->set_strategy(std::make_unique<flight::TakeoffStrategy>(
-        mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), takeoff_alt));
+        mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), takeoff_alt,
+        1.0, 0.5, 30.0, flight::StrategyType::TAKEOFF_AFTER_DELIVERY));
     } else if (next_strategy == flight::StrategyType::TRANSIT_OUT) {
       Route route;
       if (has_custom_transit_out_route_) {

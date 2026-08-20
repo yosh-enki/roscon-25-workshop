@@ -11,14 +11,16 @@ TakeoffStrategy::TakeoffStrategy(
   double target_altitude_above_home_m,
   double altitude_tolerance_m,
   double settle_speed_m_s,
-  double timeout_s)
+  double timeout_s,
+  StrategyType strategy_type)
 : node_(node),
   state_cache_(std::move(state_cache)),
   goto_setpoint_(std::move(goto_setpoint)),
   target_altitude_above_home_m_(target_altitude_above_home_m),
   altitude_tolerance_m_(altitude_tolerance_m),
   settle_speed_m_s_(settle_speed_m_s),
-  timeout_s_(timeout_s)
+  timeout_s_(timeout_s),
+  strategy_type_(strategy_type)
 {
 }
 

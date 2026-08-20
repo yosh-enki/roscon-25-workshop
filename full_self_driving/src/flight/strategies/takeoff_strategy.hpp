@@ -25,7 +25,8 @@ public:
     double target_altitude_above_home_m = 10.0,
     double altitude_tolerance_m = 1.0,
     double settle_speed_m_s = 0.5,
-    double timeout_s = 30.0);
+    double timeout_s = 30.0,
+    StrategyType strategy_type = StrategyType::TAKEOFF);
 
   ~TakeoffStrategy() override = default;
 
@@ -37,8 +38,10 @@ public:
 
   bool is_completed() const override { return completed_; }
   bool is_failed() const { return failed_; }
-  StrategyType get_type() const override { return StrategyType::TAKEOFF; }
-  std::string get_name() const override { return "TAKEOFF"; }
+  StrategyType get_type() const override { return strategy_type_; }
+  std::string get_name() const override {
+    return strategy_type_ == StrategyType::TAKEOFF_AFTER_DELIVERY ? "TAKEOFF_AFTER_DELIVERY" : "TAKEOFF";
+  }
 
   double target_altitude_above_home_m() const { return target_altitude_above_home_m_; }
   double target_altitude_msl_m() const { return target_altitude_msl_m_; }
@@ -68,6 +71,7 @@ private:
 
   std::chrono::steady_clock::time_point start_time_{};
   CompletionCallback completion_cb_;
+  StrategyType strategy_type_{StrategyType::TAKEOFF};
 };
 
 }  // namespace full_self_driving::flight
