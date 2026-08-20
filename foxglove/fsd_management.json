@@ -1,0 +1,233 @@
+{
+  "configById": {
+    "fsd-mission-control.fsd-mission-control!fsd_ctrl": {},
+    "3D!vehicle_scene": {
+      "cameraState": {
+        "perspective": true,
+        "distance": 21.479591715782735,
+        "phi": 57.3999862670978,
+        "thetaOffset": 89.10001373291055,
+        "targetOffset": [
+          7.03314781276211,
+          -0.40064706219038193,
+          -8.655175449144414e-16
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "followTf": "map",
+      "scene": {
+        "enableStats": false,
+        "transforms": {
+          "editable": false,
+          "showLabel": true,
+          "lineWidth": 0
+        }
+      },
+      "transforms": {
+        "frame:base_link": {
+          "visible": true
+        },
+        "frame:odom": {
+          "visible": true
+        },
+        "frame:map": {
+          "visible": true
+        },
+        "frame:camera_frame": {
+          "visible": true
+        }
+      },
+      "topics": {
+        "/robot_description": {
+          "visible": true
+        },
+        "/point_cloud": {
+          "visible": true,
+          "colorField": "intensity",
+          "colorMode": "colormap",
+          "colorMap": "rainbow",
+          "pointSize": 8
+        },
+        "/fmu/out/vehicle_odometry": {
+          "visible": true
+        }
+      },
+      "layers": {
+        "grid": {
+          "visible": true,
+          "drawBehind": false,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "grid_world",
+          "layerId": "foxglove.Grid",
+          "size": 50,
+          "divisions": 50,
+          "lineWidth": 1,
+          "color": "#248eff",
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "publish": {
+        "type": "pose",
+        "poseTopic": "/move_base_simple/goal",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "foxglovePanelTitle": "3D Flight Scene & Trajectory",
+      "synchronize": false,
+      "imageMode": {}
+    },
+    "Plot!altitude": {
+      "paths": [
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/full_self_driving/telemetry.altitude_m",
+          "enabled": true,
+          "color": "#4e98e2"
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": false,
+      "legendDisplay": "floating",
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 200,
+      "foxglovePanelTitle": "Altitude (m)",
+      "yAxisLabel": "z [m]"
+    },
+    "Plot!battery_speed": {
+      "paths": [
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/full_self_driving/telemetry.battery_percentage",
+          "enabled": true,
+          "color": "#45bf55"
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/full_self_driving/telemetry.ground_speed_m_s",
+          "enabled": true,
+          "color": "#e28743"
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": false,
+      "legendDisplay": "floating",
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 200,
+      "foxglovePanelTitle": "Battery % & Speed (m/s)"
+    },
+    "RawMessages!pad_registry": {
+      "topicPath": "/full_self_driving/pad_registry",
+      "diffEnabled": false,
+      "foxglovePanelTitle": "Discovered Pad Registry",
+      "defaultExpanded": false
+    },
+    "Image!kl2fqg": {
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "thetaOffset": 60,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "publish": {
+        "type": "point",
+        "poseTopic": "/move_base_simple/goal",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "synchronize": false,
+      "imageMode": {
+        "imageTopic": "/camera"
+      },
+      "foxglovePanelTitle": "/camera/compressed"
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "first": "fsd-mission-control.fsd-mission-control!fsd_ctrl",
+    "second": {
+      "first": {
+        "first": "Image!kl2fqg",
+        "second": "3D!vehicle_scene",
+        "direction": "column",
+        "splitPercentage": 50
+      },
+      "second": {
+        "first": {
+          "first": "Plot!altitude",
+          "second": "Plot!battery_speed",
+          "direction": "column",
+          "splitPercentage": 50
+        },
+        "second": "RawMessages!pad_registry",
+        "direction": "column",
+        "splitPercentage": 50
+      },
+      "direction": "row",
+      "splitPercentage": 55
+    },
+    "direction": "row",
+    "splitPercentage": 30
+  }
+}

@@ -19,6 +19,8 @@
 #include "full_self_driving/srv/emergency_stop.hpp"
 #include "full_self_driving/srv/prepare_payload.hpp"
 #include "full_self_driving/srv/select_target_identity.hpp"
+#include "full_self_driving/srv/upload_plan_artifact.hpp"
+#include "full_self_driving/srv/select_plan_artifact.hpp"
 
 #include "domain/engineering_config.hpp"
 #include "domain/mission_context.hpp"
@@ -77,6 +79,8 @@ private:
   rclcpp::Service<full_self_driving::srv::EmergencyStop>::SharedPtr emergency_stop_srv_;
   rclcpp::Service<full_self_driving::srv::PreparePayload>::SharedPtr prepare_payload_srv_;
   rclcpp::Service<full_self_driving::srv::SelectTargetIdentity>::SharedPtr select_target_srv_;
+  rclcpp::Service<full_self_driving::srv::UploadPlanArtifact>::SharedPtr upload_plan_srv_;
+  rclcpp::Service<full_self_driving::srv::SelectPlanArtifact>::SharedPtr select_plan_srv_;
 
   // Timers
   rclcpp::TimerBase::SharedPtr periodic_timer_;

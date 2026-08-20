@@ -1,5 +1,5 @@
 import { MessageEvent, PanelExtensionContext } from "@foxglove/extension";
-import { ReactElement, useEffect, useLayoutEffect, useState } from "react";
+import { ReactElement, useEffect, useLayoutEffect, useState, useRef } from "react";
 import { createRoot } from "react-dom/client";
 
 interface LogEntry {
@@ -53,6 +53,13 @@ interface TelemetryMsg {
   heading_deg?: number;
 }
 
+interface WorkingPlanStatusMsg {
+  state?: number;
+  working_plan_id?: string;
+  map_id?: string;
+  scenario_id?: string;
+}
+
 const customStyles = `
   @keyframes pulseGlow {
     0% { box-shadow: 0 0 4px rgba(46, 204, 113, 0.4); }
@@ -80,7 +87,7 @@ const customStyles = `
     transition: all 0.15s ease;
   }
   .gcs-chip:hover {
-    transform: scale(1.05);
+    transform: scale(1.03);
   }
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
@@ -104,6 +111,9 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
   const dictionary = "DICT_4X4_50";
   const targetNamespace = "aavc2026";
 
+  const [selectedPlanName, setSelectedPlanName] = useState<string>("aavc2026_mission.plan");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const [isCalling, setIsCalling] = useState<boolean>(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
@@ -113,6 +123,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
   const [payloadStatus, setPayloadStatus] = useState<PayloadStatusMsg | undefined>();
   const [liveLock, setLiveLock] = useState<LiveTargetLockMsg | undefined>();
   const [telemetry, setTelemetry] = useState<TelemetryMsg | undefined>();
+  const [workingPlan, setWorkingPlan] = useState<WorkingPlanStatusMsg | undefined>();
 
   const [renderDone, setRenderDone] = useState<(() => void) | undefined>();
 
@@ -138,6 +149,8 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
             setLiveLock(m.message as LiveTargetLockMsg);
           } else if (m.topic === "/full_self_driving/telemetry") {
             setTelemetry(m.message as TelemetryMsg);
+          } else if (m.topic === "/full_self_driving/plan/working_status") {
+            setWorkingPlan(m.message as WorkingPlanStatusMsg);
           }
         }
       }
@@ -152,6 +165,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
       { topic: "/full_self_driving/payload/status" },
       { topic: "/full_self_driving/perception/live_target_lock" },
       { topic: "/full_self_driving/telemetry" },
+      { topic: "/full_self_driving/plan/working_status" },
     ]);
   }, [context]);
 
@@ -173,7 +187,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
   // Service Caller
   const callRosService = async (serviceName: string, payload: unknown, actionDesc: string) => {
     setIsCalling(true);
-    addLog("info", `⚡ Requesting ${serviceName}...`);
+    addLog("info", `Requesting ${serviceName}...`);
 
     try {
       const callFn = (context as unknown as { callService?: (name: string, req: unknown) => Promise<unknown> }).callService;
@@ -182,10 +196,10 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
       }
 
       const res = (await callFn(serviceName, payload)) as Record<string, unknown>;
-      addLog("success", `✓ ${actionDesc} -> Accepted: ${safeStringify(res)}`);
+      addLog("success", `${actionDesc} -> Accepted: ${safeStringify(res)}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      addLog("error", `✗ ${actionDesc} -> Failed: ${msg}`);
+      addLog("error", `${actionDesc} -> Failed: ${msg}`);
     } finally {
       setIsCalling(false);
     }
@@ -224,8 +238,72 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
       {
         reason: "Operator manual emergency stop from Foxglove Panel",
       },
-      "🚨 EMERGENCY STOP TRIGGERED"
+      "EMERGENCY STOP TRIGGERED"
     );
+  };
+
+  const handleSelectPlan = (planName: string) => {
+    setSelectedPlanName(planName);
+    callRosService(
+      "/full_self_driving/select_plan_artifact",
+      {
+        request_id: `select_plan_${Date.now()}`,
+        artifact_id: planName,
+        expected_selection_revision: 0,
+      },
+      `Select Plan: ${planName}`
+    );
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCalling(true);
+    addLog("info", `Reading file '${file.name}' (${file.size} bytes)...`);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const bytes = Array.from(new Uint8Array(buffer));
+      const safeName = file.name;
+
+      const callFn = (context as unknown as { callService?: (name: string, req: unknown) => Promise<unknown> }).callService;
+      if (typeof callFn !== "function") {
+        throw new Error("Foxglove service caller not available");
+      }
+
+      addLog("info", `Uploading plan artifact '${safeName}'...`);
+      const uploadRes = (await callFn("/full_self_driving/upload_plan_artifact", {
+        request_id: `upload_${Date.now()}`,
+        safe_name: safeName,
+        content: bytes,
+        expected_selection_revision: 0,
+      })) as { accepted: boolean; artifact?: { artifact_id: string } };
+
+      if (uploadRes.accepted && uploadRes.artifact?.artifact_id) {
+        const artId = uploadRes.artifact.artifact_id;
+        setSelectedPlanName(safeName);
+        addLog("success", `Plan uploaded: ${artId}`);
+
+        // Automatically select the newly uploaded plan
+        await callFn("/full_self_driving/select_plan_artifact", {
+          request_id: `select_${Date.now()}`,
+          artifact_id: artId,
+          expected_selection_revision: 0,
+        });
+        addLog("success", `Plan '${safeName}' selected and committed!`);
+      } else {
+        throw new Error("Plan upload was not accepted by flight runtime");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addLog("error", `Plan upload failed: ${msg}`);
+    } finally {
+      setIsCalling(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   // Lock State Label
@@ -259,7 +337,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
     >
       <style>{customStyles}</style>
 
-      {/* 🚀 Header: Modern Aerospace HUD Bar */}
+      {/* Header: Modern Aerospace HUD Bar */}
       <div
         style={{
           display: "flex",
@@ -304,11 +382,11 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
             letterSpacing: "0.5px",
           }}
         >
-          {isReady ? "✓ READY FOR MODE" : "✗ PRE-FLIGHT NOT READY"}
+          {isReady ? "READY FOR MODE" : "PRE-FLIGHT NOT READY"}
         </div>
       </div>
 
-      {/* 📊 HUD Quick Metrics Cards */}
+      {/* Quick Metrics Cards */}
       <div
         style={{
           display: "grid",
@@ -363,7 +441,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
         </div>
       </div>
 
-      {/* 🧭 Telemetry Real-time Strip */}
+      {/* Telemetry Real-time Strip */}
       {telemetry && (
         <div
           style={{
@@ -395,7 +473,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
         </div>
       )}
 
-      {/* 🎯 Section 1: Target Selection Card */}
+      {/* Section 1: Target Selection Card */}
       <div
         style={{
           background: "rgba(22, 27, 34, 0.8)",
@@ -474,7 +552,77 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
         </button>
       </div>
 
-      {/* 📦 Section 2: Cargo & Payload Preparation */}
+      {/* Section 2: Flight Plan Selection & Upload Card */}
+      <div
+        style={{
+          background: "rgba(22, 27, 34, 0.8)",
+          border: "1px solid #30363d",
+          borderRadius: "10px",
+          padding: "14px",
+          marginBottom: "14px",
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+          <div style={{ fontSize: "12px", fontWeight: "bold", color: "#58a6ff", letterSpacing: "0.5px" }}>
+            2. FLIGHT PLAN SELECTION
+          </div>
+          <span style={{ fontSize: "10px", background: "rgba(88, 166, 255, 0.15)", color: "#79c0ff", padding: "2px 6px", borderRadius: "4px" }}>
+            {workingPlan?.working_plan_id ? "PLAN LOADED" : "DEFAULT"}
+          </span>
+        </div>
+
+        <div style={{ fontSize: "11px", color: "#8b949e", marginBottom: "6px" }}>Active Plan:</div>
+        <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+          <button
+            type="button"
+            className="gcs-chip"
+            onClick={() => handleSelectPlan("aavc2026_mission.plan")}
+            style={{
+              flex: 1,
+              padding: "6px 8px",
+              borderRadius: "6px",
+              fontSize: "11px",
+              fontWeight: selectedPlanName === "aavc2026_mission.plan" ? "bold" : "normal",
+              background: selectedPlanName === "aavc2026_mission.plan" ? "rgba(88, 166, 255, 0.2)" : "rgba(33, 38, 45, 0.8)",
+              border: selectedPlanName === "aavc2026_mission.plan" ? "1px solid #58a6ff" : "1px solid #30363d",
+              color: selectedPlanName === "aavc2026_mission.plan" ? "#79c0ff" : "#c9d1d9",
+              cursor: "pointer",
+            }}
+          >
+            aavc2026_mission.plan
+          </button>
+
+          <input
+            type="file"
+            accept=".plan,.json"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            style={{ display: "none" }}
+          />
+
+          <button
+            type="button"
+            className="gcs-chip"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isCalling}
+            style={{
+              padding: "6px 10px",
+              borderRadius: "6px",
+              fontSize: "11px",
+              background: "rgba(56, 139, 253, 0.15)",
+              border: "1px dashed #58a6ff",
+              color: "#58a6ff",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            Upload .plan
+          </button>
+        </div>
+      </div>
+
+      {/* Section 3: Cargo & Payload Preparation */}
       <div
         style={{
           background: "rgba(22, 27, 34, 0.8)",
@@ -487,7 +635,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
           <div style={{ fontSize: "12px", fontWeight: "bold", color: "#3fb950", letterSpacing: "0.5px" }}>
-            2. PAYLOAD & CARGO MECHANISM
+            3. PAYLOAD & CARGO MECHANISM
           </div>
           <span
             style={{
@@ -545,7 +693,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
         </div>
       </div>
 
-      {/* 🚨 Section 3: Tactical Emergency Stop */}
+      {/* Section 4: Tactical Emergency Stop */}
       <div
         style={{
           background: "linear-gradient(180deg, rgba(218, 54, 51, 0.15) 0%, rgba(30, 10, 10, 0.8) 100%)",
@@ -580,7 +728,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
         </button>
       </div>
 
-      {/* 💻 Section 4: Live Service Console Logs */}
+      {/* Section 5: Live Service Console Logs */}
       <div
         style={{
           background: "#0d1117",

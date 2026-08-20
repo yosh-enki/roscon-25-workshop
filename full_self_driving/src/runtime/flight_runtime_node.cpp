@@ -432,6 +432,96 @@ void FlightRuntimeNode::initialize_components()
         req->target.marker_id, req->target.dictionary.c_str(), validate_rev);
     });
 
+  upload_plan_srv_ = this->create_service<full_self_driving::srv::UploadPlanArtifact>(
+    "/full_self_driving/upload_plan_artifact",
+    [this](
+      const std::shared_ptr<full_self_driving::srv::UploadPlanArtifact::Request> req,
+      std::shared_ptr<full_self_driving::srv::UploadPlanArtifact::Response> res)
+    {
+      if (!plan_manager_) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "PLAN_MANAGER_UNAVAILABLE";
+        res->error.message = "PlanManager is not available";
+        return;
+      }
+      if (context_ && (context_->is_locked() || context_->is_armed())) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "REJECTED_ARMED_OR_LOCKED";
+        res->error.message = "Cannot upload plan while vehicle is armed or locked";
+        return;
+      }
+      std::string err;
+      auto art = plan_manager_->upload_artifact(
+        req->safe_name, req->content, req->expected_selection_revision, &err);
+      if (!art) {
+        res->accepted = false;
+        res->has_artifact = false;
+        res->has_error = true;
+        res->error.code = "UPLOAD_FAILED";
+        res->error.message = err;
+        return;
+      }
+      res->accepted = true;
+      res->has_artifact = true;
+      res->artifact.artifact_id = art->artifact_id;
+      res->artifact.safe_name = art->safe_name;
+      res->artifact.sha256 = art->sha256;
+      res->artifact.size_bytes = art->size_bytes;
+      res->has_error = false;
+      RCLCPP_INFO(get_logger(), "[RUNTIME] Plan uploaded: '%s' (id=%s, bytes=%lu)",
+        art->safe_name.c_str(), art->artifact_id.c_str(), art->size_bytes);
+    });
+
+  select_plan_srv_ = this->create_service<full_self_driving::srv::SelectPlanArtifact>(
+    "/full_self_driving/select_plan_artifact",
+    [this](
+      const std::shared_ptr<full_self_driving::srv::SelectPlanArtifact::Request> req,
+      std::shared_ptr<full_self_driving::srv::SelectPlanArtifact::Response> res)
+    {
+      if (!context_ || !plan_manager_) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "COMPONENTS_UNAVAILABLE";
+        res->error.message = "Context or PlanManager is not available";
+        return;
+      }
+      if (context_->is_locked() || context_->is_armed()) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "REJECTED_ARMED_OR_LOCKED";
+        res->error.message = "Cannot select plan while vehicle is armed or locked";
+        return;
+      }
+      std::string err;
+      uint64_t current_rev = context_->get_selection_revision();
+      if (!context_->select_plan_artifact(req->artifact_id, current_rev, &err)) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "PLAN_SELECTION_FAILED";
+        res->error.message = err;
+        return;
+      }
+      std::string wp_err;
+      auto wp = plan_manager_->create_or_select_working_plan(
+        req->artifact_id, context_->get_map_id(), context_->get_scenario_id(), current_rev + 1, &wp_err);
+      if (wp) {
+        context_->select_working_plan(wp->get_working_plan_id(), current_rev + 1, &err);
+      }
+      uint64_t validate_rev = context_->get_selection_revision();
+      auto vreport = context_->validate_selection(validate_rev);
+      if (vreport.is_valid) {
+        context_->commit(vreport.token, validate_rev, &err);
+      }
+      res->accepted = true;
+      res->has_error = false;
+      res->selection.context_id = context_->get_context_id();
+      res->selection.plan_artifact_id = req->artifact_id;
+      RCLCPP_INFO(get_logger(), "[RUNTIME] Plan selected: '%s', context committed (rev=%lu)",
+        req->artifact_id.c_str(), validate_rev);
+    });
+
   if (acquisition_fixture == "stale_direct") {
     coordinator_->set_trusted_record_max_age_s(0.001); // Set max age to 1ms so fixture record is immediately stale in sim
     RCLCPP_INFO(get_logger(), "[RUNTIME] Set trusted_record_max_age_s to 0.001s for stale_direct fixture");
