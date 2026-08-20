@@ -666,10 +666,22 @@ void FlightRuntimeNode::check_and_register_mode()
         &missing);
 
       if (payload_controller_) {
-        std::string payload_err;
-        if (!payload_controller_->is_ready_for_sortie(&payload_err)) {
-          missing.push_back("PAYLOAD_NOT_SECURED: " + payload_err);
-          ok = false;
+        bool skip_payload_check = false;
+        if (coordinator_) {
+          auto strat = coordinator_->get_current_strategy();
+          if (strat == flight::StrategyType::TAKEOFF_AFTER_DELIVERY ||
+              strat == flight::StrategyType::TRANSIT_OUT ||
+              strat == flight::StrategyType::RETURN_STRATEGY ||
+              strat == flight::StrategyType::RETURN_LANDED) {
+            skip_payload_check = true;
+          }
+        }
+        if (!skip_payload_check) {
+          std::string payload_err;
+          if (!payload_controller_->is_ready_for_sortie(&payload_err)) {
+            missing.push_back("PAYLOAD_NOT_SECURED: " + payload_err);
+            ok = false;
+          }
         }
       }
 
@@ -821,7 +833,19 @@ bool FlightRuntimeNode::is_ready_for_ownmode() const
   }
   bool payload_ok = true;
   if (payload_controller_) {
-    payload_ok = payload_controller_->is_ready_for_sortie();
+    bool skip_payload_check = false;
+    if (coordinator_) {
+      auto strat = coordinator_->get_current_strategy();
+      if (strat == flight::StrategyType::TAKEOFF_AFTER_DELIVERY ||
+          strat == flight::StrategyType::TRANSIT_OUT ||
+          strat == flight::StrategyType::RETURN_STRATEGY ||
+          strat == flight::StrategyType::RETURN_LANDED) {
+        skip_payload_check = true;
+      }
+    }
+    if (!skip_payload_check) {
+      payload_ok = payload_controller_->is_ready_for_sortie();
+    }
   }
   return supervisor_->is_all_active() &&
          state_cache_->is_transport_healthy() &&
