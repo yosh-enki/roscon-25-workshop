@@ -496,37 +496,96 @@ void FlightRuntimeNode::initialize_components()
         res->error.message = "Cannot select plan while vehicle is armed or locked";
         return;
       }
+
+      auto art = plan_manager_->get_artifact(req->artifact_id);
+      if (!art) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "ARTIFACT_NOT_FOUND";
+        res->error.message = "Artifact not found: " + req->artifact_id;
+        return;
+      }
+
+      std::string actual_art_id = art->artifact_id;
       std::string err;
       uint64_t current_rev = context_->get_selection_revision();
-      if (!context_->select_plan_artifact(req->artifact_id, current_rev, &err)) {
+      if (!context_->select_plan_artifact(actual_art_id, current_rev, &err)) {
         res->accepted = false;
         res->has_error = true;
         res->error.code = "PLAN_SELECTION_FAILED";
         res->error.message = err;
         return;
       }
+
       std::string wp_err;
+      uint64_t wp_rev = context_->get_selection_revision();
       auto wp = plan_manager_->create_or_select_working_plan(
-        req->artifact_id,
+        actual_art_id,
         context_->get_selection().map_id,
         context_->get_selection().scenario_id,
-        current_rev + 1,
+        wp_rev,
         &wp_err);
-      if (wp) {
-        context_->select_working_plan(wp->get_working_plan_id(), current_rev + 1, &err);
+      if (!wp) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "WORKING_PLAN_FAILED";
+        res->error.message = "Failed to create working plan: " + wp_err;
+        return;
       }
+
+      if (!context_->select_working_plan(wp->get_working_plan_id(), wp_rev, &err)) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "WORKING_PLAN_SELECTION_FAILED";
+        res->error.message = err;
+        return;
+      }
+
       uint64_t validate_rev = context_->get_selection_revision();
       auto vreport = context_->validate_selection(validate_rev);
-      if (vreport.is_valid) {
-        context_->commit(vreport.token, validate_rev, &err);
+      if (!vreport.is_valid) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "VALIDATION_FAILED";
+        std::string viol_str;
+        for (const auto & v : vreport.violations) {
+          if (!viol_str.empty()) viol_str += "; ";
+          viol_str += v;
+        }
+        res->error.message = viol_str;
+        return;
       }
+
+      if (!context_->commit(vreport.token, validate_rev, &err)) {
+        res->accepted = false;
+        res->has_error = true;
+        res->error.code = "COMMIT_FAILED";
+        res->error.message = err;
+        return;
+      }
+
+      if (working_plan_status_pub_) {
+        full_self_driving::msg::WorkingPlanStatus wp_msg;
+        wp_msg.state = static_cast<uint8_t>(wp->get_state());
+        wp_msg.working_plan_id = wp->get_working_plan_id();
+        wp_msg.map_id = wp->get_map_id();
+        wp_msg.scenario_id = wp->get_scenario_id();
+        wp_msg.source_artifact_sha256 = wp->get_source_artifact_sha256();
+        working_plan_status_pub_->publish(wp_msg);
+      }
+
       res->accepted = true;
       res->has_error = false;
       res->selection.context_id = context_->get_context_id();
       res->selection.has_plan_artifact = true;
-      res->selection.plan_artifact.artifact_id = req->artifact_id;
-      RCLCPP_INFO(get_logger(), "[RUNTIME] Plan selected: '%s', context committed (rev=%lu)",
-        req->artifact_id.c_str(), validate_rev);
+      res->selection.plan_artifact.artifact_id = actual_art_id;
+      res->selection.plan_artifact.original_name = art->safe_name;
+      res->selection.plan_artifact.sha256 = art->sha256;
+      res->selection.has_working_plan = true;
+      res->selection.working_plan.working_plan_id = wp->get_working_plan_id();
+      RCLCPP_INFO(get_logger(),
+        "[RUNTIME] Plan selected: '%s' (%s) -> Working Plan '%s', context committed (rev=%lu)",
+        art->safe_name.c_str(), actual_art_id.c_str(), wp->get_working_plan_id().c_str(), validate_rev);
     });
 
   if (acquisition_fixture == "stale_direct") {

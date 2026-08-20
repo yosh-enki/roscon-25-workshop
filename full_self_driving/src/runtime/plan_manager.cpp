@@ -118,10 +118,15 @@ std::optional<ManagedPlanArtifact> PlanManager::get_artifact(const std::string &
 {
   std::lock_guard<std::mutex> lock(mutex_);
   auto it = artifacts_.find(artifact_id);
-  if (it == artifacts_.end()) {
-    return std::nullopt;
+  if (it != artifacts_.end()) {
+    return it->second;
   }
-  return it->second;
+  for (const auto & [_, art] : artifacts_) {
+    if (art.safe_name == artifact_id) {
+      return art;
+    }
+  }
+  return std::nullopt;
 }
 
 std::optional<domain::WorkingPlan> PlanManager::create_or_select_working_plan(
@@ -134,6 +139,15 @@ std::optional<domain::WorkingPlan> PlanManager::create_or_select_working_plan(
   std::lock_guard<std::mutex> lock(mutex_);
 
   auto it = artifacts_.find(artifact_id);
+  if (it == artifacts_.end()) {
+    for (auto a_it = artifacts_.begin(); a_it != artifacts_.end(); ++a_it) {
+      if (a_it->second.safe_name == artifact_id) {
+        it = a_it;
+        break;
+      }
+    }
+  }
+
   if (it == artifacts_.end()) {
     if (out_error) {
       *out_error = "Artifact not found: " + artifact_id;
