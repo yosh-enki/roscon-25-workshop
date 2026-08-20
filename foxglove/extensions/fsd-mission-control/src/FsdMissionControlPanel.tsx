@@ -101,8 +101,8 @@ const customStyles = `
 
 function FsdMissionControlPanel({ context }: { context: PanelExtensionContext }): ReactElement {
   const [markerId, setMarkerId] = useState<number>(1);
-  const [dictionary, setDictionary] = useState<string>("DICT_4X4_50");
-  const [targetNamespace, setTargetNamespace] = useState<string>("aavc2026");
+  const dictionary = "DICT_4X4_50";
+  const targetNamespace = "aavc2026";
 
   const [isCalling, setIsCalling] = useState<boolean>(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -450,46 +450,6 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
               </button>
             );
           })}
-        </div>
-
-        {/* Dictionary & Namespace Config */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
-          <div>
-            <div style={{ fontSize: "10px", color: "#8b949e", marginBottom: "3px" }}>Dict:</div>
-            <input
-              type="text"
-              value={dictionary}
-              onChange={(e) => setDictionary(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "6px 8px",
-                background: "#0d1117",
-                color: "#e6edf3",
-                border: "1px solid #30363d",
-                borderRadius: "4px",
-                fontSize: "11px",
-                boxSizing: "border-box",
-              }}
-            />
-          </div>
-          <div>
-            <div style={{ fontSize: "10px", color: "#8b949e", marginBottom: "3px" }}>Namespace:</div>
-            <input
-              type="text"
-              value={targetNamespace}
-              onChange={(e) => setTargetNamespace(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "6px 8px",
-                background: "#0d1117",
-                color: "#e6edf3",
-                border: "1px solid #30363d",
-                borderRadius: "4px",
-                fontSize: "11px",
-                boxSizing: "border-box",
-              }}
-            />
-          </div>
         </div>
 
         <button
