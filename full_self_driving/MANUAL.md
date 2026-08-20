@@ -1258,6 +1258,28 @@ The `Px4GripperPayloadAdapter` allows direct offloading of servo/gripper actuati
    - Publishes `px4_msgs::msg::VehicleCommand` (`VEHICLE_CMD_DO_GRIPPER` / Command ID 211) to `/fmu/in/vehicle_command`.
    - Subscribes to `/fmu/out/vehicle_command_ack` to measure feedback latency and verify execution status while strictly respecting Property 14 idempotency.
 
+### 13.7 ESP32 + Servo Hardware-in-the-Loop (HITL) Actuator Testbed
+
+For rapid hardware validation without requiring a physical flight controller (Pixhawk), the ESP32 HITL Testbed enables physical servo actuation on the developer's desk synchronized with the Gazebo SITL simulation in Docker:
+
+1. **Hardware Setup**:
+   - ESP32 connected via USB (`/dev/ttyACM0` or `/dev/ttyUSB0`)
+   - Servo Signal connected to GPIO 18, 5V/VIN, and GND.
+   - Flash firmware: `firmware/esp32_gripper_actuator/esp32_gripper_actuator.ino`.
+2. **Interactive CLI Smoke Test**:
+   ```bash
+   ./scripts/test_esp32_gripper.py /dev/ttyACM0
+   ```
+3. **Launch HITL Simulation with USB Passthrough**:
+   ```bash
+   ./scripts/run_hitl_delivery.sh /dev/ttyACM0 kmitl_airfield
+   ```
+4. **Foxglove Mission Control Integration**:
+   - Open Foxglove Dashboard (`foxglove/roscon-25-workshop.json`).
+   - Click `OPEN (0)` -> Physical servo rotates to 180° -> UI shows `UNLATCHED`.
+   - Click `CLOSE & LOCK (2)` -> Physical servo rotates to 0° -> UI shows `SECURED & LOCKED`.
+   - Autonomous Sortie: Drone touches down on ArUco marker in Gazebo -> Real servo rotates to 180° automatically -> Drone returns home!
+
 ---
 
 ## 14. Section 13: Security & Multi-Machine DDS Hardening (Task 13)
