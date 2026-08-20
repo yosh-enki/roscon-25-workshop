@@ -453,8 +453,9 @@ void FlightRuntimeNode::initialize_components()
         return;
       }
       std::string err;
+      std::vector<uint8_t> bytes(req->content.begin(), req->content.end());
       auto art = plan_manager_->upload_artifact(
-        req->safe_name, req->content, req->expected_selection_revision, &err);
+        req->safe_name, bytes, req->expected_selection_revision, &err);
       if (!art) {
         res->accepted = false;
         res->has_artifact = false;
@@ -466,12 +467,13 @@ void FlightRuntimeNode::initialize_components()
       res->accepted = true;
       res->has_artifact = true;
       res->artifact.artifact_id = art->artifact_id;
-      res->artifact.safe_name = art->safe_name;
+      res->artifact.original_name = art->safe_name;
       res->artifact.sha256 = art->sha256;
-      res->artifact.size_bytes = art->size_bytes;
+      res->artifact.byte_length = art->byte_length;
+      res->artifact.immutable = art->immutable;
       res->has_error = false;
       RCLCPP_INFO(get_logger(), "[RUNTIME] Plan uploaded: '%s' (id=%s, bytes=%lu)",
-        art->safe_name.c_str(), art->artifact_id.c_str(), art->size_bytes);
+        art->safe_name.c_str(), art->artifact_id.c_str(), art->byte_length);
     });
 
   select_plan_srv_ = this->create_service<full_self_driving::srv::SelectPlanArtifact>(
@@ -505,7 +507,11 @@ void FlightRuntimeNode::initialize_components()
       }
       std::string wp_err;
       auto wp = plan_manager_->create_or_select_working_plan(
-        req->artifact_id, context_->get_map_id(), context_->get_scenario_id(), current_rev + 1, &wp_err);
+        req->artifact_id,
+        context_->get_selection().map_id,
+        context_->get_selection().scenario_id,
+        current_rev + 1,
+        &wp_err);
       if (wp) {
         context_->select_working_plan(wp->get_working_plan_id(), current_rev + 1, &err);
       }
@@ -517,7 +523,8 @@ void FlightRuntimeNode::initialize_components()
       res->accepted = true;
       res->has_error = false;
       res->selection.context_id = context_->get_context_id();
-      res->selection.plan_artifact_id = req->artifact_id;
+      res->selection.has_plan_artifact = true;
+      res->selection.plan_artifact.artifact_id = req->artifact_id;
       RCLCPP_INFO(get_logger(), "[RUNTIME] Plan selected: '%s', context committed (rev=%lu)",
         req->artifact_id.c_str(), validate_rev);
     });

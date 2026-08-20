@@ -54,6 +54,7 @@ const customStyles = `
 
 function FsdPlanManagerPanel({ context }: { context: PanelExtensionContext }): ReactElement {
   const [selectedPlanName, setSelectedPlanName] = useState<string>("aavc2026_mission.plan");
+  const [availablePlans, setAvailablePlans] = useState<string[]>(["aavc2026_mission.plan"]);
   const [workingPlan, setWorkingPlan] = useState<WorkingPlanStatusMsg | undefined>();
   const [isCalling, setIsCalling] = useState<boolean>(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -95,7 +96,7 @@ function FsdPlanManagerPanel({ context }: { context: PanelExtensionContext }): R
   const handleSelectPlan = async (planName: string) => {
     setSelectedPlanName(planName);
     setIsCalling(true);
-    addLog("info", `Selecting plan: ${planName}...`);
+    addLog("info", `Switching to plan: '${planName}'...`);
 
     try {
       const callFn = (context as unknown as { callService?: (name: string, req: unknown) => Promise<unknown> }).callService;
@@ -107,12 +108,12 @@ function FsdPlanManagerPanel({ context }: { context: PanelExtensionContext }): R
         request_id: `select_plan_${Date.now()}`,
         artifact_id: planName,
         expected_selection_revision: 0,
-      })) as { accepted: boolean };
+      })) as { accepted?: boolean } | undefined;
 
-      if (res.accepted) {
-        addLog("success", `Plan '${planName}' selected and committed successfully!`);
+      if (res && res.accepted) {
+        addLog("success", `Plan '${planName}' active & committed!`);
       } else {
-        throw new Error("Plan selection rejected by flight runtime");
+        throw new Error(res ? "Plan selection rejected by flight runtime" : "Service not available on ROS 2 graph. Please rebuild and restart node.");
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -139,28 +140,32 @@ function FsdPlanManagerPanel({ context }: { context: PanelExtensionContext }): R
         throw new Error("Foxglove service caller not available");
       }
 
-      addLog("info", `Uploading plan artifact '${safeName}'...`);
+      addLog("info", `Uploading plan artifact '${safeName}' (${bytes.length} bytes)...`);
       const uploadRes = (await callFn("/full_self_driving/upload_plan_artifact", {
         request_id: `upload_${Date.now()}`,
         safe_name: safeName,
         content: bytes,
         expected_selection_revision: 0,
-      })) as { accepted: boolean; artifact?: { artifact_id: string } };
+      })) as { accepted?: boolean; artifact?: { artifact_id?: string } } | undefined;
 
-      if (uploadRes.accepted && uploadRes.artifact?.artifact_id) {
+      if (uploadRes && uploadRes.accepted && uploadRes.artifact?.artifact_id) {
         const artId = uploadRes.artifact.artifact_id;
-        setSelectedPlanName(safeName);
+        setSelectedPlanName(artId);
+        setAvailablePlans((prev) => (prev.includes(artId) ? prev : [...prev, artId]));
         addLog("success", `Plan uploaded: ${artId}`);
 
         // Automatically select the newly uploaded plan
-        await callFn("/full_self_driving/select_plan_artifact", {
+        const selectRes = (await callFn("/full_self_driving/select_plan_artifact", {
           request_id: `select_${Date.now()}`,
           artifact_id: artId,
           expected_selection_revision: 0,
-        });
-        addLog("success", `Plan '${safeName}' selected and committed!`);
+        })) as { accepted?: boolean } | undefined;
+
+        if (selectRes && selectRes.accepted) {
+          addLog("success", `Plan '${safeName}' selected and committed!`);
+        }
       } else {
-        throw new Error("Plan upload was not accepted by flight runtime");
+        throw new Error(uploadRes ? "Plan upload was not accepted by flight runtime" : "Service '/full_self_driving/upload_plan_artifact' not responding (node needs rebuild & restart)");
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -263,27 +268,38 @@ function FsdPlanManagerPanel({ context }: { context: PanelExtensionContext }): R
           marginBottom: "12px",
         }}
       >
-        <div style={{ fontSize: "11px", color: "#8b949e", marginBottom: "6px" }}>Select / Switch Plan:</div>
-        <div style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
-          <button
-            type="button"
-            className="plan-chip"
-            onClick={() => handleSelectPlan("aavc2026_mission.plan")}
-            disabled={isCalling}
-            style={{
-              flex: 1,
-              padding: "8px",
-              borderRadius: "6px",
-              fontSize: "11px",
-              fontWeight: selectedPlanName === "aavc2026_mission.plan" ? "bold" : "normal",
-              background: selectedPlanName === "aavc2026_mission.plan" ? "rgba(88, 166, 255, 0.2)" : "rgba(33, 38, 45, 0.8)",
-              border: selectedPlanName === "aavc2026_mission.plan" ? "1px solid #58a6ff" : "1px solid #30363d",
-              color: selectedPlanName === "aavc2026_mission.plan" ? "#79c0ff" : "#c9d1d9",
-              cursor: isCalling ? "not-allowed" : "pointer",
-            }}
-          >
-            aavc2026_mission.plan
-          </button>
+        <div style={{ fontSize: "11px", color: "#8b949e", marginBottom: "6px" }}>Available Plans (Click to Switch):</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "10px" }}>
+          {availablePlans.map((plan) => {
+            const isActive = selectedPlanName === plan;
+            return (
+              <button
+                key={plan}
+                type="button"
+                className="plan-chip"
+                onClick={() => handleSelectPlan(plan)}
+                disabled={isCalling}
+                style={{
+                  flex: "1 1 calc(50% - 6px)",
+                  padding: "8px 10px",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                  fontWeight: isActive ? "bold" : "normal",
+                  background: isActive ? "linear-gradient(135deg, #1f6feb 0%, #388bfd 100%)" : "rgba(33, 38, 45, 0.8)",
+                  border: isActive ? "1px solid #58a6ff" : "1px solid #30363d",
+                  color: isActive ? "#fff" : "#c9d1d9",
+                  cursor: isCalling ? "not-allowed" : "pointer",
+                  boxShadow: isActive ? "0 0 10px rgba(31, 111, 235, 0.5)" : "none",
+                  textAlign: "center",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {plan === "aavc2026_mission.plan" ? "DEFAULT (aavc2026)" : plan}
+              </button>
+            );
+          })}
         </div>
 
         <input
