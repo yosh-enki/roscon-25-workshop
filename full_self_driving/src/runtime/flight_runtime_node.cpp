@@ -18,7 +18,7 @@ FlightRuntimeNode::FlightRuntimeNode(const rclcpp::NodeOptions & options)
   this->declare_parameter<std::string>("world", "kmitl_airfield");
   this->declare_parameter<std::string>("flight_fixture", "none");
   this->declare_parameter<std::string>("acquisition_fixture", "none");
-  this->declare_parameter<int>("target_marker_id", 7);
+  this->declare_parameter<int>("target_marker_id", 0);
   this->declare_parameter<std::string>("target_dictionary", "DICT_4X4_50");
   this->declare_parameter<std::string>("target_namespace", "aavc2026");
 
@@ -198,24 +198,34 @@ void FlightRuntimeNode::initialize_components()
   context_ = std::make_shared<domain::MissionContext>("ctx_flight_runtime");
   context_->set_engineering_config(config_);
 
-  // Pre-commit default simulation context for simulation bringup
+  // Initialize MissionContext
   std::string err;
   int marker_id = this->get_parameter("target_marker_id").as_int();
   std::string dict = this->get_parameter("target_dictionary").as_string();
   std::string target_ns = this->get_parameter("target_namespace").as_string();
 
-  context_->select_map_scenario("kmitl_airfield", "default_scenario", 0, &err);
-  context_->select_target(domain::TargetIdentity(static_cast<uint32_t>(marker_id), dict, target_ns), 1, &err);
+  uint64_t rev = 0;
+  context_->select_map_scenario("kmitl_airfield", "default_scenario", rev++, &err);
   if (!default_artifact_id.empty()) {
-    context_->select_plan_artifact(default_artifact_id, 2, &err);
+    context_->select_plan_artifact(default_artifact_id, rev++, &err);
   }
   if (!default_wp_id.empty()) {
-    context_->select_working_plan(default_wp_id, 3, &err);
+    context_->select_working_plan(default_wp_id, rev++, &err);
   }
-  uint64_t next_rev = (!default_wp_id.empty()) ? 4 : 2;
-  auto vreport = context_->validate_selection(next_rev);
-  if (vreport.is_valid) {
-    context_->commit(vreport.token, next_rev, &err);
+
+  // Only auto-commit target if marker_id > 0 is explicitly specified
+  if (marker_id > 0) {
+    context_->select_target(domain::TargetIdentity(static_cast<uint32_t>(marker_id), dict, target_ns), rev++, &err);
+    auto vreport = context_->validate_selection(rev);
+    if (vreport.is_valid) {
+      context_->commit(vreport.token, rev, &err);
+      RCLCPP_INFO(get_logger(), "[RUNTIME] Auto-committed target ID %d on boot", marker_id);
+    }
+  } else {
+    RCLCPP_WARN(get_logger(),
+      "[RUNTIME] No target selected on boot (target_marker_id=%d). "
+      "Arming is BLOCKED until operator selects and commits a target via Foxglove/Service.",
+      marker_id);
   }
 
   persistence::StoragePaths paths;

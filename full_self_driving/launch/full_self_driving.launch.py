@@ -375,7 +375,7 @@ def launch_setup(context, *args, **kwargs):
             "world": world_name,
             "flight_fixture": flight_fixture,
             "acquisition_fixture": acquisition_fixture,
-            "target_marker_id": selected_marker_id if selected_marker_id >= 0 else 7,
+            "target_marker_id": selected_marker_id if selected_marker_id >= 0 else 0,
             "target_dictionary": selected_dict,
             "target_namespace": selected_ns,
         }],
