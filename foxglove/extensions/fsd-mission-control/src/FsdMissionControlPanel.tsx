@@ -470,7 +470,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
             boxShadow: "0 2px 8px rgba(46, 160, 67, 0.4)",
           }}
         >
-          SELECT PAD {markerId}
+          ASSIGN PAD {markerId}
         </button>
       </div>
 
