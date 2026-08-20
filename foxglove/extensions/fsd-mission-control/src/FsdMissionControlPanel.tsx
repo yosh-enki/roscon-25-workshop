@@ -504,20 +504,20 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
           </span>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
           <button
             type="button"
             className="gcs-btn"
             onClick={() => handlePreparePayload(0, "Open for Loading")}
             disabled={isCalling}
             style={{
-              padding: "8px",
+              padding: "10px",
               background: "rgba(33, 38, 45, 0.8)",
               color: "#c9d1d9",
               border: "1px solid #30363d",
               borderRadius: "6px",
-              cursor: "pointer",
-              fontSize: "11px",
+              cursor: isCalling ? "not-allowed" : "pointer",
+              fontSize: "12px",
               fontWeight: "bold",
             }}
           >
@@ -526,44 +526,23 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
           <button
             type="button"
             className="gcs-btn"
-            onClick={() => handlePreparePayload(1, "Verify Secured")}
+            onClick={() => handlePreparePayload(2, "Close & Lock for Sortie")}
             disabled={isCalling}
             style={{
-              padding: "8px",
-              background: "rgba(33, 38, 45, 0.8)",
-              color: "#c9d1d9",
-              border: "1px solid #30363d",
+              padding: "10px",
+              background: "linear-gradient(135deg, #1f6feb 0%, #388bfd 100%)",
+              color: "#fff",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
               borderRadius: "6px",
-              cursor: "pointer",
-              fontSize: "11px",
               fontWeight: "bold",
+              fontSize: "12px",
+              cursor: isCalling ? "not-allowed" : "pointer",
+              boxShadow: "0 2px 8px rgba(31, 111, 235, 0.4)",
             }}
           >
-            VERIFY SENSOR (1)
+            CLOSE & LOCK (2)
           </button>
         </div>
-
-        <button
-          type="button"
-          className="gcs-btn"
-          onClick={() => handlePreparePayload(2, "Close & Lock for Sortie")}
-          disabled={isCalling}
-          style={{
-            width: "100%",
-            padding: "10px",
-            background: "linear-gradient(135deg, #1f6feb 0%, #388bfd 100%)",
-            color: "#fff",
-            border: "1px solid rgba(255, 255, 255, 0.2)",
-            borderRadius: "6px",
-            fontWeight: "bold",
-            fontSize: "12px",
-            letterSpacing: "0.5px",
-            cursor: isCalling ? "not-allowed" : "pointer",
-            boxShadow: "0 2px 8px rgba(31, 111, 235, 0.4)",
-          }}
-        >
-          CLOSE & LOCK (2)
-        </button>
       </div>
 
       {/* 🚨 Section 3: Tactical Emergency Stop */}
