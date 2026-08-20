@@ -31,6 +31,7 @@ fi
 docker run --rm -it \
     --net=host \
     --ipc=host \
+    --group-add dialout \
     ${DEVICE_FLAG} \
     -v /tmp/.X11-unix:/tmp/.X11-unix:ro \
     -e DISPLAY="${DISPLAY}" \
