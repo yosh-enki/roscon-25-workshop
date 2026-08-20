@@ -43,6 +43,62 @@ interface LiveTargetLockMsg {
   };
 }
 
+interface TelemetryMsg {
+  armed?: boolean;
+  airborne?: boolean;
+  landed?: boolean;
+  altitude_m?: number;
+  ground_speed_m_s?: number;
+  battery_percentage?: number;
+  heading_deg?: number;
+}
+
+const customStyles = `
+  @keyframes pulseGlow {
+    0% { box-shadow: 0 0 4px rgba(46, 204, 113, 0.4); }
+    50% { box-shadow: 0 0 14px rgba(46, 204, 113, 0.8); }
+    100% { box-shadow: 0 0 4px rgba(46, 204, 113, 0.4); }
+  }
+  @keyframes warningGlow {
+    0% { box-shadow: 0 0 4px rgba(231, 76, 60, 0.4); }
+    50% { box-shadow: 0 0 16px rgba(231, 76, 60, 0.8); }
+    100% { box-shadow: 0 0 4px rgba(231, 76, 60, 0.4); }
+  }
+  .gcs-btn {
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: inherit;
+  }
+  .gcs-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.15);
+  }
+  .gcs-btn:active:not(:disabled) {
+    transform: translateY(1px);
+    filter: brightness(0.9);
+  }
+  .gcs-chip {
+    transition: all 0.15s ease;
+  }
+  .gcs-chip:hover {
+    transform: scale(1.05);
+  }
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+`;
+
 function FsdMissionControlPanel({ context }: { context: PanelExtensionContext }): ReactElement {
   const [markerId, setMarkerId] = useState<number>(1);
   const [dictionary, setDictionary] = useState<string>("DICT_4X4_50");
@@ -56,12 +112,13 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
   const [readiness, setReadiness] = useState<ReadinessMsg | undefined>();
   const [payloadStatus, setPayloadStatus] = useState<PayloadStatusMsg | undefined>();
   const [liveLock, setLiveLock] = useState<LiveTargetLockMsg | undefined>();
+  const [telemetry, setTelemetry] = useState<TelemetryMsg | undefined>();
 
   const [renderDone, setRenderDone] = useState<(() => void) | undefined>();
 
   const addLog = (type: "info" | "success" | "error" | "warn", text: string) => {
     const time = new Date().toLocaleTimeString();
-    setLogs((prev) => [{ id: Math.random().toString(), time, type, text }, ...prev.slice(0, 20)]);
+    setLogs((prev) => [{ id: Math.random().toString(), time, type, text }, ...prev.slice(0, 30)]);
   };
 
   useLayoutEffect(() => {
@@ -79,6 +136,8 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
             setPayloadStatus(m.message as PayloadStatusMsg);
           } else if (m.topic === "/full_self_driving/perception/live_target_lock") {
             setLiveLock(m.message as LiveTargetLockMsg);
+          } else if (m.topic === "/full_self_driving/telemetry") {
+            setTelemetry(m.message as TelemetryMsg);
           }
         }
       }
@@ -92,6 +151,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
       { topic: "/full_self_driving/readiness" },
       { topic: "/full_self_driving/payload/status" },
       { topic: "/full_self_driving/perception/live_target_lock" },
+      { topic: "/full_self_driving/telemetry" },
     ]);
   }, [context]);
 
@@ -113,19 +173,19 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
   // Service Caller
   const callRosService = async (serviceName: string, payload: unknown, actionDesc: string) => {
     setIsCalling(true);
-    addLog("info", `Calling ${serviceName}...`);
+    addLog("info", `⚡ Requesting ${serviceName}...`);
 
     try {
       const callFn = (context as unknown as { callService?: (name: string, req: unknown) => Promise<unknown> }).callService;
       if (typeof callFn !== "function") {
-        throw new Error("Foxglove data source does not support service calls (make sure foxglove_bridge is connected)");
+        throw new Error("Foxglove data source does not support service calls (check foxglove_bridge connection)");
       }
 
       const res = (await callFn(serviceName, payload)) as Record<string, unknown>;
-      addLog("success", `${actionDesc} -> Success: ${safeStringify(res)}`);
+      addLog("success", `✓ ${actionDesc} -> Accepted: ${safeStringify(res)}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      addLog("error", `${actionDesc} -> Error: ${msg}`);
+      addLog("error", `✗ ${actionDesc} -> Failed: ${msg}`);
     } finally {
       setIsCalling(false);
     }
@@ -142,7 +202,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
         },
         expected_selection_revision: 0,
       },
-      `Select Target ID ${markerId}`
+      `Target Assigned (ID: ${markerId})`
     );
   };
 
@@ -154,7 +214,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
         operation,
         expected_selection_revision: 0,
       },
-      `Payload: ${opName}`
+      `Payload ${opName}`
     );
   };
 
@@ -164,153 +224,468 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
       {
         reason: "Operator manual emergency stop from Foxglove Panel",
       },
-      "🚨 EMERGENCY STOP"
+      "🚨 EMERGENCY STOP TRIGGERED"
     );
   };
 
   // Lock State Label
-  const getLockStateLabel = (state?: number) => {
+  const getLockStateInfo = (state?: number) => {
     switch (state) {
-      case 0: return { label: "NO TARGET", color: "#888" };
-      case 1: return { label: "ACQUIRING", color: "#f39c12" };
-      case 2: return { label: "CANDIDATE", color: "#3498db" };
-      case 3: return { label: "QUALIFIED (LOCKED)", color: "#2ecc71" };
-      case 4: return { label: "TARGET LOST", color: "#e74c3c" };
-      default: return { label: "DISARMED / UNKNOWN", color: "#888" };
+      case 0: return { label: "NO TARGET", bg: "rgba(136,136,136,0.2)", border: "#666", text: "#aaa" };
+      case 1: return { label: "ACQUIRING", bg: "rgba(243,156,18,0.2)", border: "#f39c12", text: "#f1c40f" };
+      case 2: return { label: "CANDIDATE", bg: "rgba(52,152,219,0.2)", border: "#3498db", text: "#5dade2" };
+      case 3: return { label: "QUALIFIED (LOCKED)", bg: "rgba(46,204,113,0.2)", border: "#2ecc71", text: "#2ecc71" };
+      case 4: return { label: "TARGET LOST", bg: "rgba(231,76,60,0.2)", border: "#e74c3c", text: "#e74c3c" };
+      default: return { label: "STANDBY", bg: "rgba(255,255,255,0.05)", border: "#444", text: "#888" };
     }
   };
 
-  const lockInfo = getLockStateLabel(liveLock?.lock_state);
+  const lockInfo = getLockStateInfo(liveLock?.lock_state);
+  const isReady = readiness?.ready ?? false;
+  const isArmed = fsdState?.armed ?? false;
 
   return (
-    <div style={{ padding: "12px", fontFamily: "system-ui, -apple-system, sans-serif", color: "#fff", background: "#1e1e24", height: "100%", overflowY: "auto", boxSizing: "border-box" }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #333", paddingBottom: "8px", marginBottom: "12px" }}>
-        <h3 style={{ margin: 0, fontSize: "16px", color: "#58a6ff" }}>🚁 FSD Mission Control</h3>
-        <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", background: readiness?.ready ? "#238636" : "#da3633", color: "#fff", fontWeight: "bold" }}>
-          {readiness?.ready ? "✓ READY FOR MODE" : "✗ NOT READY"}
-        </span>
-      </div>
+    <div
+      className="custom-scrollbar"
+      style={{
+        padding: "16px",
+        fontFamily: "'JetBrains Mono', 'Segoe UI', system-ui, -apple-system, sans-serif",
+        color: "#e6edf3",
+        background: "linear-gradient(180deg, #0d1117 0%, #161b22 100%)",
+        height: "100%",
+        overflowY: "auto",
+        boxSizing: "border-box",
+      }}
+    >
+      <style>{customStyles}</style>
 
-      {/* Flight State Overview Bar */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", background: "#26262e", padding: "8px", borderRadius: "6px", marginBottom: "12px", fontSize: "12px" }}>
-        <div>
-          <span style={{ color: "#8b949e" }}>Strategy: </span>
-          <b style={{ color: "#79c0ff" }}>{fsdState?.active_strategy ?? "IDLE / STANDBY"}</b>
-        </div>
-        <div>
-          <span style={{ color: "#8b949e" }}>Armed: </span>
-          <b style={{ color: fsdState?.armed ? "#7ee787" : "#8b949e" }}>{fsdState?.armed ? "YES" : "NO"}</b>
-        </div>
-        <div>
-          <span style={{ color: "#8b949e" }}>Visual Lock: </span>
-          <b style={{ color: lockInfo.color }}>{lockInfo.label}</b>
-        </div>
-      </div>
-
-      {/* 1. Target Selection Section */}
-      <div style={{ background: "#26262e", padding: "10px", borderRadius: "6px", marginBottom: "12px" }}>
-        <h4 style={{ margin: "0 0 8px 0", fontSize: "13px", color: "#f0883e" }}>1. Target Marker Selection</h4>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-          <label style={{ fontSize: "12px", width: "70px" }}>Marker ID:</label>
-          <select
-            value={markerId}
-            onChange={(e) => setMarkerId(Number(e.target.value))}
-            style={{ flex: 1, padding: "6px", background: "#161b22", color: "#fff", border: "1px solid #30363d", borderRadius: "4px" }}
-          >
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((id) => (
-              <option key={id} value={id}>
-                ArUco ID {id} {id === 5 ? "(Home Origin)" : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-          <label style={{ fontSize: "12px", width: "70px" }}>Dict:</label>
-          <input
-            type="text"
-            value={dictionary}
-            onChange={(e) => setDictionary(e.target.value)}
-            style={{ flex: 1, padding: "6px", background: "#161b22", color: "#fff", border: "1px solid #30363d", borderRadius: "4px" }}
+      {/* 🚀 Header: Modern Aerospace HUD Bar */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          background: "rgba(22, 27, 34, 0.8)",
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(88, 166, 255, 0.2)",
+          borderRadius: "10px",
+          padding: "10px 14px",
+          marginBottom: "14px",
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.3)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div
+            style={{
+              width: "10px",
+              height: "10px",
+              borderRadius: "50%",
+              background: isReady ? "#2ea043" : "#f85149",
+              animation: isReady ? "pulseGlow 2s infinite" : "none",
+            }}
           />
+          <div>
+            <div style={{ fontSize: "14px", fontWeight: "bold", letterSpacing: "0.5px", color: "#58a6ff" }}>
+              FSD MISSION COMMAND
+            </div>
+            <div style={{ fontSize: "10px", color: "#8b949e" }}>ROS 2 AUTONOMOUS FLIGHT CONTROLLER</div>
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-          <label style={{ fontSize: "12px", width: "70px" }}>Namespace:</label>
-          <input
-            type="text"
-            value={targetNamespace}
-            onChange={(e) => setTargetNamespace(e.target.value)}
-            style={{ flex: 1, padding: "6px", background: "#161b22", color: "#fff", border: "1px solid #30363d", borderRadius: "4px" }}
-          />
-        </div>
-
-        <button
-          onClick={handleSelectTarget}
-          disabled={isCalling}
-          style={{ width: "100%", padding: "8px", background: "#1f6feb", color: "#fff", border: "none", borderRadius: "4px", fontWeight: "bold", cursor: isCalling ? "not-allowed" : "pointer" }}
+        <div
+          style={{
+            fontSize: "11px",
+            padding: "4px 12px",
+            borderRadius: "20px",
+            background: isReady ? "rgba(46, 160, 67, 0.15)" : "rgba(248, 81, 73, 0.15)",
+            border: `1px solid ${isReady ? "#2ea043" : "#f85149"}`,
+            color: isReady ? "#3fb950" : "#f85149",
+            fontWeight: "bold",
+            letterSpacing: "0.5px",
+          }}
         >
-          🎯 Select & Commit Target (ID: {markerId})
-        </button>
+          {isReady ? "✓ READY FOR MODE" : "✗ PRE-FLIGHT NOT READY"}
+        </div>
       </div>
 
-      {/* 2. Payload & Cargo Controls */}
-      <div style={{ background: "#26262e", padding: "10px", borderRadius: "6px", marginBottom: "12px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-          <h4 style={{ margin: 0, fontSize: "13px", color: "#3fb950" }}>2. Payload / Cargo Preparation</h4>
-          <span style={{ fontSize: "11px", color: payloadStatus?.secured ? "#7ee787" : "#e3b341" }}>
-            {payloadStatus?.secured ? "🔒 SECURED" : "🔓 UNLATCHED"}
+      {/* 📊 HUD Quick Metrics Cards */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: "8px",
+          marginBottom: "14px",
+        }}
+      >
+        {/* Strategy Card */}
+        <div
+          style={{
+            background: "rgba(33, 38, 45, 0.7)",
+            border: "1px solid rgba(48, 54, 61, 0.8)",
+            borderRadius: "8px",
+            padding: "8px 10px",
+          }}
+        >
+          <div style={{ fontSize: "10px", color: "#8b949e", textTransform: "uppercase", marginBottom: "2px" }}>Strategy</div>
+          <div style={{ fontSize: "12px", fontWeight: "bold", color: "#79c0ff", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+            {fsdState?.active_strategy || "STANDBY"}
+          </div>
+        </div>
+
+        {/* Armed Card */}
+        <div
+          style={{
+            background: "rgba(33, 38, 45, 0.7)",
+            border: `1px solid ${isArmed ? "rgba(46,160,67,0.4)" : "rgba(48, 54, 61, 0.8)"}`,
+            borderRadius: "8px",
+            padding: "8px 10px",
+          }}
+        >
+          <div style={{ fontSize: "10px", color: "#8b949e", textTransform: "uppercase", marginBottom: "2px" }}>Armed State</div>
+          <div style={{ fontSize: "12px", fontWeight: "bold", color: isArmed ? "#3fb950" : "#8b949e" }}>
+            {isArmed ? "ARMED (LOCKED)" : "DISARMED"}
+          </div>
+        </div>
+
+        {/* Visual Lock Card */}
+        <div
+          style={{
+            background: lockInfo.bg,
+            border: `1px solid ${lockInfo.border}`,
+            borderRadius: "8px",
+            padding: "8px 10px",
+          }}
+        >
+          <div style={{ fontSize: "10px", color: "#8b949e", textTransform: "uppercase", marginBottom: "2px" }}>ArUco Lock</div>
+          <div style={{ fontSize: "11px", fontWeight: "bold", color: lockInfo.text, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+            {lockInfo.label}
+          </div>
+        </div>
+      </div>
+
+      {/* 🧭 Telemetry Real-time Strip */}
+      {telemetry && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: "8px",
+            background: "rgba(22, 27, 34, 0.5)",
+            border: "1px dashed rgba(48, 54, 61, 0.8)",
+            borderRadius: "8px",
+            padding: "8px 10px",
+            marginBottom: "14px",
+            fontSize: "11px",
+          }}
+        >
+          <div>
+            <span style={{ color: "#8b949e" }}>Alt: </span>
+            <b style={{ color: "#58a6ff" }}>{(telemetry.altitude_m ?? 0).toFixed(2)} m</b>
+          </div>
+          <div>
+            <span style={{ color: "#8b949e" }}>Speed: </span>
+            <b style={{ color: "#e3b341" }}>{(telemetry.ground_speed_m_s ?? 0).toFixed(1)} m/s</b>
+          </div>
+          <div>
+            <span style={{ color: "#8b949e" }}>Battery: </span>
+            <b style={{ color: (telemetry.battery_percentage ?? 100) > 30 ? "#3fb950" : "#f85149" }}>
+              {(telemetry.battery_percentage ?? 100).toFixed(0)}%
+            </b>
+          </div>
+        </div>
+      )}
+
+      {/* 🎯 Section 1: Target Selection Card */}
+      <div
+        style={{
+          background: "rgba(22, 27, 34, 0.8)",
+          border: "1px solid #30363d",
+          borderRadius: "10px",
+          padding: "14px",
+          marginBottom: "14px",
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+          <div style={{ fontSize: "12px", fontWeight: "bold", color: "#f0883e", letterSpacing: "0.5px" }}>
+            1. TARGET ARUCO SELECTION
+          </div>
+          <span style={{ fontSize: "10px", background: "rgba(240, 136, 62, 0.15)", color: "#f0883e", padding: "2px 6px", borderRadius: "4px" }}>
+            DICT_4X4_50
           </span>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
-          <button
-            onClick={() => handlePreparePayload(0, "Open for Loading")}
-            disabled={isCalling}
-            style={{ padding: "6px", background: "#21262d", color: "#c9d1d9", border: "1px solid #30363d", borderRadius: "4px", cursor: "pointer", fontSize: "12px" }}
-          >
-            Open for Loading (0)
-          </button>
-          <button
-            onClick={() => handlePreparePayload(1, "Verify Secured")}
-            disabled={isCalling}
-            style={{ padding: "6px", background: "#21262d", color: "#c9d1d9", border: "1px solid #30363d", borderRadius: "4px", cursor: "pointer", fontSize: "12px" }}
-          >
-            Verify Secured (1)
-          </button>
+
+        {/* Quick Marker Chip Buttons */}
+        <div style={{ fontSize: "11px", color: "#8b949e", marginBottom: "6px" }}>Select Pad ID:</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
+          {[
+            { id: 1, label: "Pad 1" },
+            { id: 2, label: "Pad 2" },
+            { id: 3, label: "Pad 3" },
+            { id: 4, label: "Pad 4" },
+            { id: 5, label: "Pad 5 (Home)" },
+            { id: 6, label: "Pad 6" },
+            { id: 7, label: "Pad 7" },
+          ].map((item) => {
+            const isSelected = markerId === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className="gcs-chip"
+                onClick={() => setMarkerId(item.id)}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                  fontWeight: isSelected ? "bold" : "normal",
+                  background: isSelected ? "linear-gradient(135deg, #1f6feb 0%, #388bfd 100%)" : "rgba(33, 38, 45, 0.8)",
+                  border: isSelected ? "1px solid #58a6ff" : "1px solid #30363d",
+                  color: isSelected ? "#fff" : "#c9d1d9",
+                  cursor: "pointer",
+                  boxShadow: isSelected ? "0 0 10px rgba(31, 111, 235, 0.5)" : "none",
+                }}
+              >
+                {item.label}
+              </button>
+            );
+          })}
         </div>
+
+        {/* Dictionary & Namespace Config */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
+          <div>
+            <div style={{ fontSize: "10px", color: "#8b949e", marginBottom: "3px" }}>Dict:</div>
+            <input
+              type="text"
+              value={dictionary}
+              onChange={(e) => setDictionary(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "6px 8px",
+                background: "#0d1117",
+                color: "#e6edf3",
+                border: "1px solid #30363d",
+                borderRadius: "4px",
+                fontSize: "11px",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: "10px", color: "#8b949e", marginBottom: "3px" }}>Namespace:</div>
+            <input
+              type="text"
+              value={targetNamespace}
+              onChange={(e) => setTargetNamespace(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "6px 8px",
+                background: "#0d1117",
+                color: "#e6edf3",
+                border: "1px solid #30363d",
+                borderRadius: "4px",
+                fontSize: "11px",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+        </div>
+
         <button
-          onClick={() => handlePreparePayload(2, "Prepare for Sortie")}
+          type="button"
+          className="gcs-btn"
+          onClick={handleSelectTarget}
           disabled={isCalling}
-          style={{ width: "100%", padding: "8px", background: "#238636", color: "#fff", border: "none", borderRadius: "4px", fontWeight: "bold", cursor: "pointer" }}
+          style={{
+            width: "100%",
+            padding: "10px",
+            background: "linear-gradient(135deg, #238636 0%, #2ea043 100%)",
+            color: "#fff",
+            border: "1px solid rgba(255, 255, 255, 0.2)",
+            borderRadius: "6px",
+            fontWeight: "bold",
+            fontSize: "12px",
+            letterSpacing: "0.5px",
+            cursor: isCalling ? "not-allowed" : "pointer",
+            boxShadow: "0 2px 8px rgba(46, 160, 67, 0.4)",
+          }}
         >
-          📦 Prepare Cargo for Sortie (2)
+          🎯 ASSIGN & COMMIT TARGET PAD {markerId}
         </button>
       </div>
 
-      {/* 3. Safety Emergency Stop */}
-      <div style={{ background: "#3d1418", padding: "10px", border: "1px solid #f85149", borderRadius: "6px", marginBottom: "12px" }}>
+      {/* 📦 Section 2: Cargo & Payload Preparation */}
+      <div
+        style={{
+          background: "rgba(22, 27, 34, 0.8)",
+          border: "1px solid #30363d",
+          borderRadius: "10px",
+          padding: "14px",
+          marginBottom: "14px",
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+          <div style={{ fontSize: "12px", fontWeight: "bold", color: "#3fb950", letterSpacing: "0.5px" }}>
+            2. PAYLOAD & CARGO MECHANISM
+          </div>
+          <span
+            style={{
+              fontSize: "10px",
+              padding: "2px 8px",
+              borderRadius: "4px",
+              background: payloadStatus?.secured ? "rgba(46,160,67,0.15)" : "rgba(227,179,65,0.15)",
+              color: payloadStatus?.secured ? "#3fb950" : "#e3b341",
+              border: `1px solid ${payloadStatus?.secured ? "#2ea043" : "#d29922"}`,
+              fontWeight: "bold",
+            }}
+          >
+            {payloadStatus?.secured ? "🔒 SECURED & LOCKED" : "🔓 UNLATCHED"}
+          </span>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+          <button
+            type="button"
+            className="gcs-btn"
+            onClick={() => handlePreparePayload(0, "Open for Loading")}
+            disabled={isCalling}
+            style={{
+              padding: "8px",
+              background: "rgba(33, 38, 45, 0.8)",
+              color: "#c9d1d9",
+              border: "1px solid #30363d",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontSize: "11px",
+            }}
+          >
+            🔓 Open Hatch (0)
+          </button>
+          <button
+            type="button"
+            className="gcs-btn"
+            onClick={() => handlePreparePayload(1, "Verify Secured")}
+            disabled={isCalling}
+            style={{
+              padding: "8px",
+              background: "rgba(33, 38, 45, 0.8)",
+              color: "#c9d1d9",
+              border: "1px solid #30363d",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontSize: "11px",
+            }}
+          >
+            🔍 Verify Sensor (1)
+          </button>
+        </div>
+
         <button
+          type="button"
+          className="gcs-btn"
+          onClick={() => handlePreparePayload(2, "Prepare for Sortie")}
+          disabled={isCalling}
+          style={{
+            width: "100%",
+            padding: "10px",
+            background: "linear-gradient(135deg, #1f6feb 0%, #388bfd 100%)",
+            color: "#fff",
+            border: "1px solid rgba(255, 255, 255, 0.2)",
+            borderRadius: "6px",
+            fontWeight: "bold",
+            fontSize: "12px",
+            letterSpacing: "0.5px",
+            cursor: isCalling ? "not-allowed" : "pointer",
+            boxShadow: "0 2px 8px rgba(31, 111, 235, 0.4)",
+          }}
+        >
+          📦 PREPARE & LOCK FOR SORTIE (2)
+        </button>
+      </div>
+
+      {/* 🚨 Section 3: Tactical Emergency Stop */}
+      <div
+        style={{
+          background: "linear-gradient(180deg, rgba(218, 54, 51, 0.15) 0%, rgba(30, 10, 10, 0.8) 100%)",
+          border: "1px solid #f85149",
+          borderRadius: "10px",
+          padding: "12px",
+          marginBottom: "14px",
+          boxShadow: "0 4px 16px rgba(248, 81, 73, 0.2)",
+        }}
+      >
+        <button
+          type="button"
+          className="gcs-btn"
           onClick={handleEmergencyStop}
           disabled={isCalling}
-          style={{ width: "100%", padding: "12px", background: "#da3633", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "14px", cursor: "pointer", letterSpacing: "1px" }}
+          style={{
+            width: "100%",
+            padding: "12px",
+            background: "linear-gradient(135deg, #da3633 0%, #f85149 100%)",
+            color: "#fff",
+            border: "1px solid rgba(255, 255, 255, 0.3)",
+            borderRadius: "8px",
+            fontWeight: "900",
+            fontSize: "13px",
+            letterSpacing: "1.5px",
+            cursor: "pointer",
+            boxShadow: "0 0 16px rgba(248, 81, 73, 0.5)",
+            animation: "warningGlow 3s infinite",
+          }}
         >
           🚨 EMERGENCY STOP (E-STOP)
         </button>
       </div>
 
-      {/* Service Call Feedback Log */}
-      <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: "6px", padding: "8px", maxHeight: "140px", overflowY: "auto" }}>
-        <div style={{ fontSize: "11px", color: "#8b949e", marginBottom: "4px", fontWeight: "bold" }}>SERVICE LOGS:</div>
-        {logs.length === 0 ? (
-          <div style={{ fontSize: "11px", color: "#484f58", fontStyle: "italic" }}>No service calls sent yet.</div>
-        ) : (
-          logs.map((log) => (
-            <div key={log.id} style={{ fontSize: "11px", marginBottom: "3px", color: log.type === "success" ? "#7ee787" : log.type === "error" ? "#f85149" : log.type === "warn" ? "#e3b341" : "#8b949e" }}>
-              [{log.time}] {log.text}
-            </div>
-          ))
-        )}
+      {/* 💻 Section 4: Live Service Console Logs */}
+      <div
+        style={{
+          background: "#0d1117",
+          border: "1px solid #30363d",
+          borderRadius: "8px",
+          padding: "10px",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+          <div style={{ fontSize: "10px", fontWeight: "bold", color: "#8b949e", letterSpacing: "0.5px" }}>
+            SERVICE AUDIT TRAIL
+          </div>
+          {logs.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setLogs([])}
+              style={{ fontSize: "9px", background: "none", border: "none", color: "#58a6ff", cursor: "pointer" }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        <div className="custom-scrollbar" style={{ maxHeight: "120px", overflowY: "auto", fontSize: "10px", lineHeight: "1.4" }}>
+          {logs.length === 0 ? (
+            <div style={{ color: "#484f58", fontStyle: "italic" }}>System standby. No service requests dispatched yet.</div>
+          ) : (
+            logs.map((log) => (
+              <div
+                key={log.id}
+                style={{
+                  marginBottom: "4px",
+                  padding: "2px 4px",
+                  borderRadius: "3px",
+                  background: log.type === "success" ? "rgba(46,160,67,0.1)" : log.type === "error" ? "rgba(248,81,73,0.1)" : "rgba(255,255,255,0.02)",
+                  color: log.type === "success" ? "#7ee787" : log.type === "error" ? "#ff7b72" : log.type === "warn" ? "#d29922" : "#8b949e",
+                  borderLeft: `2px solid ${log.type === "success" ? "#2ea043" : log.type === "error" ? "#f85149" : "#58a6ff"}`,
+                }}
+              >
+                <span style={{ color: "#484f58", marginRight: "6px" }}>[{log.time}]</span>
+                {log.text}
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
