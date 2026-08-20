@@ -500,7 +500,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
               fontWeight: "bold",
             }}
           >
-            {payloadStatus?.secured ? "🔒 SECURED & LOCKED" : "🔓 UNLATCHED"}
+            {payloadStatus?.secured ? "SECURED & LOCKED" : "UNLATCHED"}
           </span>
         </div>
 
@@ -518,9 +518,10 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
               borderRadius: "6px",
               cursor: "pointer",
               fontSize: "11px",
+              fontWeight: "bold",
             }}
           >
-            🔓 Open Hatch (0)
+            OPEN (0)
           </button>
           <button
             type="button"
@@ -535,16 +536,17 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
               borderRadius: "6px",
               cursor: "pointer",
               fontSize: "11px",
+              fontWeight: "bold",
             }}
           >
-            🔍 Verify Sensor (1)
+            VERIFY SENSOR (1)
           </button>
         </div>
 
         <button
           type="button"
           className="gcs-btn"
-          onClick={() => handlePreparePayload(2, "Prepare for Sortie")}
+          onClick={() => handlePreparePayload(2, "Close & Lock for Sortie")}
           disabled={isCalling}
           style={{
             width: "100%",
@@ -560,7 +562,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
             boxShadow: "0 2px 8px rgba(31, 111, 235, 0.4)",
           }}
         >
-          📦 PREPARE & LOCK FOR SORTIE (2)
+          CLOSE & LOCK (2)
         </button>
       </div>
 
@@ -595,7 +597,7 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
             animation: "warningGlow 3s infinite",
           }}
         >
-          🚨 EMERGENCY STOP (E-STOP)
+          EMERGENCY STOP (E-STOP)
         </button>
       </div>
 
