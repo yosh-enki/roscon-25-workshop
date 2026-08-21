@@ -1,0 +1,75 @@
+schema_version: "1.0.0"
+deployment_id: "fsd_kmitl_simulation_default"
+profile: "simulation"
+engineering_config_revision: 1
+
+# ==============================================================================
+# 1. SIMULATION ENVIRONMENT CONFIGURATION
+# ==============================================================================
+simulation:
+  world: "kmitl_airfield"
+  headless: false
+  use_sim_time: true
+
+# ==============================================================================
+# 2. SAFETY GATES & INVARIANTS
+# ==============================================================================
+safety:
+  max_altitude_m: 30.0
+  min_battery_percentage: 20.0
+  target_loss_timeout_s: 2.0
+  emergency_stop_enabled: true
+
+# ==============================================================================
+# 3. FLIGHT ROUTE DYNAMICS & KINEMATICS
+# ==============================================================================
+routes:
+  transit_in_speed_m_s: 5.0
+  transit_out_speed_m_s: 5.0
+  search_altitude_m: 15.0
+  approach_altitude_m: 5.0
+  max_horizontal_velocity_m_s: 5.0
+  landing_descent_rate_m_s: 0.5
+  acceptance_radius_m: 4.0
+  max_yaw_rate_deg_s: 45.0
+
+# ==============================================================================
+# 4. PERCEPTION & TARGET RECOGNITION
+# ==============================================================================
+perception:
+  dictionary: "DICT_4X4_50"
+  marker_size_m: 0.50
+  lock_min_consecutive_observations: 1
+  lock_spatial_consistency_radius_m: 25.0
+
+# ==============================================================================
+# 5. PAYLOAD & HARDWARE INTEGRATION
+# ==============================================================================
+payload:
+  adapter_type: "px4_uorb_gripper_actuator"  # Options: px4_uorb_gripper_actuator, simulation_payload_stub, esp32_serial_bridge
+  gripper_instance: 1
+  port: "/dev/ttyACM0"
+  baud: 115200
+
+# ==============================================================================
+# 6. SYSTEM ADAPTERS
+# ==============================================================================
+adapters:
+  px4_transport: "px4_sitl_uxrce_dds"
+  camera_adapter: "ros_gz_image_bridge"
+  payload_adapter: "px4_uorb_gripper_actuator"
+
+# ==============================================================================
+# 7. TARGET SCOPE & CONSTRAINTS
+# ==============================================================================
+target_constraints:
+  marker_id_min: 0
+  marker_id_max: 1000
+  allowed_dictionaries:
+    - "DICT_4X4_50"
+    - "DICT_4X4_250"
+    - "DICT_5X5_50"
+  allowed_namespaces:
+    - "aavc2026"
+    - "sar_search"
+    - "cargo_delivery"

@@ -73,6 +73,34 @@ def launch_setup(context, *args, **kwargs):
 
     pkg_share = FindPackageShare("full_self_driving").find("full_self_driving")
 
+    # Auto-resolve authoritative parameter configuration file (fsd_parameters.yaml)
+    if not config_path:
+        for cand in [
+            os.path.join(pkg_share, "config", "fsd_parameters.yaml"),
+            os.path.join(pkg_share, "config", "engineering_config_simulation.yaml"),
+            "/home/ubuntu/roscon-25-workshop/full_self_driving/config/fsd_parameters.yaml",
+            "/home/yosh/roscon-25-workshop/full_self_driving/config/fsd_parameters.yaml",
+        ]:
+            if os.path.exists(cand):
+                config_path = cand
+                break
+
+    # If authoritative config exists, extract perception & payload defaults if not overridden
+    if config_path and os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg_yaml = yaml.safe_load(f) or {}
+            perc_cfg = cfg_yaml.get("perception", {})
+            if "dictionary" in perc_cfg and LaunchConfiguration("dictionary").perform(context) == "DICT_4X4_50":
+                dictionary_name = perc_cfg["dictionary"]
+            if "marker_size_m" in perc_cfg and LaunchConfiguration("marker_size").perform(context) == "0.50":
+                marker_size_val = float(perc_cfg["marker_size_m"])
+            payload_cfg = cfg_yaml.get("payload", {})
+            if "adapter_type" in payload_cfg and LaunchConfiguration("payload_adapter").perform(context) == "px4_uorb_gripper_actuator":
+                payload_adapter = payload_cfg["adapter_type"]
+        except Exception as exc:
+            print(f"[WARN] Error extracting parameters from {config_path}: {exc}", file=sys.stderr)
+
     # Load simulation manifests
     profile_manifest_file = os.path.join(pkg_share, "simulation", "manifests", "profile_simulation.yaml")
     world_manifest_file = os.path.join(pkg_share, "simulation", "manifests", f"{world_name}.yaml")

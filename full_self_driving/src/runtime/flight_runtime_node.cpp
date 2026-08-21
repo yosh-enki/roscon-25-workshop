@@ -143,13 +143,53 @@ void FlightRuntimeNode::initialize_components()
     RCLCPP_INFO(get_logger(), "[RUNTIME] Pinned API manifest verified successfully");
   }
 
-  // Load Engineering Config
-  if (!config_path_.empty()) {
-    config_ = std::make_shared<domain::EngineeringConfig>(
-      domain::EngineeringConfig::from_yaml_file(config_path_));
+  // Load Authoritative Parameter Configuration
+  if (!config_path_.empty() && std::filesystem::exists(config_path_)) {
+    try {
+      config_ = std::make_shared<domain::EngineeringConfig>(
+        domain::EngineeringConfig::from_yaml_file(config_path_));
+      RCLCPP_INFO(get_logger(), "[RUNTIME] Successfully loaded authoritative config from '%s' (hash=%s)",
+        config_path_.c_str(), config_->compute_canonical_hash().c_str());
+    } catch (const std::exception & exc) {
+      RCLCPP_ERROR(get_logger(), "[RUNTIME] Failed to parse authoritative config file '%s': %s",
+        config_path_.c_str(), exc.what());
+      throw;
+    }
   } else {
-    config_ = std::make_shared<domain::EngineeringConfig>(
-      domain::EngineeringConfig::create_default_simulation_config());
+    std::string resolved_path;
+    try {
+      std::string share_dir = ament_index_cpp::get_package_share_directory("full_self_driving");
+      std::vector<std::string> cands = {
+        share_dir + "/config/fsd_parameters.yaml",
+        share_dir + "/config/engineering_config_simulation.yaml",
+        "/home/ubuntu/roscon-25-workshop/full_self_driving/config/fsd_parameters.yaml",
+        "/home/yosh/roscon-25-workshop/full_self_driving/config/fsd_parameters.yaml"
+      };
+      for (const auto & c : cands) {
+        if (std::filesystem::exists(c)) {
+          resolved_path = c;
+          break;
+        }
+      }
+    } catch (...) {}
+
+    if (!resolved_path.empty()) {
+      try {
+        config_ = std::make_shared<domain::EngineeringConfig>(
+          domain::EngineeringConfig::from_yaml_file(resolved_path));
+        RCLCPP_INFO(get_logger(), "[RUNTIME] Auto-discovered authoritative config from '%s' (hash=%s)",
+          resolved_path.c_str(), config_->compute_canonical_hash().c_str());
+      } catch (const std::exception & exc) {
+        RCLCPP_WARN(get_logger(), "[RUNTIME] Error parsing discovered config '%s' (%s), falling back to default simulation config",
+          resolved_path.c_str(), exc.what());
+        config_ = std::make_shared<domain::EngineeringConfig>(
+          domain::EngineeringConfig::create_default_simulation_config());
+      }
+    } else {
+      RCLCPP_WARN(get_logger(), "[RUNTIME] No config path provided and none discovered; falling back to default simulation config");
+      config_ = std::make_shared<domain::EngineeringConfig>(
+        domain::EngineeringConfig::create_default_simulation_config());
+    }
   }
 
   // Initialize Plan Manager

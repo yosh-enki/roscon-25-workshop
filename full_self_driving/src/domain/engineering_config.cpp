@@ -187,6 +187,9 @@ EngineeringConfig EngineeringConfig::from_yaml(const YAML::Node & node)
     if (s["min_battery_percentage"]) config.safety.min_battery_percentage = s["min_battery_percentage"].as<double>();
     if (s["target_loss_timeout_s"]) config.safety.target_loss_timeout_s = s["target_loss_timeout_s"].as<double>();
     if (s["emergency_stop_enabled"]) config.safety.emergency_stop_enabled = s["emergency_stop_enabled"].as<bool>();
+    // Resilience: support velocity/descent parameters under safety if placed by user
+    if (s["landing_descent_rate_m_s"]) config.routes.landing_descent_rate_m_s = s["landing_descent_rate_m_s"].as<double>();
+    if (s["max_horizontal_velocity_m_s"]) config.routes.max_horizontal_velocity_m_s = s["max_horizontal_velocity_m_s"].as<double>();
   }
 
   if (node["routes"]) {
@@ -207,6 +210,11 @@ EngineeringConfig EngineeringConfig::from_yaml(const YAML::Node & node)
     } else if (r["max_heading_rate_deg_s"]) {
       config.routes.max_yaw_rate_deg_s = r["max_heading_rate_deg_s"].as<double>();
     }
+  }
+
+  if (node["payload"]) {
+    const auto & p = node["payload"];
+    if (p["adapter_type"]) config.adapters.payload_adapter = p["adapter_type"].as<std::string>();
   }
 
   if (node["adapters"]) {
