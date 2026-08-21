@@ -771,6 +771,7 @@ void FlightRuntimeNode::check_and_register_mode()
       } else if (completed_type == flight::StrategyType::TRANSIT_IN) {
         RCLCPP_INFO(get_logger(), "[RUNTIME] TransitIn completed. Transitioning to ACQUIRE_TARGET...");
         if (coordinator_) {
+          coordinator_->set_current_monotonic_ns(this->get_clock()->now().nanoseconds());
           coordinator_->request_transition(flight::StrategyType::ACQUIRE_TARGET);
         }
       } else if (completed_type == flight::StrategyType::DIRECT) {
@@ -835,6 +836,11 @@ void FlightRuntimeNode::check_and_register_mode()
     executor_->set_takeover_callback([this](flight::FullSelfDrivingModeExecutor::DeactivateReason reason) {
       if (coordinator_) {
         coordinator_->handle_takeover(reason);
+      }
+    });
+    executor_->set_activation_callback([this](bool is_active) {
+      if (is_active && coordinator_) {
+        coordinator_->reset_takeover();
       }
     });
 

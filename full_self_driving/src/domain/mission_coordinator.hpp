@@ -58,6 +58,7 @@ public:
   void handle_target_lock_update(const LiveTargetLock & lock);
   void handle_takeover(flight::FullSelfDrivingModeExecutor::DeactivateReason reason);
   void handle_emergency_stop();
+  void reset_takeover();
 
   bool request_transition(flight::StrategyType next_strategy, std::string * out_error = nullptr);
 

@@ -129,6 +129,14 @@ void MissionCoordinator::handle_emergency_stop()
   current_strategy_ = flight::StrategyType::FAILSAFE;
 }
 
+void MissionCoordinator::reset_takeover()
+{
+  std::lock_guard<std::mutex> guard(mutex_);
+  takeover_active_ = false;
+  emergency_stop_active_ = false;
+  transition_trace_.push_back("TAKEOVER_RESET");
+}
+
 void MissionCoordinator::set_custom_direct_target(double lat_deg, double lon_deg, double alt_above_home_m)
 {
   std::lock_guard<std::mutex> guard(mutex_);
@@ -592,6 +600,10 @@ void MissionCoordinator::instantiate_payload_operation_strategy()
 bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, std::string * out_error)
 {
   std::lock_guard<std::mutex> guard(mutex_);
+
+  if (next_strategy == flight::StrategyType::TAKEOFF || next_strategy == flight::StrategyType::WAITING_FOR_MODE) {
+    takeover_active_ = false;
+  }
 
   if (emergency_stop_active_) {
     if (out_error) *out_error = "Emergency stop is active; transitions forbidden";

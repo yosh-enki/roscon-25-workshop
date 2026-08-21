@@ -60,6 +60,7 @@ private:
   ReadinessCheckCallback readiness_cb_;
   ActivationCallback activation_cb_;
   StrategyCompletedCallback strategy_completed_cb_;
+  bool completion_notified_{false};
 };
 
 }  // namespace full_self_driving::flight

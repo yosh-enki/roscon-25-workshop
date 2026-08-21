@@ -66,7 +66,8 @@ void FullSelfDrivingMode::updateSetpoint(float dt_s)
 {
   if (strategy_) {
     strategy_->on_update(dt_s);
-    if (strategy_->is_completed() && strategy_completed_cb_) {
+    if (strategy_->is_completed() && !completion_notified_ && strategy_completed_cb_) {
+      completion_notified_ = true;
       strategy_completed_cb_(strategy_->get_type());
     }
   }
@@ -77,6 +78,7 @@ void FullSelfDrivingMode::set_strategy(std::unique_ptr<InternalStrategy> strateg
   if (!strategy) {
     return;
   }
+  completion_notified_ = false;
   if (isActive() && strategy_) {
     strategy_->on_exit();
   }
