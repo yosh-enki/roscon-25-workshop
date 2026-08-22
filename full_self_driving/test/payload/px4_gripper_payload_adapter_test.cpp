@@ -91,3 +91,35 @@ TEST_F(Px4GripperPayloadAdapterTest, ProcessesAckFeedback)
   EXPECT_FALSE(updated.cargo_loaded);
   EXPECT_FALSE(updated.secured);
 }
+
+TEST_F(Px4GripperPayloadAdapterTest, PreflightOpenMarksPayloadUnsecured)
+{
+  full_self_driving::payload::Px4GripperPayloadAdapter adapter(*node_);
+
+  full_self_driving::msg::PayloadStatus status;
+  bool ok = adapter.execute_command(
+    full_self_driving::msg::PayloadStatus::COMMAND_OPEN,
+    "op_test_open_001",
+    status);
+
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(status.last_operation_id, "op_test_open_001");
+  EXPECT_EQ(status.commanded_state, full_self_driving::msg::PayloadStatus::COMMAND_OPEN);
+  EXPECT_EQ(status.feedback_state, full_self_driving::msg::PayloadStatus::FEEDBACK_OPEN);
+  EXPECT_FALSE(status.cargo_loaded);
+  EXPECT_FALSE(status.secured);
+
+  // Simulate ACK from PX4
+  auto ack = std::make_shared<px4_msgs::msg::VehicleCommandAck>();
+  ack->command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_GRIPPER;
+  ack->result = px4_msgs::msg::VehicleCommandAck::VEHICLE_CMD_RESULT_ACCEPTED;
+  ack->timestamp = node_->get_clock()->now().nanoseconds() / 1000;
+
+  adapter.handle_command_ack(ack);
+
+  auto updated = adapter.get_status();
+  EXPECT_EQ(updated.last_operation_result, full_self_driving::msg::PayloadStatus::RESULT_SUCCESS);
+  EXPECT_EQ(updated.feedback_state, full_self_driving::msg::PayloadStatus::FEEDBACK_OPEN);
+  EXPECT_FALSE(updated.cargo_loaded);
+  EXPECT_FALSE(updated.secured);
+}

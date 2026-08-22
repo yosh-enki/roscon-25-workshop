@@ -32,6 +32,13 @@ public:
   ~FullSelfDrivingMode() override = default;
 
   void set_readiness_check_callback(ReadinessCheckCallback cb) { readiness_cb_ = std::move(cb); }
+  bool is_ready(std::vector<std::string> & failure_codes) const
+  {
+    if (readiness_cb_) {
+      return readiness_cb_(failure_codes);
+    }
+    return true;
+  }
   void set_activation_callback(ActivationCallback cb) { activation_cb_ = std::move(cb); }
   void set_strategy_completed_callback(StrategyCompletedCallback cb) { strategy_completed_cb_ = std::move(cb); }
 

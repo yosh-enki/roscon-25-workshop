@@ -601,10 +601,6 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
 {
   std::lock_guard<std::mutex> guard(mutex_);
 
-  if (next_strategy == flight::StrategyType::TAKEOFF || next_strategy == flight::StrategyType::WAITING_FOR_MODE) {
-    takeover_active_ = false;
-  }
-
   if (emergency_stop_active_) {
     if (out_error) *out_error = "Emergency stop is active; transitions forbidden";
     return false;

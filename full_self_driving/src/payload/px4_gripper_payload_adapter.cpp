@@ -67,15 +67,21 @@ bool Px4GripperPayloadAdapter::execute_command(
     case full_self_driving::msg::PayloadStatus::COMMAND_OPEN:
       cmd.param2 = 0.0f; // Release / Open
       current_status_.feedback_state = full_self_driving::msg::PayloadStatus::FEEDBACK_OPEN;
+      current_status_.cargo_loaded = false;
+      current_status_.secured = false;
       break;
     case full_self_driving::msg::PayloadStatus::COMMAND_RELEASE_REQUESTED:
       cmd.param2 = 0.0f; // Release
       current_status_.feedback_state = full_self_driving::msg::PayloadStatus::FEEDBACK_RELEASED;
+      current_status_.cargo_loaded = false;
+      current_status_.secured = false;
       break;
     case full_self_driving::msg::PayloadStatus::COMMAND_SECURED:
     default:
       cmd.param2 = 1.0f; // Grab / Close
       current_status_.feedback_state = full_self_driving::msg::PayloadStatus::FEEDBACK_SECURED;
+      current_status_.cargo_loaded = true;
+      current_status_.secured = true;
       break;
   }
 
@@ -128,6 +134,10 @@ void Px4GripperPayloadAdapter::handle_command_ack(const px4_msgs::msg::VehicleCo
       current_status_.cargo_loaded = false;
       current_status_.secured = false;
       current_status_.feedback_state = full_self_driving::msg::PayloadStatus::FEEDBACK_RELEASED;
+    } else if (current_status_.commanded_state == full_self_driving::msg::PayloadStatus::COMMAND_OPEN) {
+      current_status_.cargo_loaded = false;
+      current_status_.secured = false;
+      current_status_.feedback_state = full_self_driving::msg::PayloadStatus::FEEDBACK_OPEN;
     } else if (current_status_.commanded_state == full_self_driving::msg::PayloadStatus::COMMAND_SECURED) {
       current_status_.cargo_loaded = true;
       current_status_.secured = true;

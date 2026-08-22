@@ -70,6 +70,15 @@ void FullSelfDrivingModeExecutor::onActivate()
   }
 
   if (isInCharge()) {
+    std::vector<std::string> failure_codes;
+    if (!mode_.is_ready(failure_codes)) {
+      std::string reason = failure_codes.empty() ? "Readiness prerequisites not met" : failure_codes[0];
+      RCLCPP_ERROR(node_.get_logger(),
+        "[EXECUTOR] Activation rejected: Mode readiness prerequisites failed (%s). Takeoff aborted.",
+        reason.c_str());
+      return;
+    }
+
     if (!isArmed()) {
       RCLCPP_INFO(node_.get_logger(), "[EXECUTOR] Vehicle disarmed. Arming vehicle before takeoff...");
       arm([this](px4_ros2::Result result) {

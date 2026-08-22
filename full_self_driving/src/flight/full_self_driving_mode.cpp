@@ -34,7 +34,7 @@ void FullSelfDrivingMode::checkArmingAndRunConditions(px4_ros2::HealthAndArmingC
       }
       reporter.armingCheckFailureExt(
         px4_ros2::events::ID("fsd_arming_check_failed"),
-        px4_ros2::events::Log::Warning,
+        px4_ros2::events::Log::Error,
         detail.c_str());
     }
   }

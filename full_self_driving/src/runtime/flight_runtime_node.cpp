@@ -734,8 +734,7 @@ void FlightRuntimeNode::check_and_register_mode()
           auto strat = coordinator_->get_current_strategy();
           if (strat == flight::StrategyType::TAKEOFF_AFTER_DELIVERY ||
               strat == flight::StrategyType::TRANSIT_OUT ||
-              strat == flight::StrategyType::RETURN_STRATEGY ||
-              strat == flight::StrategyType::RETURN_LANDED) {
+              strat == flight::StrategyType::RETURN_STRATEGY) {
             skip_payload_check = true;
           }
         }
@@ -907,8 +906,7 @@ bool FlightRuntimeNode::is_ready_for_ownmode() const
       auto strat = coordinator_->get_current_strategy();
       if (strat == flight::StrategyType::TAKEOFF_AFTER_DELIVERY ||
           strat == flight::StrategyType::TRANSIT_OUT ||
-          strat == flight::StrategyType::RETURN_STRATEGY ||
-          strat == flight::StrategyType::RETURN_LANDED) {
+          strat == flight::StrategyType::RETURN_STRATEGY) {
         skip_payload_check = true;
       }
     }
