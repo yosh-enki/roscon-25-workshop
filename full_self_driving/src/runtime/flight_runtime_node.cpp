@@ -393,6 +393,9 @@ void FlightRuntimeNode::initialize_components()
   coordinator_->set_pad_registry(pad_registry_);
   coordinator_->set_payload_controller(payload_controller_);
   coordinator_->set_persistence_manager(persistence_);
+  if (config_) {
+    coordinator_->set_search_policy(config_->routes.search_policy);
+  }
 
   payload_status_pub_ = this->create_publisher<full_self_driving::msg::PayloadStatus>(
     "/full_self_driving/payload/status", rclcpp::QoS(1).transient_local().reliable());
@@ -819,7 +822,10 @@ void FlightRuntimeNode::check_and_register_mode()
           coordinator_->request_transition(flight::StrategyType::PRECISION_LAND);
         }
       } else if (completed_type == flight::StrategyType::SEARCH) {
-        RCLCPP_INFO(get_logger(), "[RUNTIME] Search completed. Holding over final search waypoint...");
+        RCLCPP_INFO(get_logger(), "[RUNTIME] Search completed. Handling search completed transition...");
+        if (coordinator_) {
+          coordinator_->handle_search_completed();
+        }
       } else if (completed_type == flight::StrategyType::PRECISION_LAND) {
         RCLCPP_INFO(get_logger(), "[RUNTIME] Precision landing completed. Transitioning to LANDED_VERIFIED & PAYLOAD_OPERATION...");
         if (coordinator_) {

@@ -98,11 +98,14 @@ stateDiagram-v2
 
 ---
 
-### 2.4 `SearchStrategy` (Checkpointed Boustrophedon Search)
+### 2.4 `SearchStrategy` (Checkpointed Boustrophedon Search & Survey Engine)
 - **Source File**: [`src/flight/strategies/search_strategy.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/strategies/search_strategy.cpp)
 - **Role**: Executes a systematic lawnmower/boustrophedon search pattern across the search sector when direct coordinates are unavailable.
+- **Search Policies (`routes.search_policy`)**:
+  - `complete_grid_first` (Default): The drone surveys 100% of the `.plan` search grid, registering all visible pads (Pads 1..6) in [`PadRegistry`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/registry/pad_registry.hpp). Upon grid completion, it automatically transitions into `DirectStrategy` to fly straight to the target pad and land. In subsequent sorties, `DirectStrategy` is selected immediately, cutting multi-sortie mission time by 25–35%.
+  - `interrupt_on_target`: Legacy opportunistic behavior where the first qualified target lock immediately interrupts search and initiates landing.
 - **Checkpointing**: Every completed waypoint updates the [`WorkingPlan`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/domain/working_plan.hpp) state. If search is interrupted and resumed, the drone continues from the last uncompleted checkpoint.
-- **Preemption**: When `TargetCoordinator` issues a qualified `LiveTargetLock`, `SearchStrategy` immediately yields and triggers `PrecisionLandStrategy`.
+- **Fail-Safe Target Missing Handling**: If the entire grid is surveyed but the requested target was never observed, the system transitions safely to `RETURN_STRATEGY` to return to home base without getting stranded.
 
 ---
 

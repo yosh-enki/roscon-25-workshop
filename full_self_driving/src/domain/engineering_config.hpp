@@ -20,6 +20,7 @@ struct RoutePolicy
   double landing_descent_rate_m_s{0.5};
   double acceptance_radius_m{4.0};
   double max_yaw_rate_deg_s{45.0};
+  std::string search_policy{"complete_grid_first"};
 };
 
 struct SafetyPolicy

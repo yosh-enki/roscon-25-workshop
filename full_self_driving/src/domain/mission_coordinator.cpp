@@ -80,11 +80,26 @@ void MissionCoordinator::handle_target_lock_update(const LiveTargetLock & lock)
   if (lock.is_qualified()) {
     transition_trace_.push_back("LOCK_QUALIFIED: id=" + std::to_string(lock.identity.marker_id));
 
-    // When a qualified live target lock is acquired during SEARCH or DIRECT:
-    if (current_strategy_ == flight::StrategyType::SEARCH || current_strategy_ == flight::StrategyType::DIRECT) {
+    // When a qualified live target lock is acquired during DIRECT:
+    if (current_strategy_ == flight::StrategyType::DIRECT) {
       transition_trace_.push_back("FLY-008 / EVT_TARGET_ACQUIRED -> PRECISION_LAND.HOVER_BRAKE");
       current_strategy_ = flight::StrategyType::PRECISION_LAND;
       instantiate_precision_land_strategy();
+    }
+    // When a qualified live target lock is acquired during SEARCH:
+    else if (current_strategy_ == flight::StrategyType::SEARCH) {
+      std::string eff_policy = search_policy_;
+      if (context_ && context_->get_resolved_config() && !context_->get_resolved_config()->routes.search_policy.empty()) {
+        eff_policy = context_->get_resolved_config()->routes.search_policy;
+      }
+      if (eff_policy == "interrupt_on_target") {
+        transition_trace_.push_back("FLY-008 / EVT_TARGET_ACQUIRED -> PRECISION_LAND.HOVER_BRAKE");
+        current_strategy_ = flight::StrategyType::PRECISION_LAND;
+        instantiate_precision_land_strategy();
+      } else {
+        // complete_grid_first: PadRegistry already records observations, we maintain grid flight
+        transition_trace_.push_back("SEARCH_SURVEY_RECORDED: id=" + std::to_string(lock.identity.marker_id));
+      }
     }
 
     if (mode_ && current_strategy_ == flight::StrategyType::PRECISION_LAND) {
@@ -559,6 +574,54 @@ void MissionCoordinator::instantiate_precision_land_strategy()
     delta_pos, delta_vel, stabilize_duration, search_alt, approach_alt));
 }
 
+void MissionCoordinator::set_search_policy(const std::string & policy)
+{
+  std::lock_guard<std::mutex> guard(mutex_);
+  search_policy_ = policy;
+}
+
+std::string MissionCoordinator::get_search_policy() const
+{
+  std::lock_guard<std::mutex> guard(mutex_);
+  return search_policy_;
+}
+
+bool MissionCoordinator::handle_search_completed()
+{
+  std::lock_guard<std::mutex> guard(mutex_);
+  if (current_strategy_ != flight::StrategyType::SEARCH) {
+    return false;
+  }
+
+  transition_trace_.push_back("SEARCH_GRID_COMPLETED");
+
+  std::string rejection_reason;
+  double direct_lat = 0.0, direct_lon = 0.0, direct_alt = 15.0;
+  bool direct_ok = is_direct_eligible(&rejection_reason, &direct_lat, &direct_lon, &direct_alt);
+
+  if (direct_ok) {
+    transition_trace_.push_back("FLY-004 / EVT_SEARCH_TO_DIRECT_TRANSITION (lat=" +
+      std::to_string(direct_lat) + ", lon=" + std::to_string(direct_lon) + ")");
+    current_strategy_ = flight::StrategyType::DIRECT;
+    instantiate_direct_strategy(direct_lat, direct_lon, direct_alt);
+    return true;
+  } else {
+    transition_trace_.push_back("SURVEY_COMPLETE_TARGET_MISSING: " + rejection_reason);
+    current_strategy_ = flight::StrategyType::RETURN_STRATEGY;
+    if (mode_) {
+      double return_alt = 15.0;
+      if (context_ && context_->get_resolved_config()) {
+        return_alt = context_->get_resolved_config()->routes.search_altitude_m;
+      }
+      mode_->set_strategy(std::make_unique<flight::ReturnStrategy>(
+        mode_->node(), mode_->goto_global_setpoint(), mode_->trajectory_setpoint(),
+        mode_->state_cache(), persistence_, context_,
+        flight::ReturnStrategy::ReturnMode::RETURN_TO_HOME, return_alt));
+    }
+    return false;
+  }
+}
+
 bool MissionCoordinator::handle_direct_complete()
 {
   return request_transition(flight::StrategyType::PRECISION_LAND);
@@ -663,6 +726,23 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
     current_strategy_ = flight::StrategyType::PRECISION_LAND;
     instantiate_precision_land_strategy();
     return true;
+  }
+
+  // Transition from SEARCH to DIRECT (Survey completion transition)
+  if (current_strategy_ == flight::StrategyType::SEARCH && next_strategy == flight::StrategyType::DIRECT) {
+    std::string direct_rejection_reason;
+    double direct_lat = 0.0, direct_lon = 0.0, direct_alt = 15.0;
+    bool direct_ok = is_direct_eligible(&direct_rejection_reason, &direct_lat, &direct_lon, &direct_alt);
+    if (direct_ok) {
+      transition_trace_.push_back("FLY-004 / EVT_SEARCH_TO_DIRECT_TRANSITION (lat=" +
+        std::to_string(direct_lat) + ", lon=" + std::to_string(direct_lon) + ")");
+      current_strategy_ = flight::StrategyType::DIRECT;
+      instantiate_direct_strategy(direct_lat, direct_lon, direct_alt);
+      return true;
+    } else {
+      if (out_error) *out_error = "Cannot transition SEARCH to DIRECT: " + direct_rejection_reason;
+      return false;
+    }
   }
 
   // Transition from DIRECT to SEARCH (Direct fallback during flight)

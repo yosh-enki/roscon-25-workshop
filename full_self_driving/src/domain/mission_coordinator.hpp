@@ -103,6 +103,12 @@ public:
   void set_current_monotonic_ns(uint64_t ns);
   uint64_t get_current_monotonic_ns() const;
 
+  void set_search_policy(const std::string & policy);
+  std::string get_search_policy() const;
+
+  // Search completion helper
+  bool handle_search_completed();
+
   // Direct fallback and completion helpers
   bool handle_direct_complete();
   bool handle_direct_fallback(const std::string & reason = "direct navigation timed out");
@@ -160,6 +166,7 @@ private:
   float minimum_record_quality_{0.0f};
   double max_record_uncertainty_m_{50.0};
   uint64_t current_monotonic_ns_{0};
+  std::string search_policy_{"complete_grid_first"};
 
   std::vector<std::string> transition_trace_;
 };

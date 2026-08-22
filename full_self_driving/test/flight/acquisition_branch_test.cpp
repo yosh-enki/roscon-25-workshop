@@ -355,3 +355,67 @@ TEST_F(AcquisitionBranchTest, Branch_DirectDisabled_SelectsSearchImmediately)
   EXPECT_TRUE(coordinator_->request_transition(flight::StrategyType::ACQUIRE_TARGET));
   EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::SEARCH);
 }
+
+// 12. CompleteGridFirst: Target lock during Search does NOT preempt Search
+TEST_F(AcquisitionBranchTest, Branch_CompleteGridFirst_LockDoesNotPreemptSearch)
+{
+  coordinator_->set_search_policy("complete_grid_first");
+  auto wp = create_valid_working_plan();
+  coordinator_->set_custom_search_plan(wp);
+
+  EXPECT_TRUE(coordinator_->request_transition(flight::StrategyType::SEARCH));
+  EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::SEARCH);
+
+  // Send qualified live target lock
+  domain::LiveTargetLock lock;
+  lock.lock_state = domain::LockState::QUALIFIED;
+  lock.identity = domain::TargetIdentity(7, "DICT_4X4_50", "aavc2026");
+  coordinator_->handle_target_lock_update(lock);
+
+  // In complete_grid_first, search is NOT preempted to PRECISION_LAND
+  EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::SEARCH);
+  EXPECT_EQ(mode_->get_current_strategy_type(), flight::StrategyType::SEARCH);
+}
+
+// 13. CompleteGridFirst: Search completion transitions to Direct if target was recorded in PadRegistry
+TEST_F(AcquisitionBranchTest, Branch_CompleteGridFirst_SearchCompleteTransitionsToDirect)
+{
+  coordinator_->set_search_policy("complete_grid_first");
+  auto wp = create_valid_working_plan();
+  coordinator_->set_custom_search_plan(wp);
+
+  EXPECT_TRUE(coordinator_->request_transition(flight::StrategyType::SEARCH));
+  EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::SEARCH);
+
+  // Pad is recorded into PadRegistry during survey
+  auto rec = create_pad_record(7, "DICT_4X4_50", "aavc2026", "kmitl_airfield", "default_scenario", 13.73132845, 100.78990948, 15.0);
+  pad_registry_->insert_record_for_test(rec);
+  coordinator_->set_current_monotonic_ns(1000000000ULL + 1000000000ULL);
+  coordinator_->set_battery_percentage(85.0);
+
+  // Handle search completed
+  EXPECT_TRUE(coordinator_->handle_search_completed());
+  EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::DIRECT);
+  EXPECT_EQ(mode_->get_current_strategy_type(), flight::StrategyType::DIRECT);
+}
+
+// 14. CompleteGridFirst: Search completion transitions to RETURN if target was NOT seen
+TEST_F(AcquisitionBranchTest, Branch_CompleteGridFirst_SearchCompleteMissingTargetTransitionsToReturn)
+{
+  coordinator_->set_search_policy("complete_grid_first");
+  auto wp = create_valid_working_plan();
+  coordinator_->set_custom_search_plan(wp);
+
+  EXPECT_TRUE(coordinator_->request_transition(flight::StrategyType::SEARCH));
+  EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::SEARCH);
+
+  // PadRegistry is empty (target was never seen)
+  coordinator_->set_current_monotonic_ns(1000000000ULL + 1000000000ULL);
+  coordinator_->set_battery_percentage(85.0);
+
+  // Handle search completed
+  EXPECT_FALSE(coordinator_->handle_search_completed());
+  EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::RETURN_STRATEGY);
+  EXPECT_EQ(mode_->get_current_strategy_type(), flight::StrategyType::RETURN_STRATEGY);
+}
+

@@ -32,6 +32,7 @@ All configurable system values are consolidated into a single authoritative para
 | `landing_descent_rate_m_s` | `float` | `0.5` | $m/s$ | Final visual descent speed |
 | `acceptance_radius_m` | `float` | `4.0` | meters | Waypoint arrival sphere radius |
 | `max_yaw_rate_deg_s` | `float` | `45.0` | $\text{deg}/s$ | Maximum angular yaw rate limit |
+| `search_policy` | `string` | `"complete_grid_first"` | - | Search completion policy (`complete_grid_first` / `interrupt_on_target`) |
 
 #### Safety & Power Limits (`safety`)
 | Parameter Name | Data Type | Default | Units | Description |

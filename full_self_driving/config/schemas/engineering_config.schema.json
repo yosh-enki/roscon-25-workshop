@@ -44,7 +44,8 @@
       "type": "object",
       "properties": {
         "transit_in_speed_m_s": { "type": "number", "minimum": 0.5 },
-        "transit_out_speed_m_s": { "type": "number", "minimum": 0.5 }
+        "transit_out_speed_m_s": { "type": "number", "minimum": 0.5 },
+        "search_policy": { "type": "string", "enum": ["complete_grid_first", "interrupt_on_target"] }
       }
     },
     "adapters": {

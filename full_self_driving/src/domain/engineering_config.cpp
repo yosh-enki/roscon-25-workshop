@@ -73,6 +73,10 @@ ValidationResult EngineeringConfig::validate() const
     res.add_violation("routes.max_yaw_rate_deg_s must be finite and > 0.0");
   }
 
+  if (routes.search_policy != "complete_grid_first" && routes.search_policy != "interrupt_on_target") {
+    res.add_violation("routes.search_policy must be 'complete_grid_first' or 'interrupt_on_target', got '" + routes.search_policy + "'");
+  }
+
   // Relationship check
   if (std::isfinite(routes.search_altitude_m) && std::isfinite(routes.approach_altitude_m) &&
       routes.search_altitude_m < routes.approach_altitude_m)
@@ -125,6 +129,7 @@ std::string EngineeringConfig::compute_canonical_hash() const
   ss << "routes.approach_altitude_m=" << std::fixed << std::setprecision(6) << routes.approach_altitude_m << "\n";
   ss << "routes.max_horizontal_velocity_m_s=" << std::fixed << std::setprecision(6) << routes.max_horizontal_velocity_m_s << "\n";
   ss << "routes.landing_descent_rate_m_s=" << std::fixed << std::setprecision(6) << routes.landing_descent_rate_m_s << "\n";
+  ss << "routes.search_policy=" << routes.search_policy << "\n";
   ss << "adapters.px4_transport=" << adapters.px4_transport << "\n";
   ss << "adapters.camera_adapter=" << adapters.camera_adapter << "\n";
   ss << "adapters.payload_adapter=" << adapters.payload_adapter << "\n";
@@ -209,6 +214,9 @@ EngineeringConfig EngineeringConfig::from_yaml(const YAML::Node & node)
       config.routes.max_yaw_rate_deg_s = r["max_yaw_rate_deg_s"].as<double>();
     } else if (r["max_heading_rate_deg_s"]) {
       config.routes.max_yaw_rate_deg_s = r["max_heading_rate_deg_s"].as<double>();
+    }
+    if (r["search_policy"]) {
+      config.routes.search_policy = r["search_policy"].as<std::string>();
     }
   }
 
