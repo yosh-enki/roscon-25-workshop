@@ -62,6 +62,8 @@ public:
   virtual void on_exit() = 0;
 
   virtual bool is_completed() const = 0;
+  virtual bool is_failed() const { return false; }
+  virtual std::string failure_reason() const { return ""; }
   virtual StrategyType get_type() const = 0;
   virtual std::string get_name() const = 0;
 };

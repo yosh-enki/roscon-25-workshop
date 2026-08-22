@@ -41,6 +41,8 @@ public:
   }
   void set_activation_callback(ActivationCallback cb) { activation_cb_ = std::move(cb); }
   void set_strategy_completed_callback(StrategyCompletedCallback cb) { strategy_completed_cb_ = std::move(cb); }
+  using StrategyFailedCallback = std::function<void(StrategyType /* failed_type */, const std::string & /* reason */)>;
+  void set_strategy_failed_callback(StrategyFailedCallback cb) { strategy_failed_cb_ = std::move(cb); }
 
   void checkArmingAndRunConditions(px4_ros2::HealthAndArmingCheckReporter & reporter) override;
   void onActivate() override;
@@ -67,7 +69,9 @@ private:
   ReadinessCheckCallback readiness_cb_;
   ActivationCallback activation_cb_;
   StrategyCompletedCallback strategy_completed_cb_;
+  StrategyFailedCallback strategy_failed_cb_;
   bool completion_notified_{false};
+  bool failure_notified_{false};
 };
 
 }  // namespace full_self_driving::flight

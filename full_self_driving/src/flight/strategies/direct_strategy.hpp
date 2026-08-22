@@ -38,7 +38,7 @@ public:
     float settle_duration_s = 1.0f,
     float max_horizontal_speed_m_s = 5.0f,
     float max_yaw_rate_rad_s = 0.785398163f,  // 45 deg/s
-    double direct_timeout_s = 30.0,
+    double direct_timeout_s = 120.0,
     std::shared_ptr<persistence::PersistenceManager> persistence = nullptr);
 
   // Overload for testing with custom/injected GotoGlobalSetpointType
@@ -54,7 +54,7 @@ public:
     float settle_duration_s = 1.0f,
     float max_horizontal_speed_m_s = 5.0f,
     float max_yaw_rate_rad_s = 0.785398163f,
-    double direct_timeout_s = 30.0,
+    double direct_timeout_s = 120.0,
     std::shared_ptr<persistence::PersistenceManager> persistence = nullptr);
 
   // Convenience constructor from PadRecord
@@ -69,7 +69,7 @@ public:
     float settle_duration_s = 1.0f,
     float max_horizontal_speed_m_s = 5.0f,
     float max_yaw_rate_rad_s = 0.785398163f,
-    double direct_timeout_s = 30.0,
+    double direct_timeout_s = 120.0,
     std::shared_ptr<persistence::PersistenceManager> persistence = nullptr);
 
   ~DirectStrategy() override = default;
@@ -81,7 +81,7 @@ public:
   void on_exit() override;
 
   bool is_completed() const override { return mode_finished_ && !failed_; }
-  bool is_failed() const { return failed_; }
+  bool is_failed() const override { return failed_; }
   bool is_settled() const { return settled_; }
   StrategyType get_type() const override { return StrategyType::DIRECT; }
   std::string get_name() const override { return "DIRECT"; }
@@ -90,7 +90,7 @@ public:
   double target_longitude_deg() const { return target_longitude_deg_; }
   double target_altitude_above_home_m() const { return target_altitude_above_home_m_; }
   double target_altitude_amsl_m() const { return target_altitude_amsl_m_; }
-  const std::string & failure_reason() const { return failure_reason_; }
+  std::string failure_reason() const override { return failure_reason_; }
 
 private:
   void fail(const std::string & reason);
@@ -101,6 +101,7 @@ private:
   std::shared_ptr<px4_ros2::GotoGlobalSetpointType> goto_setpoint_;
   std::shared_ptr<adapters::Px4StateCache> state_cache_;
   std::shared_ptr<persistence::PersistenceManager> persistence_;
+  CompletionCallback completion_cb_;
 
   double target_latitude_deg_{0.0};
   double target_longitude_deg_{0.0};
@@ -116,7 +117,7 @@ private:
   float max_yaw_rate_rad_s_{0.785398163f};
   float altitude_tolerance_m_{1.0f};
   float data_timeout_s_{2.0f};
-  double direct_timeout_s_{30.0};
+  double direct_timeout_s_{120.0};
 
   std::chrono::steady_clock::time_point activation_time_{};
   float settle_accumulated_s_{0.0f};
@@ -131,8 +132,6 @@ private:
 
   bool last_heading_valid_{false};
   float last_heading_rad_{0.0f};
-
-  CompletionCallback completion_cb_;
 };
 
 }  // namespace full_self_driving::flight

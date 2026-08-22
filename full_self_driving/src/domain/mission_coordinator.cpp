@@ -468,7 +468,7 @@ void MissionCoordinator::instantiate_direct_strategy(double lat, double lon, dou
 
   mode_->set_strategy(std::make_unique<flight::DirectStrategy>(
     mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(),
-    lat, lon, alt, arrival_rad, 0.5f, 1.0f, max_h_speed, max_yaw_rate));
+    lat, lon, alt, arrival_rad, 0.5f, 1.0f, max_h_speed, max_yaw_rate, 120.0));
 }
 
 void MissionCoordinator::instantiate_search_strategy()

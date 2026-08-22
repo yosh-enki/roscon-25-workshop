@@ -76,7 +76,7 @@ public:
   void on_exit() override;
 
   bool is_completed() const override { return mode_finished_ && !failed_; }
-  bool is_failed() const { return failed_; }
+  bool is_failed() const override { return failed_; }
   StrategyType get_type() const override { return StrategyType::SEARCH; }
   std::string get_name() const override { return "SEARCH"; }
 
@@ -85,7 +85,7 @@ public:
   double target_altitude_amsl_m() const { return target_altitude_amsl_m_; }
   const domain::WorkingPlan & working_plan() const { return working_plan_; }
   const domain::CanonicalSearchRoute & route() const { return route_; }
-  const std::string & failure_reason() const { return failure_reason_; }
+  std::string failure_reason() const override { return failure_reason_; }
 
 private:
   void fail(const std::string & reason);

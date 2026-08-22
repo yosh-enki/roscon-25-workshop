@@ -52,13 +52,13 @@ public:
   void on_exit() override;
 
   bool is_completed() const override { return mode_finished_ && !failed_; }
-  bool is_failed() const { return failed_; }
+  bool is_failed() const override { return failed_; }
   StrategyType get_type() const override { return StrategyType::TRANSIT_IN; }
   std::string get_name() const override { return "TRANSIT_IN"; }
 
   std::size_t current_waypoint_index() const { return waypoint_index_; }
   double target_altitude_msl_m() const { return target_altitude_msl_m_; }
-  const std::string & failure_reason() const { return failure_reason_; }
+  std::string failure_reason() const override { return failure_reason_; }
 
   const domain::Route & route() const { return route_; }
 

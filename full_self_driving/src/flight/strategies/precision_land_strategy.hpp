@@ -111,7 +111,7 @@ public:
   void on_exit() override;
 
   bool is_completed() const override { return mode_finished_ && !failed_; }
-  bool is_failed() const { return failed_; }
+  bool is_failed() const override { return failed_; }
   StrategyType get_type() const override { return StrategyType::PRECISION_LAND; }
   std::string get_name() const override { return "PRECISION_LAND"; }
 
@@ -124,7 +124,7 @@ public:
   bool is_hover_stabilized() const { return hover_stabilized_; }
   float hover_settle_duration() const { return hover_settle_duration_s_; }
   float current_velocity_norm() const { return current_velocity_norm_; }
-  const std::string & failure_reason() const { return failure_reason_; }
+  std::string failure_reason() const override { return failure_reason_; }
 
   // Prototype parameter accessors (for strict parity verification)
   float max_velocity() const { return max_velocity_; }

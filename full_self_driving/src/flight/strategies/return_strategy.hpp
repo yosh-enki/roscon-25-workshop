@@ -64,13 +64,13 @@ public:
   void on_exit() override;
 
   bool is_completed() const override { return completed_; }
-  bool is_failed() const { return failed_; }
+  bool is_failed() const override { return failed_; }
   StrategyType get_type() const override { return StrategyType::RETURN_STRATEGY; }
   std::string get_name() const override { return "RETURN_STRATEGY"; }
 
   ReturnMode get_return_mode() const { return return_mode_; }
   SubPhase get_sub_phase() const { return sub_phase_; }
-  const std::string & failure_reason() const { return failure_reason_; }
+  std::string failure_reason() const override { return failure_reason_; }
 
 private:
   void fail(const std::string & reason);

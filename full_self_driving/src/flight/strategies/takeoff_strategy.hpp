@@ -37,7 +37,7 @@ public:
   void on_exit() override;
 
   bool is_completed() const override { return completed_; }
-  bool is_failed() const { return failed_; }
+  bool is_failed() const override { return failed_; }
   StrategyType get_type() const override { return strategy_type_; }
   std::string get_name() const override {
     return strategy_type_ == StrategyType::TAKEOFF_AFTER_DELIVERY ? "TAKEOFF_AFTER_DELIVERY" : "TAKEOFF";
@@ -45,7 +45,7 @@ public:
 
   double target_altitude_above_home_m() const { return target_altitude_above_home_m_; }
   double target_altitude_msl_m() const { return target_altitude_msl_m_; }
-  const std::string & failure_reason() const { return failure_reason_; }
+  std::string failure_reason() const override { return failure_reason_; }
 
 private:
   void fail(const std::string & reason);

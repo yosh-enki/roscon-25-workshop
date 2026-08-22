@@ -69,6 +69,9 @@ void FullSelfDrivingMode::updateSetpoint(float dt_s)
     if (strategy_->is_completed() && !completion_notified_ && strategy_completed_cb_) {
       completion_notified_ = true;
       strategy_completed_cb_(strategy_->get_type());
+    } else if (strategy_->is_failed() && !failure_notified_ && strategy_failed_cb_) {
+      failure_notified_ = true;
+      strategy_failed_cb_(strategy_->get_type(), strategy_->failure_reason());
     }
   }
 }
@@ -79,6 +82,7 @@ void FullSelfDrivingMode::set_strategy(std::unique_ptr<InternalStrategy> strateg
     return;
   }
   completion_notified_ = false;
+  failure_notified_ = false;
   if (isActive() && strategy_) {
     strategy_->on_exit();
   }

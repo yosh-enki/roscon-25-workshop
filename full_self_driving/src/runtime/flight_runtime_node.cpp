@@ -874,6 +874,19 @@ void FlightRuntimeNode::check_and_register_mode()
       }
     });
 
+    mode_->set_strategy_failed_callback([this](flight::StrategyType failed_type, const std::string & reason) {
+      RCLCPP_ERROR(get_logger(), "[RUNTIME] Strategy %s failed: %s",
+        flight::strategy_type_to_string(failed_type).c_str(), reason.c_str());
+      if (coordinator_) {
+        if (failed_type == flight::StrategyType::DIRECT) {
+          RCLCPP_WARN(get_logger(), "[RUNTIME] Direct navigation failed. Falling back to SEARCH or RETURN...");
+          coordinator_->handle_direct_fallback(reason);
+        } else {
+          coordinator_->request_transition(flight::StrategyType::HOLD);
+        }
+      }
+    });
+
     executor_ = std::make_shared<flight::FullSelfDrivingModeExecutor>(*this, *mode_, state_cache_);
     if (config_) {
       executor_->set_takeoff_altitude(static_cast<float>(config_->routes.search_altitude_m));
