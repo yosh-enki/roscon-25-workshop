@@ -123,6 +123,24 @@ This document provides a comprehensive historical analysis of the engineering jo
 - **Root Cause**: `gcc`/`clang` compiling heavy template headers (`Eigen`, `OpenCV`, `px4_ros2_cpp`, `yaml-cpp`) on all available CPU threads exceeded available container RAM (OOM killer).
 - **Solution**: Configured build arguments:
   ```bash
-  colcon build --parallel-workers 4 --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
+  colcon build --parallel-workers 2 --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo
   ```
 - **Architectural Lesson**: Build configurations must account for template-heavy C++ compilation memory footprints in containerized environments.
+
+---
+
+### Bug 9: Cross-Airfield Direct Navigation Timeout & Strategy Failure Handling
+- **Commit**: `87a1d65` (*fix(flight): increase direct navigation timeout to 120s and add strategy failure handling*)
+- **Symptom**: In the Survey-First flight mode (`complete_grid_first`), after surveying 100% of the grid, the drone began flying in `DIRECT` towards Target Pad 2, but suddenly stopped and hovered stationary in mid-air at 15m altitude, 46m away from the target pad.
+- **Root Cause**:
+  1. The distance from the final search waypoint across the airfield back to Pad 2 was ~150m. Flying at $5\text{ m/s}$ with turns took ~35s.
+  2. `DirectStrategy` had a default `direct_timeout_s` of only 30.0s. At $t=30.019\text{s}$, it called `fail()` and stopped streaming setpoints to PX4.
+  3. `FullSelfDrivingMode` had no `strategy_failed_cb_` registered, so when `DirectStrategy` failed, it never triggered a fallback and left the drone silently idling in the air.
+- **Solution**:
+  1. Increased `direct_timeout_s` from 30.0s to 120.0s in `DirectStrategy` and `MissionCoordinator`.
+  2. Added virtual `is_failed()` and `failure_reason()` interface to `InternalStrategy`.
+  3. Added `set_strategy_failed_callback` in `FullSelfDrivingMode` and wired `coordinator_->handle_direct_fallback()` in `FlightRuntimeNode` to safely recover from any flight strategy timeout.
+- **Architectural Lesson**:
+  1. Trajectory and waypoint timeouts must account for worst-case geographic transit distances across large operational areas.
+  2. Strategy lifecycle handlers must handle failure paths with fallback recovery mechanisms, not just nominal completion paths.
+
