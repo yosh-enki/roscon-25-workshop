@@ -20,7 +20,8 @@ public:
   {
     EVALUATE_GATES = 0,
     EXECUTE_RELEASE = 1,
-    FINISHED = 2
+    FINISHED = 2,
+    FAILED = 3
   };
 
   explicit PayloadOperationStrategy(
@@ -37,6 +38,8 @@ public:
   void on_exit() override;
 
   bool is_completed() const override { return completed_; }
+  bool is_failed() const override { return failed_; }
+  std::string failure_reason() const override { return error_message_; }
   StrategyType get_type() const override { return StrategyType::PAYLOAD_OPERATION; }
   std::string get_name() const override { return "PAYLOAD_OPERATION"; }
 
@@ -44,6 +47,8 @@ public:
   SubPhase get_sub_phase() const { return sub_phase_; }
 
 private:
+  void execute_release();
+
   rclcpp::Node & node_;
   std::shared_ptr<payload::PayloadController> controller_;
   std::shared_ptr<persistence::PersistenceManager> persistence_;
@@ -52,6 +57,7 @@ private:
 
   SubPhase sub_phase_{SubPhase::EVALUATE_GATES};
   bool completed_{false};
+  bool failed_{false};
   uint8_t result_{full_self_driving::msg::PayloadStatus::RESULT_NONE};
   full_self_driving::msg::PayloadStatus status_;
   std::string error_message_;

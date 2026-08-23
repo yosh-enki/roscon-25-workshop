@@ -27,73 +27,96 @@ void PayloadOperationStrategy::on_enter()
   RCLCPP_INFO(node_.get_logger(), "[PAYLOAD_OPERATION] Strategy entered. Op ID: %s", operation_id_.c_str());
   sub_phase_ = SubPhase::EVALUATE_GATES;
   completed_ = false;
+  failed_ = false;
   result_ = full_self_driving::msg::PayloadStatus::RESULT_NONE;
+  // Execute release sequence immediately upon strategy entry
+  execute_release();
+}
+
+void PayloadOperationStrategy::execute_release()
+{
+  if (completed_ || failed_) {
+    return;
+  }
+
+  if (!controller_) {
+    RCLCPP_ERROR(node_.get_logger(), "[PAYLOAD_OPERATION] PayloadController is missing!");
+    result_ = full_self_driving::msg::PayloadStatus::RESULT_FAILURE;
+    error_message_ = "PayloadController is missing";
+    failed_ = true;
+    completed_ = true;
+    sub_phase_ = SubPhase::FAILED;
+    return;
+  }
+
+  // 1. Persist Durable Intent before commanding actuator
+  if (persistence_) {
+    persistence::JournalEntry entry;
+    entry.event_id = "EVT_PAYLOAD_INTENT";
+    entry.idempotency_key = operation_id_;
+    entry.mission_id = context_ ? context_->get_mission_id() : "";
+    entry.sortie_id = context_ ? context_->get_sortie_id() : "";
+    entry.snapshot_hash = context_ ? context_->get_resolved_config_hash() : "";
+    entry.component = "payload_controller";
+    entry.detail = "Intent to release payload: " + operation_id_;
+    entry.timestamp_monotonic_ns = static_cast<uint64_t>(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count());
+    persistence_->append_journal_entry(entry);
+  }
+
+  sub_phase_ = SubPhase::EXECUTE_RELEASE;
+
+  // 2. Execute internal release via controller
+  result_ = controller_->execute_internal_release(operation_id_, status_, &error_message_);
+
+  // 3. Persist Durable Result
+  if (persistence_) {
+    persistence::JournalEntry entry;
+    if (result_ == full_self_driving::msg::PayloadStatus::RESULT_SUCCESS) {
+      entry.event_id = "EVT_PAYLOAD_SUCCESS";
+    } else if (result_ == full_self_driving::msg::PayloadStatus::RESULT_UNKNOWN) {
+      entry.event_id = "EVT_PAYLOAD_UNKNOWN";
+    } else {
+      entry.event_id = "EVT_PAYLOAD_FAILURE";
+    }
+    entry.idempotency_key = operation_id_;
+    entry.mission_id = context_ ? context_->get_mission_id() : "";
+    entry.sortie_id = context_ ? context_->get_sortie_id() : "";
+    entry.snapshot_hash = context_ ? context_->get_resolved_config_hash() : "";
+    entry.component = "payload_controller";
+    entry.detail = "Payload release result=" + std::to_string(result_) + (error_message_.empty() ? "" : ": " + error_message_);
+    entry.timestamp_monotonic_ns = static_cast<uint64_t>(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count());
+    persistence_->append_journal_entry(entry);
+  }
+
+  if (result_ == full_self_driving::msg::PayloadStatus::RESULT_SUCCESS) {
+    RCLCPP_INFO(node_.get_logger(), "[PAYLOAD_OPERATION] Release executed successfully. Result: %u", result_);
+    completed_ = true;
+    failed_ = false;
+    sub_phase_ = SubPhase::FINISHED;
+  } else if (result_ == full_self_driving::msg::PayloadStatus::RESULT_UNKNOWN) {
+    RCLCPP_WARN(node_.get_logger(), "[PAYLOAD_OPERATION] Release executed with UNKNOWN outcome. Result: %u", result_);
+    completed_ = true;
+    failed_ = false;
+    sub_phase_ = SubPhase::FINISHED;
+  } else {
+    RCLCPP_ERROR(node_.get_logger(), "[PAYLOAD_OPERATION] Release failed. Result: %u, Error: %s",
+      result_, error_message_.c_str());
+    completed_ = true;
+    failed_ = true;
+    sub_phase_ = SubPhase::FAILED;
+  }
 }
 
 void PayloadOperationStrategy::on_update(float dt_s)
 {
   (void)dt_s;
 
-  if (completed_) {
-    return;
-  }
-
-  if (sub_phase_ == SubPhase::EVALUATE_GATES) {
-    if (!controller_) {
-      RCLCPP_ERROR(node_.get_logger(), "[PAYLOAD_OPERATION] PayloadController is missing!");
-      result_ = full_self_driving::msg::PayloadStatus::RESULT_FAILURE;
-      completed_ = true;
-      sub_phase_ = SubPhase::FINISHED;
-      return;
-    }
-
-    // Persist Durable Intent before commanding actuator
-    if (persistence_) {
-      persistence::JournalEntry entry;
-      entry.event_id = "EVT_PAYLOAD_INTENT";
-      entry.idempotency_key = operation_id_;
-      entry.mission_id = context_ ? context_->get_mission_id() : "";
-      entry.sortie_id = context_ ? context_->get_sortie_id() : "";
-      entry.snapshot_hash = context_ ? context_->get_resolved_config_hash() : "";
-      entry.component = "payload_controller";
-      entry.detail = "Intent to release payload: " + operation_id_;
-      entry.timestamp_monotonic_ns = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-          std::chrono::steady_clock::now().time_since_epoch()).count());
-      persistence_->append_journal_entry(entry);
-    }
-
-    sub_phase_ = SubPhase::EXECUTE_RELEASE;
-  }
-
-  if (sub_phase_ == SubPhase::EXECUTE_RELEASE) {
-    result_ = controller_->execute_internal_release(operation_id_, status_, &error_message_);
-
-    // Persist Durable Result
-    if (persistence_) {
-      persistence::JournalEntry entry;
-      if (result_ == full_self_driving::msg::PayloadStatus::RESULT_SUCCESS) {
-        entry.event_id = "EVT_PAYLOAD_SUCCESS";
-      } else if (result_ == full_self_driving::msg::PayloadStatus::RESULT_UNKNOWN) {
-        entry.event_id = "EVT_PAYLOAD_UNKNOWN";
-      } else {
-        entry.event_id = "EVT_PAYLOAD_FAILURE";
-      }
-      entry.idempotency_key = operation_id_;
-      entry.mission_id = context_ ? context_->get_mission_id() : "";
-      entry.sortie_id = context_ ? context_->get_sortie_id() : "";
-      entry.snapshot_hash = context_ ? context_->get_resolved_config_hash() : "";
-      entry.component = "payload_controller";
-      entry.detail = "Payload release result=" + std::to_string(result_) + (error_message_.empty() ? "" : ": " + error_message_);
-      entry.timestamp_monotonic_ns = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-          std::chrono::steady_clock::now().time_since_epoch()).count());
-      persistence_->append_journal_entry(entry);
-    }
-
-    RCLCPP_INFO(node_.get_logger(), "[PAYLOAD_OPERATION] Release executed. Result: %u", result_);
-    completed_ = true;
-    sub_phase_ = SubPhase::FINISHED;
+  if (!completed_ && !failed_) {
+    execute_release();
   }
 }
 

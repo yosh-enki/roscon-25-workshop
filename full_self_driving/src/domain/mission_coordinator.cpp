@@ -609,9 +609,9 @@ bool MissionCoordinator::handle_search_completed()
     transition_trace_.push_back("SURVEY_COMPLETE_TARGET_MISSING: " + rejection_reason);
     current_strategy_ = flight::StrategyType::RETURN_STRATEGY;
     if (mode_) {
-      double return_alt = 15.0;
+      double return_alt = 20.0;
       if (context_ && context_->get_resolved_config()) {
-        return_alt = context_->get_resolved_config()->routes.search_altitude_m;
+        return_alt = context_->get_resolved_config()->routes.transit_altitude_m;
       }
       mode_->set_strategy(std::make_unique<flight::ReturnStrategy>(
         mode_->node(), mode_->goto_global_setpoint(), mode_->trajectory_setpoint(),
@@ -656,8 +656,10 @@ bool MissionCoordinator::handle_payload_complete(uint8_t result)
 void MissionCoordinator::instantiate_payload_operation_strategy()
 {
   if (!mode_) return;
-  mode_->set_strategy(std::make_unique<flight::PayloadOperationStrategy>(
-    mode_->node(), payload_controller_, persistence_, context_));
+  auto strat = std::make_unique<flight::PayloadOperationStrategy>(
+    mode_->node(), payload_controller_, persistence_, context_);
+  strat->on_enter();
+  mode_->set_strategy(std::move(strat));
 }
 
 bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, std::string * out_error)
@@ -815,7 +817,7 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
         if (context_ && context_->get_resolved_config()) {
           const auto & cfg = context_->get_resolved_config()->routes;
           route.set_max_horizontal_speed_m_s(static_cast<float>(cfg.transit_out_speed_m_s));
-          route.set_transit_altitude_above_home_m(cfg.search_altitude_m);
+          route.set_transit_altitude_above_home_m(cfg.transit_altitude_m);
           route.set_acceptance_radius_m(static_cast<float>(cfg.acceptance_radius_m));
           route.set_max_yaw_rate_deg_s(static_cast<float>(cfg.max_yaw_rate_deg_s));
         }
@@ -831,9 +833,9 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
     transition_trace_.push_back("FLY-018 / EVT_TRANSIT_OUT_COMPLETE -> RETURN_STRATEGY");
     current_strategy_ = flight::StrategyType::RETURN_STRATEGY;
     if (mode_) {
-      double return_alt = 15.0;
+      double return_alt = 20.0;
       if (context_ && context_->get_resolved_config()) {
-        return_alt = context_->get_resolved_config()->routes.search_altitude_m;
+        return_alt = context_->get_resolved_config()->routes.transit_altitude_m;
       }
       mode_->set_strategy(std::make_unique<flight::ReturnStrategy>(
         mode_->node(), mode_->goto_global_setpoint(), mode_->trajectory_setpoint(),

@@ -676,9 +676,73 @@ void FlightRuntimeNode::trigger_evaluation_cycle()
     was_disarmed_after_return_ = true;
   }
 
-  if (mode_ && mode_->isActive() && state_cache_ && state_cache_->is_armed()) {
-    if (coordinator_) {
-      if (coordinator_->get_current_strategy() == flight::StrategyType::WAITING_FOR_MODE) {
+  if (coordinator_) {
+    auto current_strat = coordinator_->get_current_strategy();
+
+    // 1. Handle on-ground PAYLOAD_OPERATION execution
+    if (current_strat == flight::StrategyType::PAYLOAD_OPERATION) {
+      if (mode_ && mode_->current_strategy()) {
+        auto * strat = mode_->current_strategy();
+        if (!strat->is_completed() && !strat->is_failed()) {
+          strat->on_update(0.1f);
+        }
+        if (strat->is_completed() || strat->is_failed()) {
+          auto * payload_strat = dynamic_cast<flight::PayloadOperationStrategy *>(strat);
+          uint8_t res = payload_strat ? payload_strat->get_result() :
+            (strat->is_completed() ? full_self_driving::msg::PayloadStatus::RESULT_SUCCESS :
+                                     full_self_driving::msg::PayloadStatus::RESULT_FAILURE);
+
+          RCLCPP_INFO(get_logger(),
+            "[RUNTIME] Payload operation finished with result %u. Transitioning to %s...",
+            res, (res == full_self_driving::msg::PayloadStatus::RESULT_SUCCESS ? "TAKEOFF_AFTER_DELIVERY" : "RETURN_STRATEGY"));
+          coordinator_->handle_payload_complete(res);
+
+          if (res == full_self_driving::msg::PayloadStatus::RESULT_SUCCESS && executor_) {
+            RCLCPP_INFO(get_logger(), "[RUNTIME] Re-arming and triggering second takeoff sequence...");
+            executor_->arm([this](px4_ros2::Result result) {
+              if (result == px4_ros2::Result::Success) {
+                RCLCPP_INFO(get_logger(), "[RUNTIME] Re-arm successful for second takeoff. Triggering climb...");
+                executor_->trigger_takeoff_sequence();
+              } else {
+                RCLCPP_ERROR(get_logger(), "[RUNTIME] Re-arm failed for second takeoff: %s",
+                  px4_ros2::resultToString(result));
+              }
+            });
+          }
+        }
+      }
+    }
+
+    // 2. Handle touchdown during PRECISION_LAND on ground
+    if (current_strat == flight::StrategyType::PRECISION_LAND) {
+      if (state_cache_) {
+        auto snapshot = state_cache_->capture_snapshot();
+        float vz = snapshot.local_velocity_ned.z();
+        if (snapshot.is_landed || (snapshot.local_position_ned.z() >= -0.3f && std::abs(vz) < 0.25f)) {
+          RCLCPP_INFO(get_logger(),
+            "[RUNTIME] (Periodic) Precision landing touchdown verified on ground. Transitioning to LANDED_VERIFIED & PAYLOAD_OPERATION...");
+          coordinator_->handle_landing_verified();
+        }
+      }
+    }
+
+    // 3. Handle touchdown during RETURN_STRATEGY on ground
+    if (current_strat == flight::StrategyType::RETURN_STRATEGY) {
+      if (state_cache_) {
+        auto snapshot = state_cache_->capture_snapshot();
+        float vz = snapshot.local_velocity_ned.z();
+        if (snapshot.is_landed || (snapshot.local_position_ned.z() >= -0.3f && std::abs(vz) < 0.25f)) {
+          RCLCPP_INFO(get_logger(),
+            "[RUNTIME] (Periodic) Return strategy touchdown verified at Home Base. Transitioning to RETURN_LANDED...");
+          was_disarmed_after_return_ = false;
+          coordinator_->request_transition(flight::StrategyType::RETURN_LANDED);
+        }
+      }
+    }
+
+    // 4. Handle active flight transitions when armed
+    if (mode_ && mode_->isActive() && state_cache_ && state_cache_->is_armed()) {
+      if (current_strat == flight::StrategyType::WAITING_FOR_MODE) {
         auto snapshot = state_cache_->capture_snapshot();
         if (snapshot.is_landed) {
           RCLCPP_INFO(get_logger(), "[RUNTIME] Mode active on ground. Transitioning to TAKEOFF...");
@@ -687,7 +751,7 @@ void FlightRuntimeNode::trigger_evaluation_cycle()
           RCLCPP_INFO(get_logger(), "[RUNTIME] Mode active airborne. Transitioning to TRANSIT_IN...");
           coordinator_->request_transition(flight::StrategyType::TRANSIT_IN);
         }
-      } else if (coordinator_->get_current_strategy() == flight::StrategyType::RETURN_LANDED && was_disarmed_after_return_) {
+      } else if (current_strat == flight::StrategyType::RETURN_LANDED && was_disarmed_after_return_) {
         was_disarmed_after_return_ = false;
         RCLCPP_INFO(get_logger(), "[RUNTIME] Operator armed for new Sortie! Transitioning to TAKEOFF...");
         coordinator_->request_transition(flight::StrategyType::TAKEOFF);
@@ -832,11 +896,20 @@ void FlightRuntimeNode::check_and_register_mode()
           coordinator_->handle_landing_verified();
         }
       } else if (completed_type == flight::StrategyType::PAYLOAD_OPERATION) {
-        RCLCPP_INFO(get_logger(), "[RUNTIME] Payload operation completed. Transitioning to TAKEOFF_AFTER_DELIVERY...");
-        if (coordinator_) {
-          coordinator_->handle_payload_complete(full_self_driving::msg::PayloadStatus::RESULT_SUCCESS);
+        uint8_t res = full_self_driving::msg::PayloadStatus::RESULT_SUCCESS;
+        if (mode_ && mode_->current_strategy()) {
+          auto * payload_strat = dynamic_cast<flight::PayloadOperationStrategy *>(mode_->current_strategy());
+          if (payload_strat) {
+            res = payload_strat->get_result();
+          }
         }
-        if (executor_) {
+        RCLCPP_INFO(get_logger(),
+          "[RUNTIME] Payload operation completed with result %u. Transitioning to %s...",
+          res, (res == full_self_driving::msg::PayloadStatus::RESULT_SUCCESS ? "TAKEOFF_AFTER_DELIVERY" : "RETURN_STRATEGY"));
+        if (coordinator_) {
+          coordinator_->handle_payload_complete(res);
+        }
+        if (res == full_self_driving::msg::PayloadStatus::RESULT_SUCCESS && executor_) {
           RCLCPP_INFO(get_logger(), "[RUNTIME] Re-arming and triggering second takeoff sequence...");
           executor_->arm([this](px4_ros2::Result result) {
             if (result == px4_ros2::Result::Success) {
@@ -892,6 +965,18 @@ void FlightRuntimeNode::check_and_register_mode()
       executor_->set_takeoff_altitude(static_cast<float>(config_->routes.transit_altitude_m));
     }
     executor_->set_takeover_callback([this](flight::FullSelfDrivingModeExecutor::DeactivateReason reason) {
+      auto snapshot = state_cache_ ? state_cache_->capture_snapshot() : adapters::Px4StateSnapshot{};
+      auto current_strat = coordinator_ ? coordinator_->get_current_strategy() : flight::StrategyType::WAITING_FOR_MODE;
+      if (snapshot.is_landed && (current_strat == flight::StrategyType::PRECISION_LAND ||
+                                 current_strat == flight::StrategyType::RETURN_STRATEGY ||
+                                 current_strat == flight::StrategyType::LANDED_VERIFIED ||
+                                 current_strat == flight::StrategyType::PAYLOAD_OPERATION ||
+                                 current_strat == flight::StrategyType::RETURN_LANDED)) {
+        RCLCPP_INFO(get_logger(),
+          "[RUNTIME] Mode executor deactivated on ground during landing/payload (is_landed=true, reason=%d). Ignoring takeover latch.",
+          static_cast<int>(reason));
+        return;
+      }
       if (coordinator_) {
         coordinator_->handle_takeover(reason);
       }
