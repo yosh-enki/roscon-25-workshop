@@ -147,3 +147,29 @@ This document provides a comprehensive historical analysis of the engineering jo
   1. Trajectory and waypoint timeouts must account for worst-case geographic transit distances across large operational areas.
   2. Strategy lifecycle handlers must handle failure paths with fallback recovery mechanisms, not just nominal completion paths.
 
+---
+
+### Bug 10: Precision Land Ground Disarm False Takeover Latch & Auto-Rearm Sequence
+- **Commit**: `77f0b3a` (*fix(flight): resolve precision land ground takeover latch, auto rearm for second takeoff, and transit out altitude*)
+- **Symptom**: When the drone touched down on the delivery target pad during `PRECISION_LAND`, the system became permanently idle in `HOLD` (phase 14) and refused to release cargo or take off for the second flight.
+- **Root Cause**:
+  1. Upon touchdown, PX4's autopilot land detector fired and automatically disarmed the vehicle on the ground.
+  2. Ground disarming invoked `FullSelfDrivingModeExecutor::onDeactivate()`, which called `MissionCoordinator::handle_takeover()`.
+  3. `handle_takeover()` did not exempt ground disarms during `PRECISION_LAND` or `RETURN_STRATEGY`, misinterpreting normal landing disarms as manual pilot takeovers (`takeover_active_ = true; current_strategy_ = HOLD`).
+  4. With `takeover_active_` latched, `MissionCoordinator::request_transition()` rejected all autonomous transitions.
+  5. Furthermore, upon payload release completion, PX4 required an explicit `arm()` and `trigger_takeoff_sequence()` command to relaunch the disarmed drone for the second takeoff (`TAKEOFF_AFTER_DELIVERY`).
+- **Solution**:
+  1. Filtered out ground disarms (`snapshot.is_landed == true`) during landing and payload strategies from triggering the manual takeover latch.
+  2. Added periodic ground touchdown verification in `FlightRuntimeNode` to cleanly transition from `PRECISION_LAND` to `LANDED_VERIFIED` and `PAYLOAD_OPERATION`.
+  3. Implemented automatic `executor_->arm()` and `executor_->trigger_takeoff_sequence()` execution upon successful payload delivery to launch the second flight.
+- **Architectural Lesson**: Autopilot middleware lifecycles differ between airborne and ground states. Autonomy state machines must differentiate between flight-time pilot takeovers and physical ground landing disarms.
+
+---
+
+### Bug 11: Transit Out Corridor Altitude Parameter Mismatch
+- **Commit**: `77f0b3a` (*fix(flight): resolve precision land ground takeover latch, auto rearm for second takeoff, and transit out altitude*)
+- **Symptom**: During the second flight (`TRANSIT_OUT`), the drone flew the outbound corridor at 12.0m altitude instead of the configured 20.0m transit altitude.
+- **Root Cause**: `MissionCoordinator::request_transition` bound `cfg.search_altitude_m` (12.0m) to `route.set_transit_altitude_above_home_m()` during `TAKEOFF_AFTER_DELIVERY -> TRANSIT_OUT` instead of `cfg.transit_altitude_m` (20.0m).
+- **Solution**: Corrected the configuration binding across `TAKEOFF_AFTER_DELIVERY -> TRANSIT_OUT` and `TRANSIT_OUT -> RETURN_STRATEGY` to authoritative `cfg.transit_altitude_m`.
+- **Architectural Lesson**: Parameter bindings in state machine transition matrices must strictly reflect distinct operational flight corridors (transit corridor vs survey grid).
+

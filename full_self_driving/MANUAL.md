@@ -476,9 +476,10 @@ The configuration file ([`config/engineering_config_simulation.yaml`](file:///ho
 | **Safety** | `target_loss_timeout_s` | double | `3.0` | $> 0.0\text{ s}$ |
 | **Routes** | `transit_in_speed_m_s` | double | `5.0` | $> 0.0\text{ m/s}$ |
 | **Routes** | `transit_out_speed_m_s` | double | `5.0` | $> 0.0\text{ m/s}$ |
-| **Routes** | `search_altitude_m` | double | `10.0` | $\ge \text{approach\_altitude\_m}$ |
-| **Routes** | `approach_altitude_m` | double | `4.0` | $> 0.0\text{ m}$ |
-| **Routes** | `landing_descent_rate_m_s`| double | `0.5` | $> 0.0\text{ m/s}$ |
+| **Routes** | `transit_altitude_m` | double | `20.0` | $> 0.0\text{ m}$ |
+| **Routes** | `search_altitude_m` | double | `12.0` | $\ge \text{approach\_altitude\_m}$ |
+| **Routes** | `approach_altitude_m` | double | `5.0` | $> 0.0\text{ m}$ |
+| **Routes** | `landing_descent_rate_m_s`| double | `1.0` | $> 0.0\text{ m/s}$ |
 | **Adapters** | `px4_transport` | string | `"px4_sitl_uxrce_dds"` | Non-empty |
 | **Target Constraints**| `marker_id_min / max` | uint32 | `0` / `500` | $\text{min} \le \text{max}$ |
 | **Target Constraints**| `allowed_dictionaries` | string[] | `["DICT_4X4_50", ...]` | Must contain target dictionary |

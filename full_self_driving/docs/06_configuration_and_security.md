@@ -25,8 +25,9 @@ All configurable system values are consolidated into a single authoritative para
 | Parameter Name | Data Type | Default | Units | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | `transit_in_speed_m_s` | `float` | `5.0` | $m/s$ | Ingress horizontal cruise speed |
-| `transit_out_speed_m_s` | `float` | `3.0` | $m/s$ | Egress horizontal cruise speed |
-| `search_altitude_m` | `float` | `10.0` | meters AGL | Nominal search pattern altitude |
+| `transit_out_speed_m_s` | `float` | `5.0` | $m/s$ | Egress horizontal cruise speed |
+| `transit_altitude_m` | `float` | `20.0` | meters AGL | Ingress and egress transit corridor altitude |
+| `search_altitude_m` | `float` | `12.0` | meters AGL | Nominal search pattern altitude |
 | `approach_altitude_m` | `float` | `5.0` | meters AGL | Intermediate precision land altitude |
 | `max_horizontal_velocity_m_s`| `float` | `5.0` | $m/s$ | Global horizontal velocity limit |
 | `landing_descent_rate_m_s` | `float` | `0.5` | $m/s$ | Final visual descent speed |

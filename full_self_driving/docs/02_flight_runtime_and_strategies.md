@@ -47,7 +47,7 @@ stateDiagram-v2
     PAYLOAD_OPERATION --> TAKEOFF_AFTER_DELIVERY : Cargo Delivered (Success)
     PAYLOAD_OPERATION --> RETURN_STRATEGY : Cargo Operation Non-Success / Abort
     
-    TAKEOFF_AFTER_DELIVERY --> TRANSIT_OUT : Climb Complete (15m AGL)
+    TAKEOFF_AFTER_DELIVERY --> TRANSIT_OUT : Climb Complete (20m AGL)
     TRANSIT_OUT --> RETURN_STRATEGY : Egress Waypoints Reached
     
     state RETURN_STRATEGY {
@@ -68,7 +68,7 @@ stateDiagram-v2
 - **Source File**: [`src/flight/strategies/takeoff_strategy.cpp`](file:///home/yosh/roscon-25-workshop/full_self_driving/src/flight/strategies/takeoff_strategy.cpp)
 - **Role**: Coordinates initial ascent from ground level to cruise altitude.
 - **Key Parameters**:
-  - `takeoff_altitude_m`: Target altitude above ground/home (default: 10.0m for initial takeoff, 15.0m for post-delivery takeoff).
+  - `takeoff_altitude_m`: Target altitude above ground/home (configured via `routes.transit_altitude_m`, default: 20.0m).
   - `climb_rate_m_s`: Vertical speed limit (default: 1.0 m/s).
   - `acceptance_radius_m`: Vertical arrival threshold (default: 0.5m).
 - **Completion Criteria**: Drone altitude within `acceptance_radius_m` of target and vertical velocity settled.
