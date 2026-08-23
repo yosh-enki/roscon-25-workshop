@@ -889,7 +889,7 @@ void FlightRuntimeNode::check_and_register_mode()
 
     executor_ = std::make_shared<flight::FullSelfDrivingModeExecutor>(*this, *mode_, state_cache_);
     if (config_) {
-      executor_->set_takeoff_altitude(static_cast<float>(config_->routes.search_altitude_m));
+      executor_->set_takeoff_altitude(static_cast<float>(config_->routes.transit_altitude_m));
     }
     executor_->set_takeover_callback([this](flight::FullSelfDrivingModeExecutor::DeactivateReason reason) {
       if (coordinator_) {

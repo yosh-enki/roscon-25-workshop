@@ -90,7 +90,10 @@ ros2 launch full_self_driving full_self_driving.launch.py simulation:=false
 1. **Build the package:**
    ```bash
    cd /home/ubuntu/roscon-25-workshop_ws
-   colcon build --packages-select full_self_driving --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+   colcon build --symlink-install \
+     --packages-select full_self_driving \
+     --parallel-workers 2 \
+     --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF
    ```
 2. **Run the automated test suite:**
    ```bash
@@ -489,9 +492,11 @@ cd /home/ubuntu/roscon-25-workshop_ws
 source /opt/ros/humble/setup.bash
 source /home/ubuntu/px4_ros_ws/install/setup.bash
 
-# Build package with test targets enabled
-colcon build --packages-select full_self_driving --symlink-install \
-  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+# Build package
+colcon build --symlink-install \
+  --packages-select full_self_driving \
+  --parallel-workers 2 \
+  --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF
 
 # Source workspace
 source install/setup.bash
@@ -608,8 +613,10 @@ source /opt/ros/humble/setup.bash
 source /home/ubuntu/px4_ros_ws/install/setup.bash
 
 # Build package
-colcon build --packages-select full_self_driving --symlink-install \
-  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+colcon build --symlink-install \
+  --packages-select full_self_driving \
+  --parallel-workers 2 \
+  --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF
 
 # Source workspace
 source install/setup.bash
@@ -715,8 +722,10 @@ source /opt/ros/humble/setup.bash
 source /home/ubuntu/px4_ros_ws/install/setup.bash
 
 # 1. Build package
-colcon build --packages-select full_self_driving --symlink-install \
-  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+colcon build --symlink-install \
+  --packages-select full_self_driving \
+  --parallel-workers 2 \
+  --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF
 
 # 2. Source workspace
 source install/setup.bash
@@ -792,8 +801,10 @@ source /opt/ros/humble/setup.bash
 source /home/ubuntu/px4_ros_ws/install/setup.bash
 
 # 1. Build package
-colcon build --packages-select full_self_driving --symlink-install \
-  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+colcon build --symlink-install \
+  --packages-select full_self_driving \
+  --parallel-workers 2 \
+  --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF
 
 # 2. Source workspace
 source install/setup.bash
@@ -859,8 +870,10 @@ source /opt/ros/humble/setup.bash
 source /home/ubuntu/px4_ros_ws/install/setup.bash
 
 # 1. Build package
-colcon build --packages-select full_self_driving --symlink-install \
-  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+colcon build --symlink-install \
+  --packages-select full_self_driving \
+  --parallel-workers 2 \
+  --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF
 
 # 2. Source workspace
 source install/setup.bash
@@ -967,8 +980,10 @@ source /opt/ros/humble/setup.bash
 source /home/ubuntu/px4_ros_ws/install/setup.bash
 
 # 1. Build package
-colcon build --packages-select full_self_driving --symlink-install \
-  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+colcon build --symlink-install \
+  --packages-select full_self_driving \
+  --parallel-workers 2 \
+  --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF
 
 # 2. Source workspace
 source install/setup.bash
@@ -1055,8 +1070,10 @@ source /opt/ros/humble/setup.bash
 source /home/ubuntu/px4_ros_ws/install/setup.bash
 
 # 1. Build package
-colcon build --packages-select full_self_driving --symlink-install \
-  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+colcon build --symlink-install \
+  --packages-select full_self_driving \
+  --parallel-workers 2 \
+  --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF
 
 # 2. Source workspace
 source install/setup.bash
@@ -1136,9 +1153,11 @@ source /opt/ros/humble/setup.bash
 source /home/ubuntu/px4_ros_ws/install/setup.bash
 source install/setup.bash
 
-# 1. Build and test all suites (205 tests)
-colcon build --packages-select full_self_driving --symlink-install \
-  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+# 1. Build package
+colcon build --symlink-install \
+  --packages-select full_self_driving \
+  --parallel-workers 2 \
+  --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF
 colcon test --packages-select full_self_driving --event-handlers console_direct+
 colcon test-result --all --verbose
 

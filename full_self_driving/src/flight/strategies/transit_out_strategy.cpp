@@ -156,6 +156,24 @@ void TransitOutStrategy::on_update(float dt_s)
       target_altitude_msl_m_, home_altitude_msl_m_, transit_altitude_above_home_m_);
   }
 
+  // Altitude gate: Climb in-place to transit altitude before advancing waypoints
+  double current_alt_msl = snapshot.global_pos_valid ? snapshot.global_position.z() :
+    (home_altitude_msl_m_ - snapshot.local_position_ned.z());
+  if (current_alt_msl < target_altitude_msl_m_ - altitude_tolerance_m_) {
+    double hold_lat = snapshot.global_pos_valid ? snapshot.global_position.x() :
+      (snapshot.home_pos_valid ? snapshot.home_global_position.x() : 0.0);
+    double hold_lon = snapshot.global_pos_valid ? snapshot.global_position.y() :
+      (snapshot.home_pos_valid ? snapshot.home_global_position.y() : 0.0);
+    const Eigen::Vector3d climb_target{hold_lat, hold_lon, target_altitude_msl_m_};
+    const std::optional<float> heading = update_course_heading(snapshot);
+    if (goto_setpoint_) {
+      goto_setpoint_->update(
+        climb_target, heading, max_horizontal_speed_m_s_, max_vertical_speed_m_s_,
+        max_heading_rate_rad_s_);
+    }
+    return;
+  }
+
   if (waypoint_index_ >= waypoints_.size()) {
     mode_finished_ = true;
     if (completion_cb_) {
@@ -166,7 +184,7 @@ void TransitOutStrategy::on_update(float dt_s)
 
   const auto & wp = waypoints_[waypoint_index_];
   double target_alt = target_altitude_msl_m_;
-  if (wp.altitude_m > 0.0 && wp.altitude_m != 10.0 && wp.altitude_m != transit_altitude_above_home_m_) {
+  if (wp.altitude_m > 0.0 && wp.altitude_m != 10.0 && wp.altitude_m != 15.0 && wp.altitude_m != 20.0 && wp.altitude_m != transit_altitude_above_home_m_) {
     target_alt = home_altitude_msl_m_ + wp.altitude_m;
   }
   const Eigen::Vector3d target{wp.latitude_deg, wp.longitude_deg, target_alt};

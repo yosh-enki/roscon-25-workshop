@@ -50,7 +50,10 @@ graph TD
 ### 1. Build the Workspace
 Inside the development Docker container (`/home/ubuntu/roscon-25-workshop_ws`):
 ```bash
-colcon build --packages-select full_self_driving --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+colcon build --symlink-install \
+  --packages-select full_self_driving \
+  --parallel-workers 2 \
+  --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF
 source install/setup.bash
 ```
 

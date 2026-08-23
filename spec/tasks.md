@@ -27,8 +27,10 @@ For each slice, use a writable test state directory outside installed package sh
 The common build/test commands are:
 
 ```bash
-colcon build --packages-select full_self_driving --symlink-install \
-  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+colcon build --symlink-install \
+  --packages-select full_self_driving \
+  --parallel-workers 2 \
+  --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF
 source "$WORKSPACE/install/setup.bash"
 colcon test --packages-select full_self_driving --event-handlers console_direct+
 colcon test-result --verbose

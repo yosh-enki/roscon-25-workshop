@@ -42,6 +42,7 @@ TEST_F(AuthoritativeConfigPropertyTest, Property1_ValidConfigPassesValidation)
     config.safety.min_battery_percentage = random_double(5.0, 40.0);
     config.safety.target_loss_timeout_s = random_double(0.5, 10.0);
 
+    config.routes.transit_altitude_m = random_double(15.0, 30.0);
     config.routes.approach_altitude_m = random_double(2.0, 10.0);
     config.routes.search_altitude_m = config.routes.approach_altitude_m + random_double(1.0, 20.0);
     config.routes.transit_in_speed_m_s = random_double(1.0, 15.0);
@@ -202,6 +203,13 @@ TEST_F(AuthoritativeConfigPropertyTest, Property1_HashSensitivityToMutations)
     EXPECT_NE(cfg.compute_canonical_hash(), base_hash);
   }
 
+  // Perturb transit altitude
+  {
+    auto cfg = base_cfg;
+    cfg.routes.transit_altitude_m = base_cfg.routes.transit_altitude_m + 0.5;
+    EXPECT_NE(cfg.compute_canonical_hash(), base_hash);
+  }
+
   // Perturb altitude
   {
     auto cfg = base_cfg;
@@ -254,6 +262,7 @@ safety:
 routes:
   transit_in_speed_m_s: 4.5
   transit_out_speed_m_s: 4.0
+  transit_altitude_m: 20.0
   search_altitude_m: 12.0
   approach_altitude_m: 6.0
   max_horizontal_velocity_m_s: 6.0
@@ -281,6 +290,7 @@ target_constraints:
   EXPECT_EQ(config.deployment_id, "test_kmitl_deployment");
   EXPECT_EQ(config.engineering_config_revision, 42u);
   EXPECT_DOUBLE_EQ(config.routes.transit_in_speed_m_s, 4.5);
+  EXPECT_DOUBLE_EQ(config.routes.transit_altitude_m, 20.0);
   EXPECT_DOUBLE_EQ(config.safety.max_altitude_m, 25.0);
   EXPECT_EQ(config.target_constraints.marker_id_min, 1u);
   EXPECT_EQ(config.target_constraints.marker_id_max, 50u);

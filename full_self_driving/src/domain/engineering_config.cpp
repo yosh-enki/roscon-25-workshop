@@ -49,6 +49,10 @@ ValidationResult EngineeringConfig::validate() const
     res.add_violation("routes.transit_out_speed_m_s must be finite and > 0.0");
   }
 
+  if (!std::isfinite(routes.transit_altitude_m) || routes.transit_altitude_m <= 0.0) {
+    res.add_violation("routes.transit_altitude_m must be finite and > 0.0");
+  }
+
   if (!std::isfinite(routes.search_altitude_m) || routes.search_altitude_m <= 0.0) {
     res.add_violation("routes.search_altitude_m must be finite and > 0.0");
   }
@@ -125,6 +129,7 @@ std::string EngineeringConfig::compute_canonical_hash() const
   ss << "safety.emergency_stop_enabled=" << (safety.emergency_stop_enabled ? "1" : "0") << "\n";
   ss << "routes.transit_in_speed_m_s=" << std::fixed << std::setprecision(6) << routes.transit_in_speed_m_s << "\n";
   ss << "routes.transit_out_speed_m_s=" << std::fixed << std::setprecision(6) << routes.transit_out_speed_m_s << "\n";
+  ss << "routes.transit_altitude_m=" << std::fixed << std::setprecision(6) << routes.transit_altitude_m << "\n";
   ss << "routes.search_altitude_m=" << std::fixed << std::setprecision(6) << routes.search_altitude_m << "\n";
   ss << "routes.approach_altitude_m=" << std::fixed << std::setprecision(6) << routes.approach_altitude_m << "\n";
   ss << "routes.max_horizontal_velocity_m_s=" << std::fixed << std::setprecision(6) << routes.max_horizontal_velocity_m_s << "\n";
@@ -201,6 +206,7 @@ EngineeringConfig EngineeringConfig::from_yaml(const YAML::Node & node)
     const auto & r = node["routes"];
     if (r["transit_in_speed_m_s"]) config.routes.transit_in_speed_m_s = r["transit_in_speed_m_s"].as<double>();
     if (r["transit_out_speed_m_s"]) config.routes.transit_out_speed_m_s = r["transit_out_speed_m_s"].as<double>();
+    if (r["transit_altitude_m"]) config.routes.transit_altitude_m = r["transit_altitude_m"].as<double>();
     if (r["search_altitude_m"]) config.routes.search_altitude_m = r["search_altitude_m"].as<double>();
     if (r["approach_altitude_m"]) config.routes.approach_altitude_m = r["approach_altitude_m"].as<double>();
     if (r["max_horizontal_velocity_m_s"]) config.routes.max_horizontal_velocity_m_s = r["max_horizontal_velocity_m_s"].as<double>();
@@ -284,6 +290,7 @@ EngineeringConfig EngineeringConfig::create_default_simulation_config()
 
   config.routes.transit_in_speed_m_s = 5.0;
   config.routes.transit_out_speed_m_s = 3.0;
+  config.routes.transit_altitude_m = 20.0;
   config.routes.search_altitude_m = 15.0;
   config.routes.approach_altitude_m = 5.0;
   config.routes.max_horizontal_velocity_m_s = 5.0;

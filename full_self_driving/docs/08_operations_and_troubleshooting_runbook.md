@@ -12,7 +12,14 @@ Inside the development Docker container:
 # Source underlay and overlay workspaces
 source /opt/ros/humble/setup.bash
 source /home/ubuntu/px4_ros_ws/install/setup.bash
-source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash
+
+# Build package (Optimized for low-memory environments)
+cd /home/ubuntu/roscon-25-workshop_ws
+colcon build --symlink-install \
+  --packages-select full_self_driving \
+  --parallel-workers 2 \
+  --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF
+source install/setup.bash
 ```
 
 ---

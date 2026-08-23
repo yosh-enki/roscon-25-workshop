@@ -123,7 +123,10 @@ This document provides a comprehensive historical analysis of the engineering jo
 - **Root Cause**: `gcc`/`clang` compiling heavy template headers (`Eigen`, `OpenCV`, `px4_ros2_cpp`, `yaml-cpp`) on all available CPU threads exceeded available container RAM (OOM killer).
 - **Solution**: Configured build arguments:
   ```bash
-  colcon build --parallel-workers 2 --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+  colcon build --symlink-install \
+    --packages-select full_self_driving \
+    --parallel-workers 2 \
+    --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=OFF
   ```
 - **Architectural Lesson**: Build configurations must account for template-heavy C++ compilation memory footprints in containerized environments.
 

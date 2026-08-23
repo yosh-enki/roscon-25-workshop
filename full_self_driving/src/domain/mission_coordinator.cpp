@@ -784,9 +784,9 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
     transition_trace_.push_back("FLY-014 / EVT_PAYLOAD_SUCCESS -> TAKEOFF_AFTER_DELIVERY");
     current_strategy_ = flight::StrategyType::TAKEOFF_AFTER_DELIVERY;
     if (mode_) {
-      double takeoff_alt = 15.0;
+      double takeoff_alt = 20.0;
       if (context_ && context_->get_resolved_config()) {
-        takeoff_alt = context_->get_resolved_config()->routes.search_altitude_m;
+        takeoff_alt = context_->get_resolved_config()->routes.transit_altitude_m;
       }
       mode_->set_strategy(std::make_unique<flight::TakeoffStrategy>(
         mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), takeoff_alt,
@@ -860,9 +860,9 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
     if (next_strategy == flight::StrategyType::WAITING_FOR_MODE) {
       mode_->set_strategy(std::make_unique<flight::WaitingForModeStrategy>());
     } else if (next_strategy == flight::StrategyType::TAKEOFF) {
-      double takeoff_alt = 10.0;
+      double takeoff_alt = 20.0;
       if (context_ && context_->get_resolved_config()) {
-        takeoff_alt = context_->get_resolved_config()->routes.search_altitude_m;
+        takeoff_alt = context_->get_resolved_config()->routes.transit_altitude_m;
       }
       mode_->set_strategy(std::make_unique<flight::TakeoffStrategy>(
         mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), takeoff_alt));
@@ -875,7 +875,7 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
         if (context_ && context_->get_resolved_config()) {
           const auto & cfg = context_->get_resolved_config()->routes;
           route.set_max_horizontal_speed_m_s(static_cast<float>(cfg.transit_in_speed_m_s));
-          route.set_transit_altitude_above_home_m(cfg.search_altitude_m);
+          route.set_transit_altitude_above_home_m(cfg.transit_altitude_m);
           route.set_acceptance_radius_m(static_cast<float>(cfg.acceptance_radius_m));
           route.set_max_yaw_rate_deg_s(static_cast<float>(cfg.max_yaw_rate_deg_s));
         }
@@ -893,9 +893,9 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
     } else if (next_strategy == flight::StrategyType::PAYLOAD_OPERATION) {
       instantiate_payload_operation_strategy();
     } else if (next_strategy == flight::StrategyType::TAKEOFF_AFTER_DELIVERY) {
-      double takeoff_alt = 15.0;
+      double takeoff_alt = 20.0;
       if (context_ && context_->get_resolved_config()) {
-        takeoff_alt = context_->get_resolved_config()->routes.search_altitude_m;
+        takeoff_alt = context_->get_resolved_config()->routes.transit_altitude_m;
       }
       mode_->set_strategy(std::make_unique<flight::TakeoffStrategy>(
         mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), takeoff_alt,
@@ -909,7 +909,7 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
         if (context_ && context_->get_resolved_config()) {
           const auto & cfg = context_->get_resolved_config()->routes;
           route.set_max_horizontal_speed_m_s(static_cast<float>(cfg.transit_out_speed_m_s));
-          route.set_transit_altitude_above_home_m(cfg.search_altitude_m);
+          route.set_transit_altitude_above_home_m(cfg.transit_altitude_m);
           route.set_acceptance_radius_m(static_cast<float>(cfg.acceptance_radius_m));
           route.set_max_yaw_rate_deg_s(static_cast<float>(cfg.max_yaw_rate_deg_s));
         }
@@ -917,9 +917,9 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
       mode_->set_strategy(std::make_unique<flight::TransitOutStrategy>(
         mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), route, persistence_));
     } else if (next_strategy == flight::StrategyType::RETURN_STRATEGY) {
-      double return_alt = 15.0;
+      double return_alt = 20.0;
       if (context_ && context_->get_resolved_config()) {
-        return_alt = context_->get_resolved_config()->routes.search_altitude_m;
+        return_alt = context_->get_resolved_config()->routes.transit_altitude_m;
       }
       mode_->set_strategy(std::make_unique<flight::ReturnStrategy>(
         mode_->node(), mode_->goto_global_setpoint(), mode_->trajectory_setpoint(),

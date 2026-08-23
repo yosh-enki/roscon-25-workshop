@@ -114,6 +114,7 @@ TEST_F(Property24AdapterInvarianceTest, DomainSafetyRulesInvariantAcrossProfiles
   EXPECT_EQ(sim_cfg_->routes.max_horizontal_velocity_m_s, hw_cfg_->routes.max_horizontal_velocity_m_s);
   EXPECT_EQ(sim_cfg_->routes.transit_in_speed_m_s, hw_cfg_->routes.transit_in_speed_m_s);
   EXPECT_EQ(sim_cfg_->routes.transit_out_speed_m_s, hw_cfg_->routes.transit_out_speed_m_s);
+  EXPECT_EQ(sim_cfg_->routes.transit_altitude_m, hw_cfg_->routes.transit_altitude_m);
   EXPECT_EQ(sim_cfg_->routes.search_altitude_m, hw_cfg_->routes.search_altitude_m);
   EXPECT_EQ(sim_cfg_->routes.approach_altitude_m, hw_cfg_->routes.approach_altitude_m);
   EXPECT_EQ(sim_cfg_->routes.acceptance_radius_m, hw_cfg_->routes.acceptance_radius_m);
