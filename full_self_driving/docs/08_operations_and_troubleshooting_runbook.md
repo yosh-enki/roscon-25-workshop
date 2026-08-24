@@ -44,21 +44,24 @@ ros2 launch full_self_driving full_self_driving.launch.py \
   headless:=true
 ```
 
-#### Mode C: Hardware-in-the-Loop (HITL) with ESP32 Gripper & GPU Acceleration
-Launches physical ESP32 serial bridge, GPU-accelerated Gazebo, and Foxglove on host machine:
+#### Mode E: Distributed Hardware-in-the-Loop (Host PC + RPi 4 + Pixhawk 4)
+Executes physics & sensor rendering on Host PC while running companion autonomy stack on Raspberry Pi 4:
 ```bash
-# From workspace root on host:
-./scripts/run_hitl_delivery.sh /dev/ttyUSB0
-```
+# 1. On Raspberry Pi 4 (Test Serial Connection):
+./scripts/test_pixhawk_connection.sh /dev/ttyAMA0 921600
 
-#### Mode D: Custom Port Launch (Avoiding Port Conflicts)
-```bash
-ros2 launch full_self_driving full_self_driving.launch.py \
-  simulation:=true \
-  foxglove_port:=8766
+# 2. On Host PC (Simulation Backend & Bridges):
+ros2 launch full_self_driving fsd_hitl_host.launch.py world:=kmitl_airfield
+
+# 3. On Raspberry Pi 4 (Companion Autonomy Stack):
+ros2 launch full_self_driving fsd_companion_rpi.launch.py \
+  serial_port:=/dev/ttyAMA0 \
+  baud_rate:=921600 \
+  payload_adapter:=px4_uorb_gripper_actuator
 ```
 
 ---
+
 
 ## 2. Step-by-Step Mission Execution Workflow
 
