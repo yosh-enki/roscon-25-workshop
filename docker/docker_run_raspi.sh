@@ -15,6 +15,7 @@ DEFAULT_DEVICE="/dev/ttyAMA0"
 BAUDRATE="921600"
 DOCKER_IMAGE="dronecode/roscon-25-workshop:latest"
 CONTAINER_NAME="px4-roscon-25-raspi"
+CONTAINER_RCFILE="/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/docker/.raspi_bashrc"
 
 # Colors
 GREEN='\033[0;32m'
@@ -138,32 +139,7 @@ if [ "$ACTION" = "exec" ]; then
         ACTION="interactive"
     else
         echo -e "${GREEN}Connecting to running container '${CONTAINER_NAME}'...${NC}"
-        exec docker exec -it "${CONTAINER_NAME}" bash --init-file <(cat << 'INITECHO'
-if [ -f /opt/ros/humble/setup.bash ]; then source /opt/ros/humble/setup.bash; fi
-if [ -f /home/ubuntu/px4_ros_ws/install/setup.bash ]; then source /home/ubuntu/px4_ros_ws/install/setup.bash; fi
-if [ -f /home/ubuntu/roscon-25-workshop_ws/install/setup.bash ]; then source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash; fi
-
-# Convenient Aliases
-alias agent="MicroXRCEAgent serial --dev $PIXHAWK_DEV -b $PIXHAWK_BAUD"
-alias status="ros2 topic echo /fmu/out/vehicle_status_v1"
-alias imu="ros2 topic echo /fmu/out/sensor_combined"
-alias gps="ros2 topic echo /fmu/out/vehicle_global_position"
-alias odom="ros2 topic echo /fmu/out/vehicle_odometry"
-alias topics="ros2 topic list"
-alias build="cd /home/ubuntu/roscon-25-workshop_ws && colcon build --symlink-install && source install/setup.bash"
-
-echo "======================================================"
-echo " 🚁 Connected to ROSCon 2025 Container"
-echo "======================================================"
-echo " Quick Aliases Ready:"
-echo "   • topics : View all ROS 2 topics"
-echo "   • status : Echo /fmu/out/vehicle_status_v1"
-echo "   • imu    : Echo /fmu/out/sensor_combined"
-echo "   • gps    : Echo /fmu/out/vehicle_global_position"
-echo "   • build  : colcon build & source workspace"
-echo "======================================================"
-INITECHO
-)
+        exec docker exec -it "${CONTAINER_NAME}" bash --rcfile "${CONTAINER_RCFILE}" -i
     fi
 fi
 
@@ -246,28 +222,4 @@ if [ "$ACTION" = "agent_foreground" ]; then
 fi
 
 # Action: INTERACTIVE SHELL (Default)
-exec docker run -it --rm "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" bash --init-file <(cat << 'INITECHO'
-if [ -f /opt/ros/humble/setup.bash ]; then source /opt/ros/humble/setup.bash; fi
-if [ -f /home/ubuntu/px4_ros_ws/install/setup.bash ]; then source /home/ubuntu/px4_ros_ws/install/setup.bash; fi
-if [ -f /home/ubuntu/roscon-25-workshop_ws/install/setup.bash ]; then source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash; fi
-
-alias agent="MicroXRCEAgent serial --dev $PIXHAWK_DEV -b $PIXHAWK_BAUD"
-alias status="ros2 topic echo /fmu/out/vehicle_status_v1"
-alias imu="ros2 topic echo /fmu/out/sensor_combined"
-alias gps="ros2 topic echo /fmu/out/vehicle_global_position"
-alias odom="ros2 topic echo /fmu/out/vehicle_odometry"
-alias topics="ros2 topic list"
-alias build="cd /home/ubuntu/roscon-25-workshop_ws && colcon build --symlink-install && source install/setup.bash"
-
-echo "======================================================"
-echo "  🚁 ROSCon 2025 Workshop Container Ready (Raspberry Pi)"
-echo "======================================================"
-echo " Quick Aliases Ready:"
-echo "   • agent  : Start MicroXRCEAgent on $PIXHAWK_DEV"
-echo "   • topics : View all ROS 2 topics"
-echo "   • status : Echo /fmu/out/vehicle_status_v1"
-echo "   • imu    : Echo /fmu/out/sensor_combined"
-echo "   • build  : colcon build & source workspace"
-echo "======================================================"
-INITECHO
-)
+exec docker run -it --rm "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" bash --rcfile "${CONTAINER_RCFILE}" -i
