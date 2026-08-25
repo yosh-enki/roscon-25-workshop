@@ -139,15 +139,15 @@ def launch_setup(context, *args, **kwargs):
             output="screen",
             parameters=[{
                 "video_device": camera_device,
-                "image_size": [1280, 720],
+                "image_size": [640, 480],  # 640x480 VGA @ 30fps optimal for C270 + Pi 4
                 "camera_frame_id": "camera_frame",
                 "pixel_format": "YUYV",
                 "output_encoding": "rgb8",
                 "use_sim_time": use_sim_time,
             }],
             remappings=[
-                ("image_raw", "/camera/image_raw"),
-                ("camera_info", "/camera/camera_info"),
+                ("image_raw", "/camera"),
+                ("camera_info", "/camera_info"),
             ],
         )
         entities.append(v4l2_camera_node)
