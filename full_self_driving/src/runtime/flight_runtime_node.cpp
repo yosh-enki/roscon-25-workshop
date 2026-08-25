@@ -403,6 +403,9 @@ void FlightRuntimeNode::initialize_components()
   target_selection_pub_ = this->create_publisher<full_self_driving::msg::TargetIdentity>(
     "/full_self_driving/target_selection", rclcpp::QoS(10).reliable());
 
+  vehicle_command_pub_ = this->create_publisher<px4_msgs::msg::VehicleCommand>(
+    "/fmu/in/vehicle_command", rclcpp::SystemDefaultsQoS());
+
   prepare_payload_srv_ = this->create_service<full_self_driving::srv::PreparePayload>(
     "/full_self_driving/prepare_payload",
     [this](
@@ -856,7 +859,8 @@ void FlightRuntimeNode::check_and_register_mode()
               coordinator_->request_transition(flight::StrategyType::TRANSIT_IN);
             }
           } else if (coordinator_->get_current_strategy() == flight::StrategyType::TAKEOFF_AFTER_DELIVERY) {
-            RCLCPP_INFO(get_logger(), "[RUNTIME] Mode activated airborne after second takeoff. Transitioning to TRANSIT_OUT...");
+            RCLCPP_INFO(get_logger(), "[RUNTIME] Mode activated airborne after second takeoff. Restoring PX4 Home to Airfield and transitioning to TRANSIT_OUT...");
+            restore_px4_origin_home();
             coordinator_->request_transition(flight::StrategyType::TRANSIT_OUT);
           }
         }
@@ -866,7 +870,8 @@ void FlightRuntimeNode::check_and_register_mode()
     mode_->set_strategy_completed_callback([this](flight::StrategyType completed_type) {
       if (completed_type == flight::StrategyType::TAKEOFF) {
         if (coordinator_ && coordinator_->get_current_strategy() == flight::StrategyType::TAKEOFF_AFTER_DELIVERY) {
-          RCLCPP_INFO(get_logger(), "[RUNTIME] Second takeoff (TAKEOFF_AFTER_DELIVERY) completed. Transitioning to TRANSIT_OUT...");
+          RCLCPP_INFO(get_logger(), "[RUNTIME] Second takeoff (TAKEOFF_AFTER_DELIVERY) completed. Restoring PX4 Home to Airfield and transitioning to TRANSIT_OUT...");
+          restore_px4_origin_home();
           coordinator_->request_transition(flight::StrategyType::TRANSIT_OUT);
         } else {
           RCLCPP_INFO(get_logger(), "[RUNTIME] Takeoff completed. Transitioning to TRANSIT_IN...");
@@ -922,7 +927,8 @@ void FlightRuntimeNode::check_and_register_mode()
           });
         }
       } else if (completed_type == flight::StrategyType::TAKEOFF_AFTER_DELIVERY) {
-        RCLCPP_INFO(get_logger(), "[RUNTIME] Second takeoff completed. Transitioning to TRANSIT_OUT...");
+        RCLCPP_INFO(get_logger(), "[RUNTIME] Second takeoff completed. Restoring PX4 Home to Airfield and transitioning to TRANSIT_OUT...");
+        restore_px4_origin_home();
         if (coordinator_) {
           coordinator_->request_transition(flight::StrategyType::TRANSIT_OUT);
         }
@@ -1137,6 +1143,31 @@ void FlightRuntimeNode::publish_status_cycle()
   if (payload_status_pub_ && payload_controller_) {
     payload_status_pub_->publish(payload_controller_->get_status());
   }
+}
+
+void FlightRuntimeNode::restore_px4_origin_home()
+{
+  if (!context_ || !context_->has_origin_home_position() || !vehicle_command_pub_) {
+    return;
+  }
+  auto origin = context_->get_origin_home_position();
+  px4_msgs::msg::VehicleCommand cmd{};
+  cmd.timestamp = this->get_clock()->now().nanoseconds() / 1000;
+  cmd.command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_SET_HOME;
+  cmd.param1 = 0.0f; // 0 = Use specified lat/lon/alt in param5, param6, param7
+  cmd.param5 = origin.latitude_deg;
+  cmd.param6 = origin.longitude_deg;
+  cmd.param7 = static_cast<float>(origin.altitude_msl_m);
+  cmd.target_system = 1;
+  cmd.target_component = 1;
+  cmd.source_system = 1;
+  cmd.source_component = 1;
+  cmd.from_external = true;
+
+  vehicle_command_pub_->publish(cmd);
+  RCLCPP_INFO(get_logger(),
+    "[RUNTIME] Overrode PX4 Home Position back to Sortie Origin Airfield: lat=%.6f, lon=%.6f, alt=%.2f m",
+    origin.latitude_deg, origin.longitude_deg, origin.altitude_msl_m);
 }
 
 }  // namespace full_self_driving::runtime

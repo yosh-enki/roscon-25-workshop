@@ -22,6 +22,8 @@
 #include "full_self_driving/srv/upload_plan_artifact.hpp"
 #include "full_self_driving/srv/select_plan_artifact.hpp"
 
+#include <px4_msgs/msg/vehicle_command.hpp>
+
 #include "domain/engineering_config.hpp"
 #include "domain/mission_context.hpp"
 #include "domain/mission_coordinator.hpp"
@@ -63,6 +65,7 @@ private:
   void initialize_components();
   void check_and_register_mode();
   void publish_status_cycle();
+  void restore_px4_origin_home();
 
   // Publishers
   rclcpp::Publisher<full_self_driving::msg::FullSelfDrivingState>::SharedPtr state_pub_;
@@ -72,6 +75,7 @@ private:
   rclcpp::Publisher<full_self_driving::msg::WorkingPlanStatus>::SharedPtr working_plan_status_pub_;
   rclcpp::Publisher<full_self_driving::msg::PayloadStatus>::SharedPtr payload_status_pub_;
   rclcpp::Publisher<full_self_driving::msg::TargetIdentity>::SharedPtr target_selection_pub_;
+  rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicle_command_pub_;
 
   // Subscriptions & Services
   rclcpp::Subscription<full_self_driving::msg::LiveTargetLock>::SharedPtr target_lock_sub_;
