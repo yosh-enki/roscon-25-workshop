@@ -754,6 +754,10 @@ void FlightRuntimeNode::trigger_evaluation_cycle()
             "[RUNTIME] (Periodic) Return strategy touchdown verified at Home Base. Transitioning to RETURN_LANDED...");
           was_disarmed_after_return_ = false;
           coordinator_->request_transition(flight::StrategyType::RETURN_LANDED);
+          if (context_) {
+            context_->clear_target();
+            RCLCPP_INFO(get_logger(), "[RUNTIME] (Periodic) Target identity cleared on return touchdown.");
+          }
         }
       }
     }
@@ -957,6 +961,10 @@ void FlightRuntimeNode::check_and_register_mode()
         was_disarmed_after_return_ = false;
         if (coordinator_) {
           coordinator_->request_transition(flight::StrategyType::RETURN_LANDED);
+        }
+        if (context_) {
+          context_->clear_target();
+          RCLCPP_INFO(get_logger(), "[RUNTIME] Sortie completed at Home Base. Target identity cleared to prevent loop.");
         }
         if (executor_) {
           executor_->disarm([](px4_ros2::Result result) {
