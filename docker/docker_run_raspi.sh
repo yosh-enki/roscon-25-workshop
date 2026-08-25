@@ -137,8 +137,8 @@ if [ "$ACTION" = "exec" ]; then
         echo -e "${YELLOW}Container is not running. Starting interactive container instead...${NC}"
         ACTION="interactive"
     else
-        echo -e "${GREEN}Connecting to running container '${CONTAINER_NAME}'...${NC}"
-        exec docker exec -it "${CONTAINER_NAME}" /ros_entrypoint.sh bash -c "\
+        echo -e "${GREEN}Connecting to running container '${CONTAINER_NAME}' as root...${NC}"
+        exec docker exec -it --user root "${CONTAINER_NAME}" /ros_entrypoint.sh bash -c "\
             source /opt/ros/humble/setup.bash && \
             source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true && \
             source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true && \
@@ -169,13 +169,15 @@ else
     fi
 fi
 
-# Build Docker Arguments (Always add dialout group permissions)
+# Build Docker Arguments (Always add dialout and video group permissions, and run as root)
 DOCKER_ARGS=(
     --name "${CONTAINER_NAME}"
+    --user root
     --net=host
     --ipc=host
     --privileged
     --group-add dialout
+    --group-add video
     --shm-size=1g
     -v "${WORKSPACE_ROOT}:/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop"
     -w "/home/ubuntu/roscon-25-workshop_ws"
@@ -199,6 +201,7 @@ if [ -n "$DISPLAY" ]; then
 fi
 
 SETUP_COMMANDS="\
+    echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers 2>/dev/null || true; \
     grep -q 'source /opt/ros/humble/setup.bash' ~/.bashrc 2>/dev/null || echo 'source /opt/ros/humble/setup.bash' >> ~/.bashrc; \
     grep -q 'px4_ros_ws/install/setup.bash' ~/.bashrc 2>/dev/null || echo 'source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null' >> ~/.bashrc; \
     grep -q 'roscon-25-workshop_ws/install/setup.bash' ~/.bashrc 2>/dev/null || echo 'source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null' >> ~/.bashrc; \
