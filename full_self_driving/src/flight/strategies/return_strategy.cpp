@@ -50,6 +50,7 @@ void ReturnStrategy::on_enter()
   failed_ = false;
   failure_reason_.clear();
   dwell_timer_s_ = 0.0f;
+  hover_settle_timer_s_ = 0.0f;
   home_initialized_ = false;
 
   if (return_mode_ == ReturnMode::LAND_IMMEDIATELY) {
@@ -115,15 +116,30 @@ void ReturnStrategy::on_update(float dt_s)
     if (home_initialized_ && goto_setpoint_) {
       double target_alt = home_alt_msl_ + return_altitude_above_home_m_;
       Eigen::Vector3d target{home_lat_, home_lon_, target_alt};
-      goto_setpoint_->update(target, std::nullopt, 3.0f, 1.0f, 0.785f);
 
       float h_dist = px4_ros2::horizontalDistanceToGlobalPosition(snapshot.global_position, target);
       float h_speed = std::sqrt(snapshot.local_velocity_ned.x() * snapshot.local_velocity_ned.x() +
                                 snapshot.local_velocity_ned.y() * snapshot.local_velocity_ned.y());
-      if (std::isfinite(h_dist) && h_dist <= 2.0f && h_speed <= 0.75f) {
-        RCLCPP_INFO(node_.get_logger(), "[RETURN_STRATEGY] Arrived and settled over Sortie Home Base (dist=%.2f m, speed=%.2f m/s). Starting descent...",
-          h_dist, h_speed);
-        sub_phase_ = SubPhase::DESCEND_HOME;
+
+      // Progressive velocity braking to eliminate forward overshoot:
+      float approach_speed = 3.0f;
+      if (std::isfinite(h_dist) && h_dist < 6.0f) {
+        approach_speed = std::clamp(h_dist * 0.5f, 0.4f, 2.0f);
+      }
+      goto_setpoint_->update(target, std::nullopt, approach_speed, 1.0f, 0.785f);
+
+      // Strict zero-momentum hover gate (< 35cm error and < 0.20 m/s ground speed):
+      if (std::isfinite(h_dist) && h_dist <= 0.35f && h_speed <= 0.20f) {
+        hover_settle_timer_s_ += dt_s;
+        if (hover_settle_timer_s_ >= kHoverSettleDurationS) {
+          RCLCPP_INFO(
+            node_.get_logger(),
+            "[RETURN_STRATEGY] Zero-momentum hover STABILIZED over Home Base (dist=%.2f m, speed=%.2f m/s). Starting 2-stage descent...",
+            h_dist, h_speed);
+          sub_phase_ = SubPhase::DESCEND_HOME;
+        }
+      } else {
+        hover_settle_timer_s_ = 0.0f;
       }
     } else {
       sub_phase_ = SubPhase::DESCEND_HOME;
@@ -146,14 +162,15 @@ void ReturnStrategy::on_update(float dt_s)
     // 2-Stage Descent: 1.0 m/s above 2.5m, 0.35 m/s soft touchdown below 2.5m
     float descent_speed = (current_alt_agl > approach_threshold_m) ? 1.0f : 0.35f;
 
-    if (traj_setpoint_) {
+    // Closed-loop horizontal position guidance locked to exact (home_lat_, home_lon_):
+    if (goto_setpoint_ && home_initialized_) {
+      Eigen::Vector3d target{home_lat_, home_lon_, home_alt_msl_};
+      goto_setpoint_->update(target, std::nullopt, 0.5f, descent_speed);
+    } else if (traj_setpoint_) {
       traj_setpoint_->update(
         Eigen::Vector3f{0.0f, 0.0f, descent_speed},
         std::nullopt,
         std::nullopt);
-    } else if (goto_setpoint_ && home_initialized_) {
-      Eigen::Vector3d target{home_lat_, home_lon_, home_alt_msl_};
-      goto_setpoint_->update(target, std::nullopt, descent_speed);
     }
 
     float vz = snapshot.local_velocity_ned.z();

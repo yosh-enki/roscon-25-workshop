@@ -94,6 +94,9 @@ private:
   float dwell_timer_s_{0.0f};
   static constexpr float kTouchdownDwellDurationS = 0.5f;
 
+  float hover_settle_timer_s_{0.0f};
+  static constexpr float kHoverSettleDurationS = 0.5f;
+
   bool completed_{false};
   bool failed_{false};
   std::string failure_reason_;
