@@ -8,7 +8,11 @@
 set -e
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-WORKSPACE_ROOT=$(cd "${SCRIPT_DIR}/.." && pwd)
+if [ -d "${SCRIPT_DIR}/full_self_driving" ]; then
+    WORKSPACE_ROOT="${SCRIPT_DIR}"
+else
+    WORKSPACE_ROOT=$(cd "${SCRIPT_DIR}/.." && pwd)
+fi
 
 # Default Configurations
 DEFAULT_DEVICE="/dev/ttyAMA0"
