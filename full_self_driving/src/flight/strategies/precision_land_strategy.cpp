@@ -141,6 +141,7 @@ void PrecisionLandStrategy::on_enter()
   failure_reason_.clear();
   hover_stabilized_ = false;
   hover_settle_duration_s_ = 0.0f;
+  hover_brake_total_duration_s_ = 0.0f;
   brake_hold_position_captured_ = false;
   target_acquired_ = false;
   vel_x_integral_ = 0.0f;
@@ -213,6 +214,7 @@ void PrecisionLandStrategy::update_target_lock(const domain::LiveTargetLock & lo
         brake_hold_position_captured_ = false;
         brake_position_locked_ = false;
         hover_settle_duration_s_ = 0.0f;
+        hover_brake_total_duration_s_ = 0.0f;
         hover_stabilized_ = false;
 
         RCLCPP_INFO(
@@ -287,9 +289,11 @@ void PrecisionLandStrategy::on_update(float dt_s)
       goto_setpoint_->update(brake_target, std::nullopt, max_velocity_);
 
       // Check if vehicle velocity is settled below delta_velocity threshold
+      hover_brake_total_duration_s_ += dt_s;
       bool velocity_settled = (h_speed <= delta_velocity_) && (std::abs(vz) <= delta_velocity_);
+      bool timeout_fallback = (hover_brake_total_duration_s_ >= 4.0f) && (h_speed <= delta_velocity_ * 2.0f);
 
-      if (velocity_settled) {
+      if (velocity_settled || timeout_fallback) {
         hover_settle_duration_s_ += dt_s;
         if (!brake_position_locked_) {
           // Lock hover coordinate precisely where the vehicle came to rest!
@@ -300,13 +304,13 @@ void PrecisionLandStrategy::on_update(float dt_s)
             brake_hold_global_.x(), brake_hold_global_.y(), search_altitude_amsl_m_);
         }
 
-        if (hover_settle_duration_s_ >= stabilize_duration_s_ && !hover_stabilized_) {
+        if ((hover_settle_duration_s_ >= stabilize_duration_s_ || timeout_fallback) && !hover_stabilized_) {
           hover_stabilized_ = true;
           RCLCPP_INFO(
             node_.get_logger(),
             "[PRECISION_LAND] Zero-velocity hover STABILIZED! Drone is stationary "
-            "(vel=%.3f m/s, settle_time=%.2fs). Auto-triggering Prototype Precision Land sequence (APPROACH)...",
-            current_velocity_norm_, hover_settle_duration_s_);
+            "(vel=%.3f m/s, settle_time=%.2fs, total_brake_time=%.2fs). Auto-triggering Prototype Precision Land sequence (APPROACH)...",
+            current_velocity_norm_, hover_settle_duration_s_, hover_brake_total_duration_s_);
           switch_to_sub_phase(PrecisionLandSubPhase::APPROACH);
         }
       } else {

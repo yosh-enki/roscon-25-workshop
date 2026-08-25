@@ -87,6 +87,11 @@ private:
   rclcpp::Service<full_self_driving::srv::UploadPlanArtifact>::SharedPtr upload_plan_srv_;
   rclcpp::Service<full_self_driving::srv::SelectPlanArtifact>::SharedPtr select_plan_srv_;
 
+  // Callback Groups for Thread Isolation
+  rclcpp::CallbackGroup::SharedPtr control_cbg_;
+  rclcpp::CallbackGroup::SharedPtr emergency_cbg_;
+  rclcpp::CallbackGroup::SharedPtr services_cbg_;
+
   // Timers
   rclcpp::TimerBase::SharedPtr periodic_timer_;
 

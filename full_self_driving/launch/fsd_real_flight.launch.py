@@ -139,7 +139,7 @@ def launch_setup(context, *args, **kwargs):
             output="screen",
             parameters=[{
                 "video_device": camera_device,
-                "image_size": [640, 480],  # 640x480 VGA @ 30fps optimal for C270 + Pi 4
+                "image_size": [1280, 720],  # 1280x720 HD @ 30fps matching imx219_720p.yaml calibration
                 "camera_frame_id": "camera_frame",
                 "pixel_format": "YUYV",
                 "output_encoding": "rgb8",

@@ -31,10 +31,12 @@ void ArucoDetector::initialize_detector()
   detector_params.maxMarkerPerimeterRate = 4.0;
   detector_params.adaptiveThreshWinSizeMin = 3;
   detector_params.adaptiveThreshWinSizeMax = 23;
-  detector_params.adaptiveThreshWinSizeStep = 5;           // Balanced step for Pi 4 CPU budget
+  detector_params.adaptiveThreshWinSizeStep = 10;          // Optimized 3-pass search for Pi 4 CPU budget
   detector_params.adaptiveThreshConstant = 7.0;
   detector_params.polygonalApproxAccuracyRate = 0.05;      // Robust polygon fitting during vehicle tilt
   detector_params.cornerRefinementMethod = cv::aruco::CORNER_REFINE_CONTOUR; // Fast & light sub-pixel corner refinement
+  detector_params.cornerRefinementMaxIterations = 15;      // Bound max iterations on ARM Cortex-A72
+  detector_params.cornerRefinementMinAccuracy = 0.1;
   detector_params.maxErroneousBitsInBorderRate = 0.35;     // Error tolerance on outer black border
 
   detector_ = std::make_unique<cv::aruco::ArucoDetector>(dictionary, detector_params);
@@ -209,12 +211,15 @@ DetectionResult ArucoDetector::process_image(
   const builtin_interfaces::msg::Time & stamp,
   uint64_t monotonic_ns,
   uint64_t sequence,
-  uint32_t dropped_before_batch)
+  uint32_t dropped_before_batch,
+  bool generate_annotated)
 {
   DetectionResult result;
   result.calibration_valid = calibration_valid_;
   result.calibration_sha256 = calibration_sha256_;
-  result.annotated_image = bgr_image.clone();
+  if (generate_annotated && !bgr_image.empty()) {
+    result.annotated_image = bgr_image.clone();
+  }
 
   result.batch.header.stamp = stamp;
   result.batch.header.frame_id = config_.camera_frame;
@@ -241,7 +246,7 @@ DetectionResult ArucoDetector::process_image(
   detector_->detectMarkers(gray_image, corners, ids, rejected);
   result.total_detected = ids.size();
 
-  if (!ids.empty()) {
+  if (generate_annotated && !ids.empty() && !result.annotated_image.empty()) {
     cv::aruco::drawDetectedMarkers(result.annotated_image, corners, ids);
   }
 
@@ -299,9 +304,11 @@ DetectionResult ArucoDetector::process_image(
       continue;
     }
 
-    cv::drawFrameAxes(
-      result.annotated_image, camera_matrix_, cv::noArray(), rvec, tvec,
-      static_cast<float>(config_.marker_size_m));
+    if (generate_annotated && !result.annotated_image.empty()) {
+      cv::drawFrameAxes(
+        result.annotated_image, camera_matrix_, cv::noArray(), rvec, tvec,
+        static_cast<float>(config_.marker_size_m));
+    }
 
     full_self_driving::msg::AllIdObservation obs;
     obs.header.stamp = stamp;
@@ -328,7 +335,7 @@ DetectionResult ArucoDetector::process_image(
     obs.observation_state = full_self_driving::msg::AllIdObservation::QUALITY_ACCEPTED;
 
     // Overlay text matching prototype format: "X: <x> Y: <y> Z: <z>"
-    if (i == 0) {
+    if (generate_annotated && i == 0 && !result.annotated_image.empty()) {
       std::ostringstream ss;
       ss << std::fixed << std::setprecision(2);
       ss << "X: " << tvec[0] << " Y: " << tvec[1] << " Z: " << tvec[2];

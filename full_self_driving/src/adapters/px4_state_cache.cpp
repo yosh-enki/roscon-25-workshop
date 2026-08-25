@@ -106,7 +106,8 @@ bool Px4StateCache::is_vehicle_status_fresh(std::chrono::milliseconds timeout) c
 
 bool Px4StateCache::is_transport_healthy() const
 {
-  return is_vehicle_status_fresh(std::chrono::milliseconds(2000));
+  return is_vehicle_status_fresh(std::chrono::milliseconds(2000)) ||
+         local_pos_.lastValid(std::chrono::milliseconds(2000));
 }
 
 bool Px4StateCache::is_armed() const

@@ -43,6 +43,11 @@ void FlightRuntimeNode::initialize_components()
 {
   RCLCPP_INFO(get_logger(), "[RUNTIME] Initializing FlightRuntimeNode...");
 
+  // Initialize callback groups for real-time thread isolation on Raspberry Pi 4
+  control_cbg_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  emergency_cbg_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  services_cbg_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
   // Publishers
   state_pub_ = this->create_publisher<full_self_driving::msg::FullSelfDrivingState>(
     "/full_self_driving/state", 10);
@@ -116,7 +121,7 @@ void FlightRuntimeNode::initialize_components()
       }
     });
 
-  // Emergency Stop Service
+  // Emergency Stop Service (Isolated Callback Group for instantaneous safety response)
   emergency_stop_srv_ = this->create_service<full_self_driving::srv::EmergencyStop>(
     "/full_self_driving/emergency_stop",
     [this](
@@ -131,7 +136,9 @@ void FlightRuntimeNode::initialize_components()
       res->success = true;
       res->message = "Emergency stop applied by coordinator";
       res->stop_monotonic_ns = this->get_clock()->now().nanoseconds();
-    });
+    },
+    rmw_qos_profile_services_default,
+    emergency_cbg_);
 
   // Verify API Manifest
   auto api_report = adapters::Px4ApiCapabilities::verify_api_manifest(manifest_path_);
@@ -429,7 +436,9 @@ void FlightRuntimeNode::initialize_components()
       } else {
         res->has_error = false;
       }
-    });
+    },
+    rmw_qos_profile_services_default,
+    services_cbg_);
 
   select_target_srv_ = this->create_service<full_self_driving::srv::SelectTargetIdentity>(
     "/full_self_driving/select_target",
@@ -499,7 +508,9 @@ void FlightRuntimeNode::initialize_components()
       RCLCPP_INFO(get_logger(),
         "[RUNTIME] Target selection service executed: ID %u (%s), context committed (rev=%lu)",
         req->target.marker_id, req->target.dictionary.c_str(), validate_rev);
-    });
+    },
+    rmw_qos_profile_services_default,
+    services_cbg_);
 
   upload_plan_srv_ = this->create_service<full_self_driving::srv::UploadPlanArtifact>(
     "/full_self_driving/upload_plan_artifact",
@@ -543,7 +554,9 @@ void FlightRuntimeNode::initialize_components()
       res->has_error = false;
       RCLCPP_INFO(get_logger(), "[RUNTIME] Plan uploaded: '%s' (id=%s, bytes=%lu)",
         art->safe_name.c_str(), art->artifact_id.c_str(), art->byte_length);
-    });
+    },
+    rmw_qos_profile_services_default,
+    services_cbg_);
 
   select_plan_srv_ = this->create_service<full_self_driving::srv::SelectPlanArtifact>(
     "/full_self_driving/select_plan_artifact",
@@ -655,16 +668,18 @@ void FlightRuntimeNode::initialize_components()
       RCLCPP_INFO(get_logger(),
         "[RUNTIME] Plan selected: '%s' (%s) -> Working Plan '%s', context committed (rev=%lu)",
         art->safe_name.c_str(), actual_art_id.c_str(), wp->get_working_plan_id().c_str(), validate_rev);
-    });
+    },
+    rmw_qos_profile_services_default,
+    services_cbg_);
 
   if (acquisition_fixture == "stale_direct") {
     coordinator_->set_trusted_record_max_age_s(0.001); // Set max age to 1ms so fixture record is immediately stale in sim
     RCLCPP_INFO(get_logger(), "[RUNTIME] Set trusted_record_max_age_s to 0.001s for stale_direct fixture");
   }
 
-  // Start periodic evaluation timer at 10Hz
+  // Start periodic evaluation timer at 10Hz with dedicated real-time control callback group
   periodic_timer_ = this->create_wall_timer(
-    100ms, std::bind(&FlightRuntimeNode::trigger_evaluation_cycle, this));
+    100ms, std::bind(&FlightRuntimeNode::trigger_evaluation_cycle, this), control_cbg_);
 }
 
 void FlightRuntimeNode::trigger_evaluation_cycle()
@@ -1176,7 +1191,9 @@ int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<full_self_driving::runtime::FlightRuntimeNode>();
-  rclcpp::spin(node);
+  rclcpp::executors::MultiThreadedExecutor executor(rclcpp::ExecutorOptions(), 2);
+  executor.add_node(node);
+  executor.spin();
   rclcpp::shutdown();
   return 0;
 }

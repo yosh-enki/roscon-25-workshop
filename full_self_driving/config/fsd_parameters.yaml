@@ -33,7 +33,7 @@ routes:
   landing_descent_rate_m_s: 0.35
   acceptance_radius_m: 8.0
   max_yaw_rate_deg_s: 45.0
-  search_policy: "interrupt_on_target"  # Options: complete_grid_first, interrupt_on_target
+  search_policy: "complete_grid_first"  # Options: complete_grid_first, interrupt_on_target
 
 # ==============================================================================
 # 4. PERCEPTION & TARGET RECOGNITION

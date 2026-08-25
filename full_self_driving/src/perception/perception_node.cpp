@@ -252,24 +252,29 @@ void PerceptionNode::image_callback(const sensor_msgs::msg::Image::SharedPtr msg
   }
 
   try {
-    cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
+    cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::BGR8);
 
     uint64_t monotonic_ns = static_cast<uint64_t>(
       std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count());
+
+    bool need_annotated = (annotated_image_pub_ &&
+                           annotated_image_pub_->is_activated() &&
+                           annotated_image_pub_->get_subscription_count() > 0);
 
     DetectionResult res = detector_->process_image(
       cv_ptr->image,
       msg->header.stamp,
       monotonic_ns,
       ++sequence_,
-      queue_drops_);
+      queue_drops_,
+      need_annotated);
 
     if (all_id_pub_ && all_id_pub_->is_activated()) {
       all_id_pub_->publish(res.batch);
     }
 
-    if (annotated_image_pub_ && annotated_image_pub_->is_activated()) {
+    if (need_annotated && !res.annotated_image.empty()) {
       cv_bridge::CvImage out_img;
       out_img.header = msg->header;
       out_img.encoding = sensor_msgs::image_encodings::BGR8;

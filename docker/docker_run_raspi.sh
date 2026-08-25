@@ -152,6 +152,8 @@ if [ -e "$SERIAL_DEV" ]; then
     sudo chmod 666 "$SERIAL_DEV" 2>/dev/null || true
     # Reset TTY flags to raw mode and disable hardware flow control
     sudo stty -F "$SERIAL_DEV" raw -echo -crtscts -ixon -ixoff "${BAUDRATE}" 2>/dev/null || true
+    # Enable Linux Kernel low-latency serial mode (reduces 16ms buffer delay to <1ms)
+    sudo setserial "$SERIAL_DEV" low_latency 2>/dev/null || true
 else
     echo -e "${YELLOW}⚠ Warning: $SERIAL_DEV not found. Checking alternatives...${NC}"
     if [ -e "/dev/ttyACM0" ]; then
@@ -215,11 +217,11 @@ echo -e "${CYAN}========================================================${NC}"
 
 # Action: DAEMON (Background MicroXRCEAgent)
 if [ "$ACTION" = "daemon" ]; then
-    echo -e "${GREEN}Starting MicroXRCEAgent in BACKGROUND daemon mode...${NC}"
+    echo -e "${GREEN}Starting MicroXRCEAgent in BACKGROUND daemon mode (High Priority)...${NC}"
     docker run -d "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "\
         ${SETUP_COMMANDS} \
-        echo 'Agent running in background...'; \
-        exec MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE}"
+        echo 'Agent running in background with high process priority...'; \
+        exec nice -n -10 MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE} -v 3"
     echo ""
     echo -e "${GREEN}✔ MicroXRCEAgent is now running in background!${NC}"
     echo "Useful commands:"
@@ -231,10 +233,10 @@ fi
 
 # Action: FOREGROUND AGENT
 if [ "$ACTION" = "agent_foreground" ]; then
-    echo -e "${GREEN}⚡ Starting MicroXRCEAgent in foreground...${NC}"
+    echo -e "${GREEN}⚡ Starting MicroXRCEAgent in foreground (High Priority)...${NC}"
     exec docker run -it --rm "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "\
         ${SETUP_COMMANDS} \
-        MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE}"
+        nice -n -10 MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE} -v 3"
 fi
 
 # Action: INTERACTIVE SHELL (Default)

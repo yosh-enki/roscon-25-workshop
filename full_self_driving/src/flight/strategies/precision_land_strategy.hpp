@@ -196,6 +196,7 @@ private:
   bool brake_hold_position_captured_{false};
   bool brake_position_locked_{false};
   float hover_settle_duration_s_{0.0f};
+  float hover_brake_total_duration_s_{0.0f};
   bool hover_stabilized_{false};
   float current_velocity_norm_{0.0f};
 

@@ -61,7 +61,8 @@ public:
     const builtin_interfaces::msg::Time & stamp,
     uint64_t monotonic_ns,
     uint64_t sequence = 0,
-    uint32_t dropped_before_batch = 0);
+    uint32_t dropped_before_batch = 0,
+    bool generate_annotated = false);
 
   static int dictionary_name_to_id(const std::string & name);
   static std::string dictionary_id_to_name(int id);
