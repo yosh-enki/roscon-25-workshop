@@ -41,7 +41,7 @@ TEST_F(Px4GripperPayloadAdapterTest, PublishesVehicleCommandOnRelease)
   float received_param1 = 0.0f;
 
   auto sub = node_->create_subscription<px4_msgs::msg::VehicleCommand>(
-    "/fmu/in/vehicle_command", 10,
+    "/fmu/in/vehicle_command", rclcpp::SensorDataQoS(),
     [&](const px4_msgs::msg::VehicleCommand::SharedPtr msg) {
       command_received = true;
       received_cmd = msg->command;
