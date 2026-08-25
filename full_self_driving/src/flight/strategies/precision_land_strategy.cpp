@@ -418,6 +418,12 @@ void PrecisionLandStrategy::on_update(float dt_s)
     }
 
     case PrecisionLandSubPhase::LANDED_VERIFY: {
+      if (trajectory_setpoint_) {
+        trajectory_setpoint_->update(
+          Eigen::Vector3f(0.0f, 0.0f, 0.0f),
+          std::nullopt,
+          std::nullopt);
+      }
       landed_dwell_s_ += dt_s;
       if (landed_dwell_s_ >= 0.5f) {
         RCLCPP_INFO(node_.get_logger(), "[PRECISION_LAND] Landing verified and completed successfully!");

@@ -132,14 +132,14 @@ void ReturnStrategy::on_update(float dt_s)
 
   if (sub_phase_ == SubPhase::DESCEND_HOME) {
     if (traj_setpoint_) {
-      // 1.0 m/s vertical descent
+      // 0.35 m/s soft vertical descent
       traj_setpoint_->update(
-        Eigen::Vector3f{0.0f, 0.0f, 1.0f},
+        Eigen::Vector3f{0.0f, 0.0f, 0.35f},
         std::nullopt,
         std::nullopt);
     } else if (goto_setpoint_ && home_initialized_) {
       Eigen::Vector3d target{home_lat_, home_lon_, home_alt_msl_};
-      goto_setpoint_->update(target, std::nullopt, 1.0f);
+      goto_setpoint_->update(target, std::nullopt, 0.35f);
     }
 
     float vz = snapshot.local_velocity_ned.z();
@@ -151,6 +151,12 @@ void ReturnStrategy::on_update(float dt_s)
   }
 
   if (sub_phase_ == SubPhase::TOUCHDOWN_DWELL) {
+    if (traj_setpoint_) {
+      traj_setpoint_->update(
+        Eigen::Vector3f{0.0f, 0.0f, 0.0f},
+        std::nullopt,
+        std::nullopt);
+    }
     dwell_timer_s_ += dt_s;
     if (dwell_timer_s_ >= kTouchdownDwellDurationS) {
       RCLCPP_INFO(node_.get_logger(), "[RETURN_STRATEGY] Touchdown dwell complete! Sortie finished successfully.");

@@ -547,22 +547,25 @@ void MissionCoordinator::instantiate_search_strategy()
 void MissionCoordinator::instantiate_precision_land_strategy()
 {
   if (!mode_) return;
-  float max_vel = 3.0f;
-  float descent_vel = 1.0f;
-  float p_gain = 1.5f;
+  float max_vel = 1.5f;
+  float descent_vel = 0.35f;
+  float p_gain = 0.9f;
   float i_gain = 0.0f;
   float target_timeout = 3.0f;
   float delta_pos = 0.25f;
   float delta_vel = 0.25f;
   float stabilize_duration = 1.0f;
   double search_alt = 15.0;
-  double approach_alt = 5.0;
+  double approach_alt = 2.5;
 
   if (context_ && context_->get_resolved_config()) {
     const auto & cfg = context_->get_resolved_config()->routes;
     const auto & safety = context_->get_resolved_config()->safety;
     approach_alt = cfg.approach_altitude_m;
     search_alt = cfg.search_altitude_m;
+    if (cfg.landing_descent_rate_m_s > 0.0) {
+      descent_vel = static_cast<float>(cfg.landing_descent_rate_m_s);
+    }
     if (safety.target_loss_timeout_s > 0.0) {
       target_timeout = static_cast<float>(safety.target_loss_timeout_s);
     }
