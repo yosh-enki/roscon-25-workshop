@@ -119,7 +119,8 @@ fi
 DOCKER_CMD="$DOCKER_CMD -v ${WORKSPACE_ROOT}:/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop"
 DOCKER_CMD="$DOCKER_CMD -w /home/ubuntu/roscon-25-workshop_ws"
 
-# Set environment variables inside container
+# Set environment variables inside container (Add MicroXRCEAgent to PATH directly)
+DOCKER_CMD="$DOCKER_CMD -e PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 DOCKER_CMD="$DOCKER_CMD -e RASPBERRY_PI=1"
 DOCKER_CMD="$DOCKER_CMD -e PIXHAWK_DEV=${SERIAL_DEV}"
 DOCKER_CMD="$DOCKER_CMD -e PIXHAWK_BAUD=${BAUDRATE}"
@@ -137,16 +138,10 @@ if [ "$RUN_AGENT" = true ]; then
         MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE}"
 else
     # Interactive bash session with auto-sourced environment
-    eval $DOCKER_CMD $DOCKER_IMAGE bash --init-file <(echo '
-        source /opt/ros/humble/setup.bash
-        source /home/ubuntu/px4_ros_ws/install/setup.bash
-        echo "======================================================"
-        echo "  🚁 ROSCon 2025 Workshop Container Ready (Raspberry Pi)"
-        echo "======================================================"
-        echo " Quick Commands:"
-        echo "   • Start Agent:  MicroXRCEAgent serial --dev '"$SERIAL_DEV"' -b '"$BAUDRATE"'"
-        echo "   • Check Topics: ros2 topic list"
-        echo "   • Check Status: ros2 topic echo /fmu/out/vehicle_status"
-        echo "======================================================"
-    ')
+    eval $DOCKER_CMD $DOCKER_IMAGE bash -c "\
+        if [ -f /home/ubuntu/px4_ros_ws/install/setup.bash ]; then \
+            echo 'source /opt/ros/humble/setup.bash' >> /home/ubuntu/.bashrc; \
+            echo 'source /home/ubuntu/px4_ros_ws/install/setup.bash' >> /home/ubuntu/.bashrc; \
+        fi; \
+        exec bash"
 fi
