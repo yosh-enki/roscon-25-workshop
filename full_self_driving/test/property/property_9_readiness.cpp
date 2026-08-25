@@ -139,3 +139,30 @@ TEST_F(ReadinessPropertyTest, Property9_AllGatesPassAchievesReadyForOwnmode)
   EXPECT_EQ(ctx->get_state(), domain::ConfigState::COMMITTED);
   EXPECT_EQ(missing.size(), 1u);
 }
+
+// Property 9.6: clear_target resets target identity and blocks readiness for subsequent sorties
+TEST_F(ReadinessPropertyTest, Property9_ClearTargetResetsTargetAndBlocksReadiness)
+{
+  auto ctx = create_committed_context();
+  std::vector<std::string> missing;
+  EXPECT_TRUE(ctx->check_readiness(true, true, true, &missing));
+  EXPECT_EQ(ctx->get_state(), domain::ConfigState::READY_FOR_OWNMODE);
+
+  // Clear target upon sortie completion
+  ctx->clear_target();
+  EXPECT_FALSE(ctx->get_selection().target.has_value());
+
+  // Subsequent readiness check must fail
+  missing.clear();
+  EXPECT_FALSE(ctx->check_readiness(true, true, true, &missing));
+  bool found_missing_target = false;
+  for (const auto & gate : missing) {
+    if (gate.find("target") != std::string::npos || gate.find("Target") != std::string::npos ||
+        gate.find("committed") != std::string::npos) {
+      found_missing_target = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_missing_target);
+}
+

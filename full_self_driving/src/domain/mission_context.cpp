@@ -183,6 +183,16 @@ bool MissionContext::select_target(
   return true;
 }
 
+void MissionContext::clear_target()
+{
+  selection_.target.reset();
+  selection_.selection_revision++;
+  if (state_ == ConfigState::COMMITTED || state_ == ConfigState::VALIDATING) {
+    state_ = ConfigState::CONFIGURING;
+  }
+  validation_token_.clear();
+}
+
 bool MissionContext::select_plan_artifact(
   const std::string & artifact_id,
   uint64_t expected_revision,

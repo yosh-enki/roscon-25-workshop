@@ -115,6 +115,8 @@ public:
     uint64_t expected_revision,
     std::string * out_error = nullptr);
 
+  void clear_target();
+
   bool select_plan_artifact(
     const std::string & artifact_id,
     uint64_t expected_revision,
