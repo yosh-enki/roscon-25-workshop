@@ -416,51 +416,6 @@ def launch_setup(context, *args, **kwargs):
         }],
     )
 
-    # Resolve persistent ArUco database file (markers.yaml)
-    default_db_file = ""
-    for db_cand in [
-        "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/px4_roscon_25/aruco_database/database/markers.yaml",
-        "/home/yosh/roscon-25-workshop/px4_roscon_25/aruco_database/database/markers.yaml",
-    ]:
-        if os.path.exists(db_cand):
-            default_db_file = db_cand
-            break
-
-    aruco_database_node = None
-    aruco_tracker_node = None
-    if default_db_file:
-        aruco_database_node = Node(
-            package="aruco_database",
-            executable="aruco_database_node",
-            name="aruco_database",
-            output="screen",
-            parameters=[{
-                "database_file": default_db_file,
-                "detection_topic": "/aruco/detections",
-                "global_position_topic": "/fmu/out/vehicle_global_position",
-                "vehicle_frame": "base_link",
-                "world_frame": "odom",
-                "auto_origin": True,
-                "use_sim_time": True,
-                "save_on_update": True,
-                "save_period_s": 2.0,
-                "transform_timeout_s": 0.1,
-            }],
-        )
-
-        aruco_tracker_node = Node(
-            package="aruco_tracker",
-            executable="aruco_tracker_node",
-            name="aruco_tracker",
-            output="screen",
-            parameters=[{
-                "use_sim_time": True,
-                "target_id": selected_marker_id if selected_marker_id >= 0 else 0,
-                "marker_size": marker_size_val,
-                "camera_frame": "camera_frame",
-            }],
-        )
-
     entities = [
         gz_process,
         px4_process,
@@ -479,11 +434,6 @@ def launch_setup(context, *args, **kwargs):
         fsd_gateway_node,
         fsd_flight_runtime_node,
     ]
-
-    if aruco_database_node:
-        entities.append(aruco_database_node)
-    if aruco_tracker_node:
-        entities.append(aruco_tracker_node)
 
     if test_selection and test_selection.lower() != "none" and selected_marker_id >= 0:
         selection_provider_node = Node(

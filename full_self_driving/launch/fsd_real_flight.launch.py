@@ -3,7 +3,7 @@
 # ==============================================================================
 # Full Self Driving (FSD) - Authoritative Real Hardware Flight Launch
 # Target: Raspberry Pi 4 Companion Computer & Pixhawk Autopilot (Physical Drone)
-# With Persistent ArUco Marker Database (markers.yaml)
+# Pure Standalone FSD Architecture (Zero Prototype Dependencies)
 # ==============================================================================
 
 import os
@@ -44,10 +44,12 @@ def launch_setup(context, *args, **kwargs):
     target_namespace = LaunchConfiguration("target_namespace").perform(context).strip()
     hardware_manifest_arg = LaunchConfiguration("hardware_manifest").perform(context).strip()
     config_path_arg = LaunchConfiguration("engineering_config").perform(context).strip()
-    database_file_arg = LaunchConfiguration("database_file").perform(context).strip()
     use_sim_time = False  # Strictly False for real hardware flight
 
-    pkg_share = FindPackageShare("full_self_driving").find("full_self_driving")
+    try:
+        pkg_share = FindPackageShare("full_self_driving").find("full_self_driving")
+    except Exception:
+        pkg_share = "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving"
 
     # 1. Resolve Authoritative Config
     if not config_path_arg:
@@ -74,31 +76,12 @@ def launch_setup(context, *args, **kwargs):
                 hardware_manifest_arg = m
                 break
 
-    # 3. Resolve Persistent Database File (markers.yaml)
-    if not database_file_arg:
-        try:
-            aruco_db_share = FindPackageShare("aruco_database").find("aruco_database")
-            database_file_arg = os.path.join(aruco_db_share, "database", "markers.yaml")
-        except Exception:
-            database_file_arg = ""
-
-        db_candidates = [
-            "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/px4_roscon_25/aruco_database/database/markers.yaml",
-            "/home/yosh/roscon-25-workshop/px4_roscon_25/aruco_database/database/markers.yaml",
-            database_file_arg,
-        ]
-        for db_c in db_candidates:
-            if db_c and os.path.exists(db_c):
-                database_file_arg = db_c
-                break
-
     entities = [
         LogInfo(msg="==============================================================="),
         LogInfo(msg=" 🚁 Starting FSD Autonomous Real Hardware Flight Stack"),
         LogInfo(msg=f"    • Serial Port:     {serial_port} @ {baud_rate} baud"),
         LogInfo(msg=f"    • Config:          {config_path_arg}"),
         LogInfo(msg=f"    • Manifest:        {hardware_manifest_arg}"),
-        LogInfo(msg=f"    • Persistent DB:   {database_file_arg}"),
         LogInfo(msg=f"    • World / Map:     {world_name}"),
         LogInfo(msg=f"    • Target Marker:   ID {target_marker_id} ({dictionary_name})"),
         LogInfo(msg="==============================================================="),
@@ -170,46 +153,7 @@ def launch_setup(context, *args, **kwargs):
         entities.append(v4l2_camera_node)
 
     # --------------------------------------------------------------------------
-    # D. Persistent ArUco Marker Database (markers.yaml) & Tracker
-    # --------------------------------------------------------------------------
-    if database_file_arg and os.path.exists(database_file_arg):
-        aruco_database_node = Node(
-            package="aruco_database",
-            executable="aruco_database_node",
-            name="aruco_database",
-            output="screen",
-            parameters=[{
-                "database_file": database_file_arg,
-                "detection_topic": "/aruco/detections",
-                "global_position_topic": "/fmu/out/vehicle_global_position",
-                "vehicle_frame": "base_link",
-                "world_frame": "odom",
-                "auto_origin": True,
-                "use_sim_time": use_sim_time,
-                "save_on_update": True,
-                "save_period_s": 2.0,
-                "transform_timeout_s": 0.1,
-            }],
-        )
-        entities.append(aruco_database_node)
-
-        # ArUco Tracker (px4_roscon_25)
-        aruco_tracker_node = Node(
-            package="aruco_tracker",
-            executable="aruco_tracker_node",
-            name="aruco_tracker",
-            output="screen",
-            parameters=[{
-                "use_sim_time": use_sim_time,
-                "target_id": target_marker_id,
-                "marker_size": marker_size_val,
-                "camera_frame": "camera_frame",
-            }],
-        )
-        entities.append(aruco_tracker_node)
-
-    # --------------------------------------------------------------------------
-    # E. Foxglove Studio WebSocket Bridge (GCS Telemetry & Mission Control)
+    # D. Foxglove Studio WebSocket Bridge (GCS Telemetry & Mission Control)
     # --------------------------------------------------------------------------
     if start_foxglove:
         foxglove_bridge_node = Node(
@@ -226,7 +170,7 @@ def launch_setup(context, *args, **kwargs):
         entities.append(foxglove_bridge_node)
 
     # --------------------------------------------------------------------------
-    # F. FSD Autonomy Stack (Health, Registry, Perception, Gateway, Runtime)
+    # E. FSD Autonomy Stack (Health, Registry, Perception, Gateway, Runtime)
     # --------------------------------------------------------------------------
     launch_probe_node = Node(
         package="full_self_driving",
@@ -397,11 +341,6 @@ def generate_launch_description():
             "target_namespace",
             default_value="aavc2026",
             description="Target mission namespace",
-        ),
-        DeclareLaunchArgument(
-            "database_file",
-            default_value="",
-            description="Path to persistent ArUco markers.yaml database file",
         ),
         DeclareLaunchArgument(
             "hardware_manifest",
