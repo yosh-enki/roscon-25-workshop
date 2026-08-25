@@ -131,15 +131,29 @@ void ReturnStrategy::on_update(float dt_s)
   }
 
   if (sub_phase_ == SubPhase::DESCEND_HOME) {
+    double current_alt_agl = 0.0;
+    if (home_initialized_ && snapshot.global_pos_valid) {
+      current_alt_agl = snapshot.global_position.z() - home_alt_msl_;
+    } else {
+      current_alt_agl = -static_cast<double>(snapshot.local_position_ned.z());
+    }
+
+    double approach_threshold_m = 2.5;
+    if (mission_ctx_ && mission_ctx_->get_resolved_config()) {
+      approach_threshold_m = mission_ctx_->get_resolved_config()->routes.approach_altitude_m;
+    }
+
+    // 2-Stage Descent: 1.0 m/s above 2.5m, 0.35 m/s soft touchdown below 2.5m
+    float descent_speed = (current_alt_agl > approach_threshold_m) ? 1.0f : 0.35f;
+
     if (traj_setpoint_) {
-      // 0.35 m/s soft vertical descent
       traj_setpoint_->update(
-        Eigen::Vector3f{0.0f, 0.0f, 0.35f},
+        Eigen::Vector3f{0.0f, 0.0f, descent_speed},
         std::nullopt,
         std::nullopt);
     } else if (goto_setpoint_ && home_initialized_) {
       Eigen::Vector3d target{home_lat_, home_lon_, home_alt_msl_};
-      goto_setpoint_->update(target, std::nullopt, 0.35f);
+      goto_setpoint_->update(target, std::nullopt, descent_speed);
     }
 
     float vz = snapshot.local_velocity_ned.z();
