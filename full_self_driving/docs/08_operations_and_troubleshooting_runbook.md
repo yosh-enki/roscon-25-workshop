@@ -117,6 +117,8 @@ python3 /home/yosh/roscon-25-workshop/full_self_driving/test/acceptance/full_sor
 
 ## 4. Field Troubleshooting Matrix
 
+### 4.1 General Autonomy & Systems Matrix
+
 | Symptom | Probable Root Cause | Diagnostic Command | Remediation Step |
 | :--- | :--- | :--- | :--- |
 | **Drone refuses to arm; takeoff aborted** | Target identity uncommitted or payload unsecured | `ros2 topic echo /full_self_driving/readiness --once` | Select a target pad and click `CLOSE & LOCK` in Foxglove before arming. |
@@ -127,3 +129,30 @@ python3 /home/yosh/roscon-25-workshop/full_self_driving/test/acceptance/full_sor
 | **`HARDWARE_PROFILE_NOT_CONFIGURED` error** | Launched with `simulation:=false` without approved manifest | Check launch arguments | Pass `--hardware_manifest /path/to/approved_manifest.yaml` or use `simulation:=true`. |
 | **ArUco markers not detected at 15m altitude** | Camera out of focus or marker size mismatch | `ros2 param get /fsd_perception marker_size` | Verify `marker_size_m` in `fsd_parameters.yaml` matches physical pad size (0.4m or 0.5m). |
 | **RTL returns to delivery pad instead of home base** | Sortie origin coordinate not locked upon initial takeoff | Check `flight_runtime_node` log for `[ORIGIN]` | Ensure you are on latest firmware commit with `lock sortie origin` fix (`f15551e`). |
+
+---
+
+### 4.2 Pixhawk ↔ Raspberry Pi 4 Serial & uXRCE-DDS Troubleshooting SOP
+
+When deploying the companion container via `./run_raspi.sh`, use the following decision matrix to troubleshoot hardware link failures:
+
+```mermaid
+graph TD
+    A[Agent stuck on 'running... | fd: 3'] --> B[Stop container & run: sudo xxd -c 16 /dev/ttyAMA0]
+    B -->|Stream of 0xfe bytes| C[MAVLink port collision on TELEM2]
+    B -->|Empty stream / No bytes| D[Check uxrce_dds_client status in NSH]
+    B -->|XRCE framing bytes present| E[Check Baud rate mismatch]
+    
+    C --> C1[Set MAV_x_CONFIG=0 & UXRCE_DDS_CFG=102 in QGC -> Reboot FCU]
+    D --> D1[Verify Board Architecture: 'ver all' in NSH]
+    D1 -->|PX4_FMU_V6C Pixhawk 6C| D2[TELEM2 is /dev/ttyS3: uxrce_dds_client start -t serial -d /dev/ttyS3 -b 921600]
+    D1 -->|PX4_FMU_V5 Pixhawk 4| D3[TELEM2 is /dev/ttyS2: uxrce_dds_client start -t serial -d /dev/ttyS2 -b 921600]
+```
+
+| Symptom | Root Cause | Verification Command | Permanent Solution |
+| :--- | :--- | :--- | :--- |
+| **`MicroXRCEAgent` stuck on `running... \| fd: 3` with no `/fmu` topics** | Port conflict: MAVLink daemon is actively broadcasting on TELEM2 instead of uXRCE-DDS. | `sudo xxd -c 16 /dev/ttyAMA0`<br>*(Outputs packets beginning with `0xfe`)* | 1. In QGC, set `MAV_1_CONFIG` / `MAV_2_CONFIG` to `Disabled` (0).<br>2. Set `UXRCE_DDS_CFG = 102` (TELEM2) and `SER_TEL2_BAUD = 921600`.<br>3. Reboot Flight Controller. |
+| **NSH reports `Running, disconnected`** | PX4 client mapped to incorrect hardware UART device for the board target. | In QGC MAVLink Console (`nsh>`):<br>`ver all`<br>`uxrce_dds_client status` | **Identify exact board target:**<br>• **Pixhawk 6C (`PX4_FMU_V6C`)**: TELEM2 is **`/dev/ttyS3`** (UART5)<br>• **Pixhawk 4 (`PX4_FMU_V5`)**: TELEM2 is **`/dev/ttyS2`** (UART2)<br>• **Cube Orange**: TELEM2 is **`/dev/ttyS1`**<br>Manual test: `uxrce_dds_client start -t serial -d /dev/ttyS3 -b 921600` |
+| **`Running, disconnected` after agent restart** | PX4 backoff retry bug: Client went into dormant retry state before agent started. | `uxrce_dds_client status` | Keep `./run_raspi.sh logs` running on RPi, then in NSH run:<br>`uxrce_dds_client stop`<br>`uxrce_dds_client start -t serial -d <DEVICE> -b 921600`<br>*(or hard power cycle Pixhawk while Agent is running)* |
+| **No serial device `/dev/ttyAMA0` on Raspberry Pi** | Serial interface disabled in Raspberry Pi firmware config. | `ls -l /dev/ttyAMA0` | Enable in `/boot/firmware/config.txt`:<br>`enable_uart=1`<br>`dtoverlay=disable-bt`<br>Disable Linux Serial Login Shell via `sudo raspi-config`. |
+

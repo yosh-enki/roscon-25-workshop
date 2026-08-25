@@ -30,6 +30,7 @@ TEST_F(Px4GripperPayloadAdapterTest, PublishesVehicleCommandOnRelease)
   full_self_driving::payload::Px4GripperPayloadAdapter::Config cfg;
   cfg.adapter_id = "px4_uorb_gripper_actuator";
   cfg.gripper_instance = 1;
+  cfg.command_type = 187; // MAV_CMD_DO_SET_ACTUATOR
 
   auto adapter = std::make_shared<full_self_driving::payload::Px4GripperPayloadAdapter>(*node_, cfg);
   EXPECT_EQ(adapter->get_adapter_id(), "px4_uorb_gripper_actuator");
@@ -37,14 +38,14 @@ TEST_F(Px4GripperPayloadAdapterTest, PublishesVehicleCommandOnRelease)
 
   bool command_received = false;
   uint32_t received_cmd = 0;
-  float received_param2 = -1.0f;
+  float received_param1 = 0.0f;
 
   auto sub = node_->create_subscription<px4_msgs::msg::VehicleCommand>(
     "/fmu/in/vehicle_command", 10,
     [&](const px4_msgs::msg::VehicleCommand::SharedPtr msg) {
       command_received = true;
       received_cmd = msg->command;
-      received_param2 = msg->param2;
+      received_param1 = msg->param1;
     });
 
   full_self_driving::msg::PayloadStatus status;
@@ -63,8 +64,8 @@ TEST_F(Px4GripperPayloadAdapterTest, PublishesVehicleCommandOnRelease)
   }
 
   EXPECT_TRUE(command_received);
-  EXPECT_EQ(received_cmd, px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_GRIPPER);
-  EXPECT_FLOAT_EQ(received_param2, 0.0f); // 0.0 = Release
+  EXPECT_EQ(received_cmd, 187); // MAV_CMD_DO_SET_ACTUATOR
+  EXPECT_FLOAT_EQ(received_param1, -1.0f); // -1.0 = Release
 }
 
 TEST_F(Px4GripperPayloadAdapterTest, ProcessesAckFeedback)
@@ -77,9 +78,9 @@ TEST_F(Px4GripperPayloadAdapterTest, ProcessesAckFeedback)
     "op_test_002",
     status);
 
-  // Simulate ACK from PX4
+  // Simulate ACK from PX4 for command 187
   auto ack = std::make_shared<px4_msgs::msg::VehicleCommandAck>();
-  ack->command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_GRIPPER;
+  ack->command = 187;
   ack->result = px4_msgs::msg::VehicleCommandAck::VEHICLE_CMD_RESULT_ACCEPTED;
   ack->timestamp = node_->get_clock()->now().nanoseconds() / 1000;
 
@@ -109,9 +110,9 @@ TEST_F(Px4GripperPayloadAdapterTest, PreflightOpenMarksPayloadUnsecured)
   EXPECT_FALSE(status.cargo_loaded);
   EXPECT_FALSE(status.secured);
 
-  // Simulate ACK from PX4
+  // Simulate ACK from PX4 for command 187
   auto ack = std::make_shared<px4_msgs::msg::VehicleCommandAck>();
-  ack->command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_GRIPPER;
+  ack->command = 187;
   ack->result = px4_msgs::msg::VehicleCommandAck::VEHICLE_CMD_RESULT_ACCEPTED;
   ack->timestamp = node_->get_clock()->now().nanoseconds() / 1000;
 

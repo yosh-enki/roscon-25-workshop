@@ -37,6 +37,45 @@ Px4GripperPayloadAdapter::Px4GripperPayloadAdapter(
   current_status_.updated_monotonic_ns = 0;
 }
 
+Px4GripperPayloadAdapter::Px4GripperPayloadAdapter(
+  rclcpp::Node & node,
+  px4_ros2::Context & context,
+  Px4GripperConfig config)
+: node_(node), config_(std::move(config))
+{
+  try {
+    peripheral_actuators_ = std::make_shared<px4_ros2::PeripheralActuatorControls>(context);
+  } catch (const std::exception & e) {
+    RCLCPP_WARN(
+      node_.get_logger(),
+      "[Px4GripperPayloadAdapter] Could not initialize PeripheralActuatorControls: %s",
+      e.what());
+  }
+
+  vehicle_command_pub_ = node_.create_publisher<px4_msgs::msg::VehicleCommand>(
+    "/fmu/in/vehicle_command", rclcpp::SystemDefaultsQoS());
+
+  vehicle_command_ack_sub_ = node_.create_subscription<px4_msgs::msg::VehicleCommandAck>(
+    "/fmu/out/vehicle_command_ack", rclcpp::SystemDefaultsQoS(),
+    [this](const px4_msgs::msg::VehicleCommandAck::SharedPtr ack) {
+      handle_command_ack(ack);
+    });
+
+  current_status_.header.frame_id = "px4_gripper";
+  current_status_.adapter_id = config_.adapter_id;
+  current_status_.commanded_state = full_self_driving::msg::PayloadStatus::COMMAND_SECURED;
+  current_status_.feedback_state = full_self_driving::msg::PayloadStatus::FEEDBACK_SECURED;
+  current_status_.cargo_loaded = true;
+  current_status_.secured = true;
+  current_status_.successful_operation_count = 0;
+  current_status_.has_last_operation_id = false;
+  current_status_.last_operation_id = "";
+  current_status_.last_operation_result = full_self_driving::msg::PayloadStatus::RESULT_NONE;
+  current_status_.unknown_result = false;
+  current_status_.feedback_latency_us = 0;
+  current_status_.updated_monotonic_ns = 0;
+}
+
 bool Px4GripperPayloadAdapter::is_healthy() const
 {
   std::lock_guard<std::mutex> lock(mutex_);
@@ -60,25 +99,57 @@ bool Px4GripperPayloadAdapter::execute_command(
       std::chrono::steady_clock::now().time_since_epoch()).count());
   last_command_timestamp_us_ = cmd.timestamp;
 
-  cmd.command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_GRIPPER;
-  cmd.param1 = static_cast<float>(config_.gripper_instance);
+  bool is_secure_cmd = (commanded_state == full_self_driving::msg::PayloadStatus::COMMAND_SECURED);
+  float actuator_target_val = is_secure_cmd ? config_.lock_value : config_.release_value;
+
+  // 1. Direct actuation via px4_ros2::PeripheralActuatorControls if available
+  if (peripheral_actuators_) {
+    Eigen::Matrix<float, px4_ros2::PeripheralActuatorControls::kNumActuators, 1> values;
+    values.setZero();
+    uint8_t ch = (config_.gripper_instance >= 1) ? (config_.gripper_instance - 1) : 0;
+    if (ch < px4_ros2::PeripheralActuatorControls::kNumActuators) {
+      values(ch) = actuator_target_val;
+    }
+    peripheral_actuators_->set(values);
+  }
+
+  // 2. Command actuation via VehicleCommand
+  if (config_.command_type == 187) {
+    // 187 = VEHICLE_CMD_DO_SET_ACTUATOR (PX4 v1.14+ Generic Control Allocation)
+    cmd.command = 187;
+    // Map to the appropriate parameter (param1..param6 for channels 1..6)
+    switch (config_.gripper_instance) {
+      case 2: cmd.param2 = actuator_target_val; break;
+      case 3: cmd.param3 = actuator_target_val; break;
+      case 4: cmd.param4 = actuator_target_val; break;
+      case 5: cmd.param5 = actuator_target_val; break;
+      case 6: cmd.param6 = actuator_target_val; break;
+      case 1:
+      default:
+        cmd.param1 = actuator_target_val;
+        break;
+    }
+    cmd.param7 = 0.0f; // Actuator Set 1 (0-indexed)
+  } else {
+    // Legacy / Payload Deliverer fallback (211 = VEHICLE_CMD_DO_GRIPPER)
+    cmd.command = px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_GRIPPER;
+    cmd.param1 = static_cast<float>(config_.gripper_instance);
+    cmd.param2 = is_secure_cmd ? 1.0f : 0.0f;
+  }
 
   switch (commanded_state) {
     case full_self_driving::msg::PayloadStatus::COMMAND_OPEN:
-      cmd.param2 = 0.0f; // Release / Open
       current_status_.feedback_state = full_self_driving::msg::PayloadStatus::FEEDBACK_OPEN;
       current_status_.cargo_loaded = false;
       current_status_.secured = false;
       break;
     case full_self_driving::msg::PayloadStatus::COMMAND_RELEASE_REQUESTED:
-      cmd.param2 = 0.0f; // Release
       current_status_.feedback_state = full_self_driving::msg::PayloadStatus::FEEDBACK_RELEASED;
       current_status_.cargo_loaded = false;
       current_status_.secured = false;
       break;
     case full_self_driving::msg::PayloadStatus::COMMAND_SECURED:
     default:
-      cmd.param2 = 1.0f; // Grab / Close
       current_status_.feedback_state = full_self_driving::msg::PayloadStatus::FEEDBACK_SECURED;
       current_status_.cargo_loaded = true;
       current_status_.secured = true;
@@ -113,7 +184,9 @@ full_self_driving::msg::PayloadStatus Px4GripperPayloadAdapter::get_status() con
 
 void Px4GripperPayloadAdapter::handle_command_ack(const px4_msgs::msg::VehicleCommandAck::SharedPtr ack)
 {
-  if (!ack || ack->command != px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_GRIPPER) {
+  if (!ack || (ack->command != config_.command_type &&
+               ack->command != 187 &&
+               ack->command != px4_msgs::msg::VehicleCommand::VEHICLE_CMD_DO_GRIPPER)) {
     return;
   }
 

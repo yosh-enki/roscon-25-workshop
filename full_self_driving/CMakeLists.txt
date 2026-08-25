@@ -198,6 +198,7 @@ target_link_libraries(fsd_payload_core
 )
 ament_target_dependencies(fsd_payload_core
   rclcpp
+  px4_ros2_cpp
   px4_msgs
   builtin_interfaces
 )
