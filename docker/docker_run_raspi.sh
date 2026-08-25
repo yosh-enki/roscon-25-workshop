@@ -35,25 +35,31 @@ show_help() {
     echo "Usage: ./run_raspi.sh [COMMAND / OPTIONS]"
     echo ""
     echo "Commands:"
-    echo "  (default)          Run interactive container"
+    echo "  (default)          Connect to persistent container (interactive shell)"
     echo "  start, -d, --bg    Start MicroXRCEAgent in BACKGROUND (Daemon Mode)"
     echo "  exec, shell        Open a new shell inside the running container"
     echo "  logs, -f           View real-time logs from the background Agent"
     echo "  status             Check status of the container and connection"
-    echo "  stop               Stop the running container"
+    echo "  stop               Stop the running container (preserves build files)"
+    echo "  reset, clean       Remove existing container completely to start fresh"
     echo ""
     echo "Options:"
-    echo "  --agent            Run MicroXRCEAgent in FOREGROUND (Interactive)"
+    echo "  --agent            Run MicroXRCEAgent in FOREGROUND"
     echo "  --dev <path>       Serial device path (Default: /dev/ttyAMA0)"
     echo "  --baud <rate>      Baud rate (Default: 921600)"
     echo "  --image <name>     Custom docker image name"
     echo "  --help, -h         Show this help message"
     echo ""
+    echo "Build Helper inside container:"
+    echo "  cbuild             # Fast incremental build of full_self_driving (2 cores)"
+    echo "  cbuild-all         # Build all packages in workspace (2 cores)"
+    echo ""
     echo "Examples:"
     echo "  ./run_raspi.sh start      # 🚀 Start Agent in background"
-    echo "  ./run_raspi.sh exec       # 💻 Open terminal to run ROS 2 commands"
+    echo "  ./run_raspi.sh            # 💻 Open terminal (or ./run_raspi.sh exec)"
     echo "  ./run_raspi.sh logs       # 📜 View Pixhawk communication logs"
-    echo "  ./run_raspi.sh stop       # 🛑 Stop all"
+    echo "  ./run_raspi.sh stop       # 🛑 Pause container (builds preserved)"
+    echo "  ./run_raspi.sh reset      # 🧹 Remove container to start fresh"
 }
 
 # Subcommands Handling
@@ -80,6 +86,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         stop)
             ACTION="stop"
+            shift
+            ;;
+        reset|clean|--recreate)
+            ACTION="reset"
             shift
             ;;
         --agent)
@@ -110,11 +120,19 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Action: RESET / CLEAN
+if [ "$ACTION" = "reset" ]; then
+    echo -e "${YELLOW}Removing container ${CONTAINER_NAME}...${NC}"
+    docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+    echo -e "${GREEN}✔ Container removed. Next run will create a fresh container.${NC}"
+    exit 0
+fi
+
 # Action: STOP
 if [ "$ACTION" = "stop" ]; then
     echo -e "${YELLOW}Stopping container ${CONTAINER_NAME}...${NC}"
     docker stop "${CONTAINER_NAME}" 2>/dev/null || true
-    echo -e "${GREEN}✔ Stopped.${NC}"
+    echo -e "${GREEN}✔ Stopped. (Container and build files are preserved)${NC}"
     exit 0
 fi
 
@@ -123,8 +141,11 @@ if [ "$ACTION" = "status" ]; then
     if docker ps -q -f name="^/${CONTAINER_NAME}$" | grep -q .; then
         echo -e "${GREEN}✔ Container '${CONTAINER_NAME}' is RUNNING.${NC}"
         echo "Active ROS 2 Nodes / Topics can be checked via: ./run_raspi.sh exec"
+    elif docker ps -a -q -f name="^/${CONTAINER_NAME}$" | grep -q .; then
+        echo -e "${YELLOW}Container '${CONTAINER_NAME}' exists but is STOPPED.${NC}"
+        echo "Resume it with: ./run_raspi.sh start  or  ./run_raspi.sh"
     else
-        echo -e "${YELLOW}Container '${CONTAINER_NAME}' is NOT running.${NC}"
+        echo -e "${YELLOW}Container '${CONTAINER_NAME}' does not exist.${NC}"
     fi
     exit 0
 fi
@@ -133,21 +154,6 @@ fi
 if [ "$ACTION" = "logs" ]; then
     echo -e "${CYAN}Following logs from ${CONTAINER_NAME} (Ctrl+C to exit)...${NC}"
     exec docker logs -f "${CONTAINER_NAME}"
-fi
-
-# Action: EXEC (Open new terminal in existing container with full ROS 2 environment)
-if [ "$ACTION" = "exec" ]; then
-    if ! docker ps -q -f name="^/${CONTAINER_NAME}$" | grep -q .; then
-        echo -e "${YELLOW}Container is not running. Starting interactive container instead...${NC}"
-        ACTION="interactive"
-    else
-        echo -e "${GREEN}Connecting to running container '${CONTAINER_NAME}' as root...${NC}"
-        exec docker exec -it --user root "${CONTAINER_NAME}" /ros_entrypoint.sh bash -c "\
-            source /opt/ros/humble/setup.bash && \
-            source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true && \
-            source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true && \
-            exec bash -i"
-    fi
 fi
 
 # Detect Devices & Setup Permissions cleanly
@@ -188,6 +194,8 @@ DOCKER_ARGS=(
     -e "RASPBERRY_PI=1"
     -e "PIXHAWK_DEV=${SERIAL_DEV}"
     -e "PIXHAWK_BAUD=${BAUDRATE}"
+    -e "MAKEFLAGS=-j2"
+    -e "CMAKE_BUILD_PARALLEL_LEVEL=2"
 )
 
 if [ -e "$SERIAL_DEV" ]; then
@@ -206,33 +214,42 @@ fi
 
 SETUP_COMMANDS="\
     echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers 2>/dev/null || true; \
-    grep -q 'source /opt/ros/humble/setup.bash' ~/.bashrc 2>/dev/null || echo 'source /opt/ros/humble/setup.bash' >> ~/.bashrc; \
-    grep -q 'px4_ros_ws/install/setup.bash' ~/.bashrc 2>/dev/null || echo 'source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null' >> ~/.bashrc; \
-    grep -q 'roscon-25-workshop_ws/install/setup.bash' ~/.bashrc 2>/dev/null || echo 'source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null' >> ~/.bashrc; \
+    for rc in /root/.bashrc /home/ubuntu/.bashrc; do \
+        grep -q 'source /opt/ros/humble/setup.bash' \$rc 2>/dev/null || echo 'source /opt/ros/humble/setup.bash' >> \$rc; \
+        grep -q 'px4_ros_ws/install/setup.bash' \$rc 2>/dev/null || echo 'source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null' >> \$rc; \
+        grep -q 'roscon-25-workshop_ws/install/setup.bash' \$rc 2>/dev/null || echo 'source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null' >> \$rc; \
+        grep -q 'alias cbuild=' \$rc 2>/dev/null || echo \"alias cbuild='colcon build --packages-select full_self_driving --symlink-install --parallel-workers 2'\" >> \$rc; \
+        grep -q 'alias cbuild-all=' \$rc 2>/dev/null || echo \"alias cbuild-all='colcon build --symlink-install --parallel-workers 2'\" >> \$rc; \
+        grep -q 'alias run-agent=' \$rc 2>/dev/null || echo \"alias run-agent='MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE} -v 3'\" >> \$rc; \
+    done; \
     source /opt/ros/humble/setup.bash; \
     source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true; \
     source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true; \
 "
 
-# Clean up any leftover stopped container with same name
-docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
-
 echo -e "${CYAN}========================================================${NC}"
-echo -e "${CYAN} 🚁 Starting ROSCon 2025 Container${NC}"
+echo -e "${CYAN} 🚁 ROSCon 2025 Container Manager${NC}"
 echo -e "${CYAN} Serial Device: ${SERIAL_DEV} @ ${BAUDRATE} baud${NC}"
 echo -e "${CYAN}========================================================${NC}"
 
 # Action: DAEMON (Background MicroXRCEAgent)
 if [ "$ACTION" = "daemon" ]; then
-    echo -e "${GREEN}Starting MicroXRCEAgent in BACKGROUND daemon mode (High Priority)...${NC}"
-    docker run -d "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "\
-        ${SETUP_COMMANDS} \
-        echo 'Agent running in background with high process priority...'; \
-        exec nice -n -10 MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE} -v 3"
+    if docker ps -q -f name="^/${CONTAINER_NAME}$" | grep -q .; then
+        echo -e "${GREEN}✔ Container '${CONTAINER_NAME}' is already running in background.${NC}"
+    elif docker ps -a -q -f name="^/${CONTAINER_NAME}$" | grep -q .; then
+        echo -e "${GREEN}Starting existing container '${CONTAINER_NAME}' (preserving build files)...${NC}"
+        docker start "${CONTAINER_NAME}"
+    else
+        echo -e "${GREEN}Starting MicroXRCEAgent in BACKGROUND daemon mode (High Priority)...${NC}"
+        docker run -d "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "\
+            ${SETUP_COMMANDS} \
+            echo 'Agent running in background with high process priority...'; \
+            exec nice -n -10 MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE} -v 3"
+    fi
     echo ""
-    echo -e "${GREEN}✔ MicroXRCEAgent is now running in background!${NC}"
+    echo -e "${GREEN}✔ MicroXRCEAgent is active!${NC}"
     echo "Useful commands:"
-    echo "  • Open Terminal:  ./run_raspi.sh exec"
+    echo "  • Open Terminal:  ./run_raspi.sh exec  (or simply ./run_raspi.sh)"
     echo "  • View Live Logs: ./run_raspi.sh logs"
     echo "  • Stop Service:   ./run_raspi.sh stop"
     exit 0
@@ -241,12 +258,41 @@ fi
 # Action: FOREGROUND AGENT
 if [ "$ACTION" = "agent_foreground" ]; then
     echo -e "${GREEN}⚡ Starting MicroXRCEAgent in foreground (High Priority)...${NC}"
-    exec docker run -it --rm "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "\
-        ${SETUP_COMMANDS} \
-        nice -n -10 MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE} -v 3"
+    if docker ps -q -f name="^/${CONTAINER_NAME}$" | grep -q .; then
+        echo -e "${CYAN}Attaching MicroXRCEAgent to running container...${NC}"
+        exec docker exec -it --user root "${CONTAINER_NAME}" /ros_entrypoint.sh bash -c "\
+            ${SETUP_COMMANDS} \
+            nice -n -10 MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE} -v 3"
+    else
+        # If stopped or not created, start/run persistent container
+        docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+        exec docker run -it "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "\
+            ${SETUP_COMMANDS} \
+            nice -n -10 MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE} -v 3"
+    fi
 fi
 
-# Action: INTERACTIVE SHELL (Default)
-exec docker run -it --rm "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "\
+# Action: EXEC / INTERACTIVE SHELL
+# 1. If container is already running -> connect directly
+if docker ps -q -f name="^/${CONTAINER_NAME}$" | grep -q .; then
+    echo -e "${GREEN}✔ Connecting to running container '${CONTAINER_NAME}'...${NC}"
+    exec docker exec -it --user root "${CONTAINER_NAME}" /ros_entrypoint.sh bash -i
+fi
+
+# 2. If container exists but is stopped -> start it (keeps all build/install artifacts)
+if docker ps -a -q -f name="^/${CONTAINER_NAME}$" | grep -q .; then
+    echo -e "${GREEN}✔ Resuming container '${CONTAINER_NAME}' (build artifacts intact)...${NC}"
+    docker start "${CONTAINER_NAME}"
+    exec docker exec -it --user root "${CONTAINER_NAME}" /ros_entrypoint.sh bash -i
+fi
+
+# 3. If container does not exist -> create persistent daemon with MicroXRCEAgent and connect
+echo -e "${GREEN}Creating persistent container '${CONTAINER_NAME}' with MicroXRCEAgent in background...${NC}"
+docker run -d "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "\
     ${SETUP_COMMANDS} \
-    exec bash -i"
+    echo 'Agent running in background with high process priority...'; \
+    exec nice -n -10 MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE} -v 3"
+
+echo -e "${GREEN}✔ Container created and MicroXRCEAgent started in background.${NC}"
+echo -e "${GREEN}Connecting to interactive terminal...${NC}"
+exec docker exec -it --user root "${CONTAINER_NAME}" /ros_entrypoint.sh bash -i
