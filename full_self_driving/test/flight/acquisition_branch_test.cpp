@@ -399,8 +399,8 @@ TEST_F(AcquisitionBranchTest, Branch_CompleteGridFirst_SearchCompleteTransitions
   EXPECT_EQ(mode_->get_current_strategy_type(), flight::StrategyType::DIRECT);
 }
 
-// 14. CompleteGridFirst: Search completion transitions to RETURN if target was NOT seen
-TEST_F(AcquisitionBranchTest, Branch_CompleteGridFirst_SearchCompleteMissingTargetTransitionsToReturn)
+// 14. CompleteGridFirst: Search completion transitions to TRANSIT_OUT if target was NOT seen
+TEST_F(AcquisitionBranchTest, Branch_CompleteGridFirst_SearchCompleteMissingTargetTransitionsToTransitOut)
 {
   coordinator_->set_search_policy("complete_grid_first");
   auto wp = create_valid_working_plan();
@@ -413,9 +413,10 @@ TEST_F(AcquisitionBranchTest, Branch_CompleteGridFirst_SearchCompleteMissingTarg
   coordinator_->set_current_monotonic_ns(1000000000ULL + 1000000000ULL);
   coordinator_->set_battery_percentage(85.0);
 
-  // Handle search completed
-  EXPECT_FALSE(coordinator_->handle_search_completed());
-  EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::RETURN_STRATEGY);
-  EXPECT_EQ(mode_->get_current_strategy_type(), flight::StrategyType::RETURN_STRATEGY);
+  // Handle search completed -> Should transition to TRANSIT_OUT (Egress corridor)
+  EXPECT_TRUE(coordinator_->handle_search_completed());
+  EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::TRANSIT_OUT);
+  EXPECT_EQ(mode_->get_current_strategy_type(), flight::StrategyType::TRANSIT_OUT);
 }
+
 

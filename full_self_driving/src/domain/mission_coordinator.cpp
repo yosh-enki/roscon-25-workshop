@@ -609,19 +609,26 @@ bool MissionCoordinator::handle_search_completed()
     instantiate_direct_strategy(direct_lat, direct_lon, direct_alt);
     return true;
   } else {
-    transition_trace_.push_back("SURVEY_COMPLETE_TARGET_MISSING: " + rejection_reason);
-    current_strategy_ = flight::StrategyType::RETURN_STRATEGY;
+    transition_trace_.push_back("SURVEY_COMPLETE_TARGET_MISSING: " + rejection_reason + " -> TRANSIT_OUT");
+    current_strategy_ = flight::StrategyType::TRANSIT_OUT;
     if (mode_) {
-      double return_alt = 20.0;
-      if (context_ && context_->get_resolved_config()) {
-        return_alt = context_->get_resolved_config()->routes.transit_altitude_m;
+      Route route;
+      if (has_custom_transit_out_route_) {
+        route = custom_transit_out_route_;
+      } else {
+        route = Route::create_default_kmitl_transit_out_route();
+        if (context_ && context_->get_resolved_config()) {
+          const auto & cfg = context_->get_resolved_config()->routes;
+          route.set_max_horizontal_speed_m_s(static_cast<float>(cfg.transit_out_speed_m_s));
+          route.set_transit_altitude_above_home_m(cfg.transit_altitude_m);
+          route.set_acceptance_radius_m(static_cast<float>(cfg.acceptance_radius_m));
+          route.set_max_yaw_rate_deg_s(static_cast<float>(cfg.max_yaw_rate_deg_s));
+        }
       }
-      mode_->set_strategy(std::make_unique<flight::ReturnStrategy>(
-        mode_->node(), mode_->goto_global_setpoint(), mode_->trajectory_setpoint(),
-        mode_->state_cache(), persistence_, context_,
-        flight::ReturnStrategy::ReturnMode::RETURN_TO_HOME, return_alt));
+      mode_->set_strategy(std::make_unique<flight::TransitOutStrategy>(
+        mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), route, persistence_));
     }
-    return false;
+    return true;
   }
 }
 
