@@ -149,9 +149,9 @@ fi
 # Detect Devices & Setup Permissions cleanly
 if [ -e "$SERIAL_DEV" ]; then
     echo -e "${GREEN}✔ Found Serial Device: $SERIAL_DEV${NC}"
-    if [ ! -r "$SERIAL_DEV" ] || [ ! -w "$SERIAL_DEV" ]; then
-        sudo chmod 666 "$SERIAL_DEV" 2>/dev/null || true
-    fi
+    sudo chmod 666 "$SERIAL_DEV" 2>/dev/null || true
+    # Reset TTY flags to raw mode and disable hardware flow control
+    sudo stty -F "$SERIAL_DEV" raw -echo -crtscts -ixon -ixoff "${BAUDRATE}" 2>/dev/null || true
 else
     echo -e "${YELLOW}⚠ Warning: $SERIAL_DEV not found. Checking alternatives...${NC}"
     if [ -e "/dev/ttyACM0" ]; then
@@ -161,17 +161,19 @@ else
         echo -e "${GREEN}  -> Found /dev/ttyAMA0 (GPIO UART), switching to it.${NC}"
         SERIAL_DEV="/dev/ttyAMA0"
     fi
-    if [ -e "$SERIAL_DEV" ] && { [ ! -r "$SERIAL_DEV" ] || [ ! -w "$SERIAL_DEV" ]; }; then
+    if [ -e "$SERIAL_DEV" ]; then
         sudo chmod 666 "$SERIAL_DEV" 2>/dev/null || true
+        sudo stty -F "$SERIAL_DEV" raw -echo -crtscts -ixon -ixoff "${BAUDRATE}" 2>/dev/null || true
     fi
 fi
 
-# Build Docker Arguments
+# Build Docker Arguments (Always add dialout group permissions)
 DOCKER_ARGS=(
     --name "${CONTAINER_NAME}"
     --net=host
     --ipc=host
     --privileged
+    --group-add dialout
     --shm-size=1g
     -v "${WORKSPACE_ROOT}:/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop"
     -w "/home/ubuntu/roscon-25-workshop_ws"
