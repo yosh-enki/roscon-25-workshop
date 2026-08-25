@@ -90,58 +90,49 @@ else
     fi
 fi
 
-# Build Docker Command
-DOCKER_CMD="docker run -it --rm"
-DOCKER_CMD="$DOCKER_CMD --name ${CONTAINER_NAME}"
-DOCKER_CMD="$DOCKER_CMD --net=host"
-DOCKER_CMD="$DOCKER_CMD --ipc=host"
-DOCKER_CMD="$DOCKER_CMD --privileged"
-DOCKER_CMD="$DOCKER_CMD --shm-size=1g"
+# Docker Arguments Array (Safe argument passing without eval)
+DOCKER_ARGS=(
+    run -it --rm
+    --name "${CONTAINER_NAME}"
+    --net=host
+    --ipc=host
+    --privileged
+    --shm-size=1g
+    -v "${WORKSPACE_ROOT}:/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop"
+    -w "/home/ubuntu/roscon-25-workshop_ws"
+    -e "RASPBERRY_PI=1"
+    -e "PIXHAWK_DEV=${SERIAL_DEV}"
+    -e "PIXHAWK_BAUD=${BAUDRATE}"
+    -e "PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+)
 
 # Mount devices if they exist
 if [ -e "$SERIAL_DEV" ]; then
-    DOCKER_CMD="$DOCKER_CMD --device=${SERIAL_DEV}:${SERIAL_DEV}"
+    DOCKER_ARGS+=(--device="${SERIAL_DEV}:${SERIAL_DEV}")
 fi
 
 # Pass through video cameras if available (e.g. Raspberry Pi Camera / USB Cam)
 for vdev in /dev/video*; do
     if [ -e "$vdev" ]; then
-        DOCKER_CMD="$DOCKER_CMD --device=${vdev}:${vdev}"
+        DOCKER_ARGS+=(--device="${vdev}:${vdev}")
     fi
 done
 
 # Pass through GUI if DISPLAY is set
 if [ -n "$DISPLAY" ]; then
-    DOCKER_CMD="$DOCKER_CMD -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY"
+    DOCKER_ARGS+=(-v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY="$DISPLAY")
 fi
-
-# Mount Workshop Workspace
-DOCKER_CMD="$DOCKER_CMD -v ${WORKSPACE_ROOT}:/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop"
-DOCKER_CMD="$DOCKER_CMD -w /home/ubuntu/roscon-25-workshop_ws"
-
-# Set environment variables inside container (Add MicroXRCEAgent to PATH directly)
-DOCKER_CMD="$DOCKER_CMD -e PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-DOCKER_CMD="$DOCKER_CMD -e RASPBERRY_PI=1"
-DOCKER_CMD="$DOCKER_CMD -e PIXHAWK_DEV=${SERIAL_DEV}"
-DOCKER_CMD="$DOCKER_CMD -e PIXHAWK_BAUD=${BAUDRATE}"
 
 echo "Target Serial Device: ${SERIAL_DEV} @ ${BAUDRATE} baud"
 echo "Starting container: ${DOCKER_IMAGE}..."
 echo "========================================================"
 
+ENTRY_SETUP="source /opt/ros/humble/setup.bash 2>/dev/null || true; source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true; source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true"
+
 if [ "$RUN_AGENT" = true ]; then
     echo "⚡ Auto-starting MicroXRCEAgent..."
-    eval $DOCKER_CMD $DOCKER_IMAGE bash -c "\
-        source /opt/ros/humble/setup.bash && \
-        source /home/ubuntu/px4_ros_ws/install/setup.bash && \
-        echo 'Starting MicroXRCEAgent on ${SERIAL_DEV} (${BAUDRATE})...' && \
-        MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE}"
+    exec docker "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" bash -c "${ENTRY_SETUP}; echo 'Starting MicroXRCEAgent on ${SERIAL_DEV} (${BAUDRATE})...'; MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE}"
 else
     # Interactive bash session with auto-sourced environment
-    eval $DOCKER_CMD $DOCKER_IMAGE bash -c "\
-        if [ -f /home/ubuntu/px4_ros_ws/install/setup.bash ]; then \
-            echo 'source /opt/ros/humble/setup.bash' >> /home/ubuntu/.bashrc; \
-            echo 'source /home/ubuntu/px4_ros_ws/install/setup.bash' >> /home/ubuntu/.bashrc; \
-        fi; \
-        exec bash"
+    exec docker "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" bash -c "${ENTRY_SETUP}; exec bash -i"
 fi
