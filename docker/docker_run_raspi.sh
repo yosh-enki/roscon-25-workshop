@@ -15,7 +15,6 @@ DEFAULT_DEVICE="/dev/ttyAMA0"
 BAUDRATE="921600"
 DOCKER_IMAGE="dronecode/roscon-25-workshop:latest"
 CONTAINER_NAME="px4-roscon-25-raspi"
-CONTAINER_RCFILE="/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/docker/.raspi_bashrc"
 
 # Colors
 GREEN='\033[0;32m'
@@ -132,14 +131,18 @@ if [ "$ACTION" = "logs" ]; then
     exec docker logs -f "${CONTAINER_NAME}"
 fi
 
-# Action: EXEC (Open new terminal in existing container)
+# Action: EXEC (Open new terminal in existing container with full ROS 2 environment)
 if [ "$ACTION" = "exec" ]; then
     if ! docker ps -q -f name="^/${CONTAINER_NAME}$" | grep -q .; then
         echo -e "${YELLOW}Container is not running. Starting interactive container instead...${NC}"
         ACTION="interactive"
     else
         echo -e "${GREEN}Connecting to running container '${CONTAINER_NAME}'...${NC}"
-        exec docker exec -it "${CONTAINER_NAME}" bash --rcfile "${CONTAINER_RCFILE}" -i
+        exec docker exec -it "${CONTAINER_NAME}" /ros_entrypoint.sh bash -c "\
+            source /opt/ros/humble/setup.bash && \
+            source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true && \
+            source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true && \
+            exec bash -i"
     fi
 fi
 
@@ -175,7 +178,6 @@ DOCKER_ARGS=(
     -e "RASPBERRY_PI=1"
     -e "PIXHAWK_DEV=${SERIAL_DEV}"
     -e "PIXHAWK_BAUD=${BAUDRATE}"
-    -e "PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 )
 
 if [ -e "$SERIAL_DEV" ]; then
@@ -192,7 +194,14 @@ if [ -n "$DISPLAY" ]; then
     DOCKER_ARGS+=(-v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY="$DISPLAY")
 fi
 
-ENTRY_SETUP="source /opt/ros/humble/setup.bash 2>/dev/null || true; source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true; source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true"
+SETUP_COMMANDS="\
+    grep -q 'source /opt/ros/humble/setup.bash' ~/.bashrc 2>/dev/null || echo 'source /opt/ros/humble/setup.bash' >> ~/.bashrc; \
+    grep -q 'px4_ros_ws/install/setup.bash' ~/.bashrc 2>/dev/null || echo 'source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null' >> ~/.bashrc; \
+    grep -q 'roscon-25-workshop_ws/install/setup.bash' ~/.bashrc 2>/dev/null || echo 'source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null' >> ~/.bashrc; \
+    source /opt/ros/humble/setup.bash; \
+    source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true; \
+    source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true; \
+"
 
 # Clean up any leftover stopped container with same name
 docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
@@ -205,7 +214,10 @@ echo -e "${CYAN}========================================================${NC}"
 # Action: DAEMON (Background MicroXRCEAgent)
 if [ "$ACTION" = "daemon" ]; then
     echo -e "${GREEN}Starting MicroXRCEAgent in BACKGROUND daemon mode...${NC}"
-    docker run -d "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" bash -c "${ENTRY_SETUP}; echo 'Agent running in background...'; exec MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE}"
+    docker run -d "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "\
+        ${SETUP_COMMANDS} \
+        echo 'Agent running in background...'; \
+        exec MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE}"
     echo ""
     echo -e "${GREEN}✔ MicroXRCEAgent is now running in background!${NC}"
     echo "Useful commands:"
@@ -218,8 +230,12 @@ fi
 # Action: FOREGROUND AGENT
 if [ "$ACTION" = "agent_foreground" ]; then
     echo -e "${GREEN}⚡ Starting MicroXRCEAgent in foreground...${NC}"
-    exec docker run -it --rm "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" bash -c "${ENTRY_SETUP}; MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE}"
+    exec docker run -it --rm "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "\
+        ${SETUP_COMMANDS} \
+        MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE}"
 fi
 
 # Action: INTERACTIVE SHELL (Default)
-exec docker run -it --rm "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" bash --rcfile "${CONTAINER_RCFILE}" -i
+exec docker run -it --rm "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "\
+    ${SETUP_COMMANDS} \
+    exec bash -i"
