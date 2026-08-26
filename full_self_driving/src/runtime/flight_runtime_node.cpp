@@ -413,13 +413,14 @@ void FlightRuntimeNode::initialize_components()
   vehicle_command_pub_ = this->create_publisher<px4_msgs::msg::VehicleCommand>(
     "/fmu/in/vehicle_command", rclcpp::SystemDefaultsQoS());
 
+  rclcpp::SubscriptionOptions manual_sub_opts;
+  manual_sub_opts.callback_group = control_cbg_;
   manual_control_sub_ = this->create_subscription<px4_msgs::msg::ManualControlSetpoint>(
     "/fmu/out/manual_control_setpoint", rclcpp::SensorDataQoS(),
     [this](const px4_msgs::msg::ManualControlSetpoint::SharedPtr msg) {
       handle_manual_control_setpoint(msg);
     },
-    rclcpp::SubscriptionOptions(),
-    control_cbg_);
+    manual_sub_opts);
 
   prepare_payload_srv_ = this->create_service<full_self_driving::srv::PreparePayload>(
     "/full_self_driving/prepare_payload",
