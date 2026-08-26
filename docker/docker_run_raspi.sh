@@ -205,6 +205,7 @@ DOCKER_ARGS=(
     --group-add dialout
     --group-add video
     --shm-size=1g
+    -v /dev:/dev
     -v "${WORKSPACE_ROOT}:/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop"
     -v "/tmp/fsd_evidence:/tmp/fsd_evidence"
     -v "/tmp/fsd_state:/tmp/fsd_state"
