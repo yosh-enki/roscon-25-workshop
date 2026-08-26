@@ -31,9 +31,9 @@
       },
       "synchronize": false,
       "imageMode": {
-        "imageTopic": "/camera"
+        "imageTopic": "/full_self_driving/perception/annotated_image"
       },
-      "foxglovePanelTitle": "/camera/compressed"
+      "foxglovePanelTitle": "Downward Camera (Annotated)"
     },
     "3D!vehicle_scene": {
       "cameraState": {
@@ -120,11 +120,8 @@
       "synchronize": false,
       "imageMode": {}
     },
-    "RawMessages!pad_registry": {
-      "topicPath": "/full_self_driving/pad_registry",
-      "diffEnabled": false,
-      "foxglovePanelTitle": "Discovered Pad Registry",
-      "defaultExpanded": false
+    "fsd-mission-control.fsd-pad-registry!fsd_pad_registry": {
+      "foxglovePanelTitle": "Discovered Pad Registry"
     }
   },
   "globalVariables": {},
@@ -143,7 +140,7 @@
       },
       "second": {
         "first": "fsd-mission-control.fsd-plan-manager!fsd_plan",
-        "second": "RawMessages!pad_registry",
+        "second": "fsd-mission-control.fsd-pad-registry!fsd_pad_registry",
         "direction": "column",
         "splitPercentage": 50
       },
