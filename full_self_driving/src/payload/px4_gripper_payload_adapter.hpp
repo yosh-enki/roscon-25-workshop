@@ -9,8 +9,6 @@
 #include <px4_msgs/msg/vehicle_command_ack.hpp>
 #include <px4_msgs/msg/actuator_servos.hpp>
 #include <px4_msgs/msg/offboard_control_mode.hpp>
-#include <px4_ros2/common/context.hpp>
-#include <px4_ros2/control/peripheral_actuator_controls.hpp>
 
 #include "payload/payload_adapter.hpp"
 #include "full_self_driving/msg/payload_status.hpp"
@@ -37,10 +35,6 @@ public:
 
   explicit Px4GripperPayloadAdapter(rclcpp::Node & node);
   Px4GripperPayloadAdapter(rclcpp::Node & node, Px4GripperConfig config);
-  Px4GripperPayloadAdapter(
-    rclcpp::Node & node,
-    px4_ros2::Context & context,
-    Px4GripperConfig config = {});
 
   ~Px4GripperPayloadAdapter() override = default;
 
@@ -64,7 +58,6 @@ private:
   Px4GripperConfig config_;
   mutable std::mutex mutex_;
 
-  std::shared_ptr<px4_ros2::PeripheralActuatorControls> peripheral_actuators_;
   rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicle_command_pub_;
   rclcpp::Publisher<px4_msgs::msg::ActuatorServos>::SharedPtr actuator_servos_pub_;
   rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr offboard_control_mode_pub_;

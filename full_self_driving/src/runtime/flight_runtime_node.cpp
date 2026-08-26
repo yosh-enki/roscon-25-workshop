@@ -387,7 +387,7 @@ void FlightRuntimeNode::initialize_components()
   if (payload_adapter_type == "px4_uorb_gripper_actuator") {
     payload::Px4GripperPayloadAdapter::Config cfg;
     cfg.gripper_instance = static_cast<uint8_t>(gripper_inst);
-    payload_adapter = std::make_shared<payload::Px4GripperPayloadAdapter>(*this, *px4_context_, cfg);
+    payload_adapter = std::make_shared<payload::Px4GripperPayloadAdapter>(*this, cfg);
   } else {
     payload_adapter = std::make_shared<payload::SimulationPayloadAdapter>("sim_payload_01");
   }

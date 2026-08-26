@@ -16,24 +16,6 @@ Px4GripperPayloadAdapter::Px4GripperPayloadAdapter(
   init_publishers_and_timer();
 }
 
-Px4GripperPayloadAdapter::Px4GripperPayloadAdapter(
-  rclcpp::Node & node,
-  px4_ros2::Context & context,
-  Px4GripperConfig config)
-: node_(node), config_(std::move(config))
-{
-  try {
-    peripheral_actuators_ = std::make_shared<px4_ros2::PeripheralActuatorControls>(context);
-  } catch (const std::exception & e) {
-    RCLCPP_WARN(
-      node_.get_logger(),
-      "[Px4GripperPayloadAdapter] Could not initialize PeripheralActuatorControls: %s",
-      e.what());
-  }
-
-  init_publishers_and_timer();
-}
-
 void Px4GripperPayloadAdapter::init_publishers_and_timer()
 {
   // 1. PX4 uXRCE-DDS expects Best Effort QoS (SensorDataQoS) for actuator inputs
@@ -148,18 +130,7 @@ bool Px4GripperPayloadAdapter::execute_command(
     actuator_servos_pub_->publish(servo_msg);
   }
 
-  // 2. Direct actuation via px4_ros2::PeripheralActuatorControls if in active mode
-  if (peripheral_actuators_) {
-    Eigen::Matrix<float, px4_ros2::PeripheralActuatorControls::kNumActuators, 1> values;
-    values.setZero();
-    uint8_t ch = (config_.gripper_instance >= 1) ? (config_.gripper_instance - 1) : 0;
-    if (ch < px4_ros2::PeripheralActuatorControls::kNumActuators) {
-      values(ch) = actuator_target_val;
-    }
-    peripheral_actuators_->set(values);
-  }
-
-  // 3. Command actuation via VehicleCommand fallback
+  // 2. Command actuation via VehicleCommand fallback
   px4_msgs::msg::VehicleCommand cmd{};
   cmd.timestamp = now_us;
   if (config_.command_type == 187) {
