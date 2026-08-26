@@ -196,6 +196,7 @@ DOCKER_ARGS=(
     -e "PIXHAWK_BAUD=${BAUDRATE}"
     -e "MAKEFLAGS=-j2"
     -e "CMAKE_BUILD_PARALLEL_LEVEL=2"
+    -e "PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 )
 
 if [ -e "$SERIAL_DEV" ]; then
@@ -212,15 +213,35 @@ if [ -n "$DISPLAY" ]; then
     DOCKER_ARGS+=(-v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY="$DISPLAY")
 fi
 
+# Background daemon supervisor command that keeps container alive and auto-restarts Agent if needed
+DAEMON_BOOTSTRAP="\
+    source /opt/ros/humble/setup.bash 2>/dev/null || true; \
+    source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true; \
+    source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true; \
+    export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:\$PATH; \
+    echo '🚁 Starting MicroXRCEAgent Supervisor in background...'; \
+    while true; do \
+        if [ -e \"${SERIAL_DEV}\" ]; then \
+            echo \"Connecting MicroXRCEAgent to ${SERIAL_DEV} @ ${BAUDRATE} baud...\"; \
+            nice -n -10 MicroXRCEAgent serial --dev \"${SERIAL_DEV}\" -b \"${BAUDRATE}\" -v 3 || true; \
+            echo 'MicroXRCEAgent stopped. Reconnecting in 2 seconds...'; \
+        else \
+            echo \"Waiting for serial device ${SERIAL_DEV}...\"; \
+        fi; \
+        sleep 2; \
+    done \
+"
+
 # Inject executable helper commands and environment into container
 ensure_container_setup() {
     docker exec --user root "${CONTAINER_NAME}" bash -c "
         cat << 'EOF' > /usr/local/bin/cbuild
 #!/usr/bin/env bash
 set -e
-source /opt/ros/humble/setup.bash
+source /opt/ros/humble/setup.bash 2>/dev/null || true
 source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true
 source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true
+export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:\$PATH
 cd /home/ubuntu/roscon-25-workshop_ws
 echo -e '\033[0;32m🔨 Building full_self_driving (2 workers, symlink-install)...\033[0m'
 exec colcon build --packages-select full_self_driving --symlink-install --parallel-workers 2 \"\$@\"
@@ -230,9 +251,10 @@ EOF
         cat << 'EOF' > /usr/local/bin/cbuild-all
 #!/usr/bin/env bash
 set -e
-source /opt/ros/humble/setup.bash
+source /opt/ros/humble/setup.bash 2>/dev/null || true
 source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true
 source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true
+export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:\$PATH
 cd /home/ubuntu/roscon-25-workshop_ws
 echo -e '\033[0;32m🔨 Building all packages (2 workers, symlink-install)...\033[0m'
 exec colcon build --symlink-install --parallel-workers 2 \"\$@\"
@@ -241,14 +263,18 @@ EOF
 
         cat << 'EOF' > /usr/local/bin/run-agent
 #!/usr/bin/env bash
+source /opt/ros/humble/setup.bash 2>/dev/null || true
+source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true
+export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:\$PATH
 exec nice -n -10 MicroXRCEAgent serial --dev \"\${PIXHAWK_DEV:-${SERIAL_DEV}}\" -b \"\${PIXHAWK_BAUD:-${BAUDRATE}}\" -v 3 \"\$@\"
 EOF
         chmod +x /usr/local/bin/run-agent
 
         cat << 'EOF' > /etc/profile.d/roscon_setup.sh
-source /opt/ros/humble/setup.bash
+source /opt/ros/humble/setup.bash 2>/dev/null || true
 source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true
 source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true
+export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:\$PATH
 EOF
 
         for rc in /root/.bashrc /home/ubuntu/.bashrc; do
@@ -276,9 +302,7 @@ if [ "$ACTION" = "daemon" ]; then
         ensure_container_setup
     else
         echo -e "${GREEN}Starting MicroXRCEAgent in BACKGROUND daemon mode (High Priority)...${NC}"
-        docker run -d "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "\
-            echo 'Agent running in background with high process priority...'; \
-            exec nice -n -10 MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE} -v 3"
+        docker run -d "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "${DAEMON_BOOTSTRAP}"
         ensure_container_setup
     fi
     echo ""
@@ -297,15 +321,17 @@ if [ "$ACTION" = "agent_foreground" ]; then
         ensure_container_setup
         echo -e "${CYAN}Attaching MicroXRCEAgent to running container...${NC}"
         exec docker exec -it --user root "${CONTAINER_NAME}" /ros_entrypoint.sh bash -c "\
+            source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true && \
+            export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:\$PATH && \
             nice -n -10 MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE} -v 3"
     else
-        # If stopped or not created, start/run persistent container
+        # If stopped or not created, start persistent container
         docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
-        docker run -d "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "\
-            echo 'Agent running in background with high process priority...'; \
-            exec nice -n -10 MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE} -v 3"
+        docker run -d "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "${DAEMON_BOOTSTRAP}"
         ensure_container_setup
         exec docker exec -it --user root "${CONTAINER_NAME}" /ros_entrypoint.sh bash -c "\
+            source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true && \
+            export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:\$PATH && \
             nice -n -10 MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE} -v 3"
     fi
 fi
@@ -315,7 +341,7 @@ fi
 if docker ps -q -f name="^/${CONTAINER_NAME}$" | grep -q .; then
     echo -e "${GREEN}✔ Connecting to running container '${CONTAINER_NAME}'...${NC}"
     ensure_container_setup
-    exec docker exec -it --user root "${CONTAINER_NAME}" /ros_entrypoint.sh bash -i
+    exec docker exec -it --user root -w /home/ubuntu/roscon-25-workshop_ws "${CONTAINER_NAME}" /ros_entrypoint.sh bash -i
 fi
 
 # 2. If container exists but is stopped -> start it (keeps all build/install artifacts)
@@ -323,16 +349,14 @@ if docker ps -a -q -f name="^/${CONTAINER_NAME}$" | grep -q .; then
     echo -e "${GREEN}✔ Resuming container '${CONTAINER_NAME}' (build artifacts intact)...${NC}"
     docker start "${CONTAINER_NAME}"
     ensure_container_setup
-    exec docker exec -it --user root "${CONTAINER_NAME}" /ros_entrypoint.sh bash -i
+    exec docker exec -it --user root -w /home/ubuntu/roscon-25-workshop_ws "${CONTAINER_NAME}" /ros_entrypoint.sh bash -i
 fi
 
 # 3. If container does not exist -> create persistent daemon with MicroXRCEAgent and connect
 echo -e "${GREEN}Creating persistent container '${CONTAINER_NAME}' with MicroXRCEAgent in background...${NC}"
-docker run -d "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "\
-    echo 'Agent running in background with high process priority...'; \
-    exec nice -n -10 MicroXRCEAgent serial --dev ${SERIAL_DEV} -b ${BAUDRATE} -v 3"
+docker run -d "${DOCKER_ARGS[@]}" "$DOCKER_IMAGE" /ros_entrypoint.sh bash -c "${DAEMON_BOOTSTRAP}"
 
 ensure_container_setup
 echo -e "${GREEN}✔ Container created and MicroXRCEAgent started in background.${NC}"
 echo -e "${GREEN}Connecting to interactive terminal...${NC}"
-exec docker exec -it --user root "${CONTAINER_NAME}" /ros_entrypoint.sh bash -i
+exec docker exec -it --user root -w /home/ubuntu/roscon-25-workshop_ws "${CONTAINER_NAME}" /ros_entrypoint.sh bash -i
