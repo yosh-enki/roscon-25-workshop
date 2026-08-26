@@ -1109,22 +1109,18 @@ if(BUILD_TESTING)
     src
   )
   target_link_libraries(rc_switch_payload_override_test
-    fsd_domain_core
-    fsd_registry_core
-    fsd_plan_core
-    fsd_persistence_core
-    fsd_payload_core
-    fsd_runtime_core
-    fsd_adapters_core
     fsd_flight_core
-    fsd_launch_core
-    "${cpp_typesupport_target}"
+    fsd_adapters_core
+    fsd_runtime_core
+    fsd_persistence_core
+    fsd_registry_core
+    fsd_domain_core
+    fsd_payload_core
     yaml-cpp
-    sqlite3
+    "${cpp_typesupport_target}"
   )
   ament_target_dependencies(rc_switch_payload_override_test
     rclcpp
-    rclcpp_lifecycle
     px4_ros2_cpp
     px4_msgs
     geometry_msgs
