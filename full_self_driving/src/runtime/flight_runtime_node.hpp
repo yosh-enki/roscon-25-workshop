@@ -23,17 +23,17 @@
 #include "full_self_driving/srv/select_plan_artifact.hpp"
 
 #include <px4_msgs/msg/vehicle_command.hpp>
+#include <px4_msgs/msg/manual_control_setpoint.hpp>
+#include <px4_ros2/common/context.hpp>
 
 #include "domain/engineering_config.hpp"
 #include "domain/mission_context.hpp"
 #include "domain/mission_coordinator.hpp"
-#include "persistence/persistence_manager.hpp"
-#include "payload/payload_controller.hpp"
-#include "payload/simulation_payload_adapter.hpp"
-#include "payload/px4_gripper_payload_adapter.hpp"
 #include "runtime/lifecycle_supervisor.hpp"
 #include "runtime/plan_manager.hpp"
-#include "adapters/px4_api_capabilities.hpp"
+#include "registry/pad_registry.hpp"
+#include "payload/payload_controller.hpp"
+#include "persistence/persistence_manager.hpp"
 #include "adapters/px4_state_cache.hpp"
 #include "flight/full_self_driving_mode.hpp"
 #include "flight/full_self_driving_mode_executor.hpp"
@@ -41,31 +41,41 @@
 namespace full_self_driving::runtime
 {
 
+enum class RcSwitchState
+{
+  UNKNOWN = 0,
+  UP_LOCK = 1,
+  DOWN_OPEN = 2,
+  NEUTRAL = 3
+};
+
 class FlightRuntimeNode : public rclcpp::Node
 {
 public:
   explicit FlightRuntimeNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions());
   ~FlightRuntimeNode() override = default;
 
-  bool is_mode_registered() const { return mode_registered_; }
+  // Accessors for integration testing
+  std::shared_ptr<domain::MissionContext> get_context() const { return context_; }
+  std::shared_ptr<domain::MissionCoordinator> get_coordinator() const { return coordinator_; }
+  std::shared_ptr<payload::PayloadController> get_payload_controller() const { return payload_controller_; }
+  std::shared_ptr<LifecycleSupervisor> get_supervisor() const { return supervisor_; }
+  std::shared_ptr<PlanManager> get_plan_manager() const { return plan_manager_; }
+  std::shared_ptr<registry::PadRegistry> get_pad_registry() const { return pad_registry_; }
+  std::shared_ptr<flight::FullSelfDrivingMode> get_mode() const { return mode_; }
+  std::shared_ptr<flight::FullSelfDrivingModeExecutor> get_executor() const { return executor_; }
+
   bool is_ready_for_ownmode() const;
+  bool trigger_takeoff(const std::string & sortie_id);
+  bool trigger_landing(uint32_t target_pad_id);
 
-  std::shared_ptr<domain::MissionContext> mission_context() const { return context_; }
-  std::shared_ptr<domain::MissionCoordinator> coordinator() const { return coordinator_; }
-  std::shared_ptr<LifecycleSupervisor> supervisor() const { return supervisor_; }
-  std::shared_ptr<persistence::PersistenceManager> persistence() const { return persistence_; }
-  std::shared_ptr<PlanManager> plan_manager() const { return plan_manager_; }
-  std::shared_ptr<registry::PadRegistry> pad_registry() const { return pad_registry_; }
-  std::shared_ptr<flight::FullSelfDrivingMode> mode() const { return mode_; }
-  std::shared_ptr<flight::FullSelfDrivingModeExecutor> executor() const { return executor_; }
-
-  void trigger_evaluation_cycle();
+  void handle_manual_control_setpoint(const px4_msgs::msg::ManualControlSetpoint::SharedPtr msg);
 
 private:
-  void initialize_components();
-  void check_and_register_mode();
-  void publish_status_cycle();
-  void restore_px4_origin_home();
+  void init_parameters();
+  void init_lifecycle();
+  void register_mode_with_px4();
+  void periodic_spin();
 
   // Publishers
   rclcpp::Publisher<full_self_driving::msg::FullSelfDrivingState>::SharedPtr state_pub_;
@@ -81,11 +91,14 @@ private:
   rclcpp::Subscription<full_self_driving::msg::LiveTargetLock>::SharedPtr target_lock_sub_;
   rclcpp::Subscription<full_self_driving::msg::PadRegistrySnapshot>::SharedPtr pad_registry_sub_;
   rclcpp::Subscription<full_self_driving::msg::TargetIdentity>::SharedPtr target_selection_sub_;
+  rclcpp::Subscription<px4_msgs::msg::ManualControlSetpoint>::SharedPtr manual_control_sub_;
   rclcpp::Service<full_self_driving::srv::EmergencyStop>::SharedPtr emergency_stop_srv_;
   rclcpp::Service<full_self_driving::srv::PreparePayload>::SharedPtr prepare_payload_srv_;
   rclcpp::Service<full_self_driving::srv::SelectTargetIdentity>::SharedPtr select_target_srv_;
   rclcpp::Service<full_self_driving::srv::UploadPlanArtifact>::SharedPtr upload_plan_srv_;
   rclcpp::Service<full_self_driving::srv::SelectPlanArtifact>::SharedPtr select_plan_srv_;
+
+  RcSwitchState last_rc_switch_state_{RcSwitchState::UNKNOWN};
 
   // Callback Groups for Thread Isolation
   rclcpp::CallbackGroup::SharedPtr control_cbg_;

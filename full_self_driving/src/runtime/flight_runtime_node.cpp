@@ -413,6 +413,14 @@ void FlightRuntimeNode::initialize_components()
   vehicle_command_pub_ = this->create_publisher<px4_msgs::msg::VehicleCommand>(
     "/fmu/in/vehicle_command", rclcpp::SystemDefaultsQoS());
 
+  manual_control_sub_ = this->create_subscription<px4_msgs::msg::ManualControlSetpoint>(
+    "/fmu/out/manual_control_setpoint", rclcpp::SensorDataQoS(),
+    [this](const px4_msgs::msg::ManualControlSetpoint::SharedPtr msg) {
+      handle_manual_control_setpoint(msg);
+    },
+    rclcpp::SubscriptionOptions(),
+    control_cbg_);
+
   prepare_payload_srv_ = this->create_service<full_self_driving::srv::PreparePayload>(
     "/full_self_driving/prepare_payload",
     [this](
@@ -1193,8 +1201,74 @@ void FlightRuntimeNode::restore_px4_origin_home()
     origin.latitude_deg, origin.longitude_deg, origin.altitude_msl_m);
 }
 
+void FlightRuntimeNode::handle_manual_control_setpoint(const px4_msgs::msg::ManualControlSetpoint::SharedPtr msg)
+{
+  if (!msg || !msg->valid || !payload_controller_) {
+    return;
+  }
+
+  // RC Channel 10 mapping:
+  // aux1 < -0.5f -> Switch UP (Physical Lock position on user's radio transmitter)
+  // aux1 > 0.5f  -> Switch DOWN (Physical Open position on user's radio transmitter)
+  RcSwitchState current_state = RcSwitchState::NEUTRAL;
+  if (msg->aux1 < -0.5f) {
+    current_state = RcSwitchState::UP_LOCK;
+  } else if (msg->aux1 > 0.5f) {
+    current_state = RcSwitchState::DOWN_OPEN;
+  }
+
+  if (current_state == RcSwitchState::NEUTRAL) {
+    return;
+  }
+
+  // Edge Trigger: Only execute when state transitions!
+  if (last_rc_switch_state_ == RcSwitchState::UNKNOWN) {
+    // Initial sync without firing spurious actions on startup
+    last_rc_switch_state_ = current_state;
+    return;
+  }
+
+  if (current_state == last_rc_switch_state_) {
+    // Static switch position holding -> NO-OP
+    // (Allows autonomous delivery drops at target pad without being overwritten!)
+    return;
+  }
+
+  // State Transition Detected (Edge Trigger Event)
+  RcSwitchState prev_state = last_rc_switch_state_;
+  last_rc_switch_state_ = current_state;
+
+  std::string op_id = "rc_override_" + std::to_string(this->get_clock()->now().nanoseconds());
+  full_self_driving::msg::PayloadStatus pstatus;
+  std::string err;
+
+  if (prev_state == RcSwitchState::DOWN_OPEN && current_state == RcSwitchState::UP_LOCK) {
+    RCLCPP_INFO(get_logger(), "[RC OVERRIDE] Pilot flipped switch UP -> Commanding LOCK (Cargo Secured)");
+    payload_controller_->prepare(
+      full_self_driving::srv::PreparePayload::Request::OP_PREPARE_FOR_SORTIE,
+      op_id, 0, pstatus, &err);
+    if (payload_status_pub_) {
+      payload_status_pub_->publish(pstatus);
+    }
+  } else if (prev_state == RcSwitchState::UP_LOCK && current_state == RcSwitchState::DOWN_OPEN) {
+    // In-Flight Safety Guard: Prevent accidental in-flight release
+    if (context_ && (context_->is_armed() || (state_cache_ && state_cache_->is_armed()))) {
+      RCLCPP_WARN(get_logger(), "[RC OVERRIDE] In-flight manual release blocked for flight safety!");
+      return;
+    }
+    RCLCPP_INFO(get_logger(), "[RC OVERRIDE] Pilot flipped switch DOWN -> Commanding OPEN (Loading/Release)");
+    payload_controller_->prepare(
+      full_self_driving::srv::PreparePayload::Request::OP_OPEN_FOR_LOADING,
+      op_id, 0, pstatus, &err);
+    if (payload_status_pub_) {
+      payload_status_pub_->publish(pstatus);
+    }
+  }
+}
+
 }  // namespace full_self_driving::runtime
 
+#ifndef FSD_TEST_BUILD
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
@@ -1205,3 +1279,4 @@ int main(int argc, char ** argv)
   rclcpp::shutdown();
   return 0;
 }
+#endif

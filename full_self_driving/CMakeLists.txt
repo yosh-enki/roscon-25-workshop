@@ -1100,6 +1100,41 @@ if(BUILD_TESTING)
     builtin_interfaces
   )
 
+  ament_add_gtest(rc_switch_payload_override_test
+    test/runtime/rc_switch_payload_override_test.cpp
+    src/runtime/flight_runtime_node.cpp
+  )
+  target_include_directories(rc_switch_payload_override_test PRIVATE
+    include
+    src
+  )
+  target_link_libraries(rc_switch_payload_override_test
+    fsd_domain_core
+    fsd_registry_core
+    fsd_plan_core
+    fsd_persistence_core
+    fsd_payload_core
+    fsd_runtime_core
+    fsd_adapters_core
+    fsd_flight_core
+    fsd_launch_core
+    "${cpp_typesupport_target}"
+    yaml-cpp
+    sqlite3
+  )
+  ament_target_dependencies(rc_switch_payload_override_test
+    rclcpp
+    rclcpp_lifecycle
+    px4_ros2_cpp
+    px4_msgs
+    geometry_msgs
+    builtin_interfaces
+    ament_index_cpp
+  )
+  target_compile_definitions(rc_switch_payload_override_test PRIVATE
+    FSD_TEST_BUILD
+  )
+
   ament_add_gtest(px4_gripper_payload_adapter_test
     test/payload/px4_gripper_payload_adapter_test.cpp
   )
