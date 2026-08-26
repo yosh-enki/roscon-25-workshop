@@ -97,12 +97,19 @@ else
 fi
 echo -e "${CYAN}=======================================================================${NC}"
 
-# 5. Tune Camera Hardware Settings
+# 5. Tune Camera Hardware Settings for Rock-Solid 30 FPS
 if command -v v4l2-ctl &>/dev/null; then
-    echo -e "${YELLOW}[1/3] Locking 30 FPS & UVC Exposure Parameters...${NC}"
-    v4l2-ctl -d "$DEVICE" -c exposure_auto_priority=0 2>/dev/null || true
+    echo -e "${YELLOW}[1/3] Locking 30 FPS UVC Shutter & Hardware Gain...${NC}"
+    # Disable 50Hz Anti-flicker throttle and dynamic framerate drop
+    v4l2-ctl -d "$DEVICE" -c power_line_frequency=0 2>/dev/null || true
+    v4l2-ctl -d "$DEVICE" -c exposure_dynamic_framerate=0 2>/dev/null || true
+    # Manual exposure mode with fast shutter (60 = 6ms, well within 33ms budget for 30 FPS)
     v4l2-ctl -d "$DEVICE" -c auto_exposure=1 2>/dev/null || true
-    v4l2-ctl -d "$DEVICE" -c exposure_time_absolute=150 2>/dev/null || true
+    v4l2-ctl -d "$DEVICE" -c exposure_time_absolute=60 2>/dev/null || true
+    # Boost hardware sensor gain & brightness for clear image in normal indoor lighting
+    v4l2-ctl -d "$DEVICE" -c gain=128 2>/dev/null || true
+    v4l2-ctl -d "$DEVICE" -c brightness=135 2>/dev/null || true
+    v4l2-ctl -d "$DEVICE" -c contrast=32 2>/dev/null || true
     v4l2-ctl -d "$DEVICE" -c white_balance_temperature_auto=1 2>/dev/null || true
 fi
 
