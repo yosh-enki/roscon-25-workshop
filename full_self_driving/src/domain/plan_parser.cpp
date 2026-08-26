@@ -418,6 +418,42 @@ void collect_waypoints(
   }
 }
 
+bool is_transect_or_complex_item(const JsonNode & item)
+{
+  if (!item.is_object()) return false;
+  if (item.has("TransectStyleComplexItem") || item.has("complexItem")) return true;
+  if (item.has("type") && item.at("type").is_string() && item.at("type").as_string() == "ComplexItem") return true;
+  return false;
+}
+
+std::optional<RoutePoint> extract_simple_waypoint(const JsonNode & item, float default_alt)
+{
+  if (!item.is_object()) return std::nullopt;
+  if (item.has("command") && item.has("params")) {
+    const JsonNode & cmd_node = item.at("command");
+    const JsonNode & params = item.at("params");
+
+    if (cmd_node.is_number() && cmd_node.as_number() == 16.0 && params.is_array() && params.size() >= 7) {
+      const double lat = require_finite_number(params.at(4), "waypoint latitude");
+      const double lon = require_finite_number(params.at(5), "waypoint longitude");
+      double alt = default_alt;
+      if (!params.at(6).is_null() && params.at(6).is_number()) {
+        double parsed_alt = params.at(6).as_number();
+        if (std::isfinite(parsed_alt) && parsed_alt > 0.0) {
+          alt = parsed_alt;
+        }
+      }
+
+      if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
+        throw std::runtime_error("PlanParser: waypoint latitude/longitude out of range [-90,90], [-180,180]");
+      }
+
+      return RoutePoint(lat, lon, alt);
+    }
+  }
+  return std::nullopt;
+}
+
 }  // namespace
 
 bool PlanParser::is_safe_basename(const std::string & name)
@@ -531,6 +567,12 @@ PlanParseResult PlanParser::parse_string(
   result.byte_length = json_text.size();
   result.raw_content_sha256 = compute_sha256(json_text);
 
+  std::string map_name = safe_name;
+  if (map_name.size() > 5 && map_name.substr(map_name.size() - 5) == ".plan") {
+    map_name = map_name.substr(0, map_name.size() - 5);
+  }
+  result.map_name = map_name;
+
   if (json_text.empty()) {
     result.error_code = "EMPTY_PLAN_CONTENT";
     result.error_message = "Plan JSON string cannot be empty";
@@ -612,9 +654,38 @@ PlanParseResult PlanParser::parse_string(
   }
 
   if (mission.has("items") && mission.at("items").is_array()) {
+    const auto & items = mission.at("items").array_items();
+
+    bool has_complex_survey = false;
+    for (const auto & item : items) {
+      if (is_transect_or_complex_item(item)) {
+        has_complex_survey = true;
+        break;
+      }
+    }
+
     uint32_t current_source_idx = 0;
     try {
-      collect_waypoints(mission.at("items"), route.waypoints, route.default_altitude_m, current_source_idx);
+      if (has_complex_survey) {
+        bool in_or_past_survey = false;
+        bool past_survey = false;
+        for (const auto & item : items) {
+          if (is_transect_or_complex_item(item)) {
+            in_or_past_survey = true;
+            collect_waypoints(item, route.waypoints, route.default_altitude_m, current_source_idx);
+            past_survey = true;
+          } else if (auto simple_wp = extract_simple_waypoint(item, route.default_altitude_m)) {
+            if (!in_or_past_survey) {
+              result.transit_in_waypoints.push_back(*simple_wp);
+            } else if (past_survey) {
+              result.transit_out_waypoints.push_back(*simple_wp);
+            }
+          }
+        }
+      } else {
+        // Flat legacy collection if no complex survey item is present
+        collect_waypoints(mission.at("items"), route.waypoints, route.default_altitude_m, current_source_idx);
+      }
     } catch (const std::exception & e) {
       result.error_code = "WAYPOINT_EXTRACTION_ERROR";
       result.error_message = e.what();

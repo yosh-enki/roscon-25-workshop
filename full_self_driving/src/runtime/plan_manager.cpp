@@ -64,11 +64,14 @@ std::optional<ManagedPlanArtifact> PlanManager::upload_artifact(
   ManagedPlanArtifact artifact;
   artifact.artifact_id = artifact_id;
   artifact.safe_name = safe_name;
+  artifact.map_name = parse_result.map_name;
   artifact.sha256 = sha256;
   artifact.byte_length = bytes.size();
   artifact.immutable = true;
   artifact.raw_content = bytes;
   artifact.route = std::move(parse_result.route);
+  artifact.transit_in_waypoints = std::move(parse_result.transit_in_waypoints);
+  artifact.transit_out_waypoints = std::move(parse_result.transit_out_waypoints);
 
   // If storage directory is configured, write atomically to disk
   if (!storage_directory_.empty()) {
@@ -158,13 +161,25 @@ std::optional<domain::WorkingPlan> PlanManager::create_or_select_working_plan(
   const auto & artifact = it->second;
   std::string working_plan_id = "wp_" + artifact_id + "_" + map_id + "_" + scenario_id;
 
+  domain::Route transit_in_route;
+  if (!artifact.transit_in_waypoints.empty()) {
+    transit_in_route.set_waypoints(artifact.transit_in_waypoints);
+  }
+
+  domain::Route transit_out_route;
+  if (!artifact.transit_out_waypoints.empty()) {
+    transit_out_route.set_waypoints(artifact.transit_out_waypoints);
+  }
+
   domain::WorkingPlan wp(
     working_plan_id,
     artifact_id,
     map_id,
     scenario_id,
     artifact.sha256,
-    artifact.route);
+    artifact.route,
+    transit_in_route,
+    transit_out_route);
 
   working_plans_[working_plan_id] = wp;
   active_working_plans_by_scope_[map_id + ":" + scenario_id] = working_plan_id;

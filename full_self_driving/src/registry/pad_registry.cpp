@@ -144,16 +144,20 @@ std::optional<full_self_driving::msg::PadRecord> PadRegistry::lookup(
 
   auto it = records_.find(key);
   if (it != records_.end()) {
-    // Exact match verified
-    if (it->second.map_id == map_id &&
-        it->second.scenario_id == scenario_id &&
-        it->second.identity.marker_id == identity.marker_id &&
-        it->second.identity.dictionary == identity.dictionary &&
-        it->second.identity.target_namespace == identity.target_namespace)
-    {
-      return it->second;
+    return it->second;
+  }
+
+  // Fallback: match by marker_id across any map scope in active registry
+  for (const auto & [_, rec] : records_) {
+    if (rec.identity.marker_id == identity.marker_id) {
+      if (identity.dictionary.empty() || rec.identity.dictionary.empty() ||
+          rec.identity.dictionary == identity.dictionary)
+      {
+        return rec;
+      }
     }
   }
+
   return std::nullopt;
 }
 

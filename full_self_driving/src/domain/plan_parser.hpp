@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "domain/route.hpp"
+
 namespace full_self_driving::domain
 {
 
@@ -43,9 +45,12 @@ struct PlanParseResult
   std::string error_code;
   std::string error_message;
   CanonicalSearchRoute route;
+  std::vector<RoutePoint> transit_in_waypoints;
+  std::vector<RoutePoint> transit_out_waypoints;
   std::string raw_content_sha256;
   uint64_t byte_length{0};
   std::string safe_name;
+  std::string map_name;
 
   // Metadata from QGC / SearchPlanner if present in the plan
   bool has_search_planner_metadata{false};

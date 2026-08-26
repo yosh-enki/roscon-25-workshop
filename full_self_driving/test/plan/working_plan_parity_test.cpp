@@ -165,3 +165,30 @@ TEST_F(WorkingPlanParityTest, DesktopOriginalPlanVerification)
   EXPECT_FALSE(result.route.canonical_route_sha256.empty());
 }
 
+// Test 4: WorkingPlan with Transit In and Transit Out routes
+TEST_F(WorkingPlanParityTest, WorkingPlanWithTransitRoutes)
+{
+  std::string kmitl_path = "/home/yosh/Documents/QGroundControl/Missions/kmitl.plan";
+  if (std::filesystem::is_regular_file(kmitl_path)) {
+    runtime::PlanManager pm;
+    std::ifstream file(kmitl_path, std::ios::binary);
+    std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    std::string err;
+    auto art = pm.upload_artifact("kmitl.plan", bytes, 0, &err);
+    ASSERT_TRUE(art.has_value()) << "Failed upload: " << err;
+    EXPECT_EQ(art->map_name, "kmitl");
+    EXPECT_EQ(art->transit_in_waypoints.size(), 3U);
+    EXPECT_EQ(art->transit_out_waypoints.size(), 3U);
+
+    auto wp = pm.create_or_select_working_plan(art->artifact_id, "kmitl", "default_scenario", 0, &err);
+    ASSERT_TRUE(wp.has_value()) << "Failed working plan: " << err;
+    EXPECT_TRUE(wp->has_transit_in_route());
+    EXPECT_TRUE(wp->has_transit_out_route());
+    EXPECT_EQ(wp->get_transit_in_route().size(), 3U);
+    EXPECT_EQ(wp->get_transit_out_route().size(), 3U);
+    EXPECT_NEAR(wp->get_transit_in_route()[0].latitude_deg, 13.730322, 1e-6);
+    EXPECT_NEAR(wp->get_transit_out_route()[0].latitude_deg, 13.730712, 1e-6);
+  }
+}
+
+

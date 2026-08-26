@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <filesystem>
 #include <random>
 #include <string>
 #include <vector>
@@ -98,3 +99,26 @@ TEST_F(PlanRoundTripTest, RoundTripWithSearchPlannerMetadata)
   EXPECT_EQ(parsed.next_waypoint_index, next_idx);
   EXPECT_EQ(parsed.route.canonical_route_sha256, initial_route.canonical_route_sha256);
 }
+
+// Test 3: Plan-centric classified waypoint extraction (Transit In, Search, Transit Out)
+TEST_F(PlanRoundTripTest, ClassifiedWaypointsExtraction)
+{
+  std::string kmitl_path = "/home/yosh/Documents/QGroundControl/Missions/kmitl.plan";
+  if (std::filesystem::is_regular_file(kmitl_path)) {
+    auto parsed = domain::PlanParser::parse_file(kmitl_path);
+    ASSERT_TRUE(parsed.is_valid) << "Parse error: " << parsed.error_message;
+    EXPECT_EQ(parsed.map_name, "kmitl");
+    EXPECT_EQ(parsed.transit_in_waypoints.size(), 3U);
+    EXPECT_EQ(parsed.transit_out_waypoints.size(), 3U);
+    EXPECT_GT(parsed.route.waypoints.size(), 0U);
+
+    // Verify first Transit In waypoint
+    EXPECT_NEAR(parsed.transit_in_waypoints[0].latitude_deg, 13.730322, 1e-6);
+    EXPECT_NEAR(parsed.transit_in_waypoints[0].longitude_deg, 100.787446, 1e-6);
+
+    // Verify first Transit Out waypoint
+    EXPECT_NEAR(parsed.transit_out_waypoints[0].latitude_deg, 13.730712, 1e-6);
+    EXPECT_NEAR(parsed.transit_out_waypoints[0].longitude_deg, 100.788755, 1e-6);
+  }
+}
+

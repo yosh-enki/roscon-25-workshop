@@ -56,7 +56,9 @@ public:
     const std::string & map_id,
     const std::string & scenario_id,
     const std::string & source_artifact_sha256,
-    const CanonicalSearchRoute & source_route);
+    const CanonicalSearchRoute & source_route,
+    const Route & transit_in_route = Route(),
+    const Route & transit_out_route = Route());
 
   const std::string & get_working_plan_id() const { return working_plan_id_; }
   const std::string & get_source_artifact_id() const { return source_artifact_id_; }
@@ -74,6 +76,13 @@ public:
 
   const CanonicalSearchRoute & get_source_route() const { return source_route_; }
   const SearchCheckpointData & get_checkpoint() const { return checkpoint_; }
+
+  bool has_transit_in_route() const { return !transit_in_route_.empty(); }
+  bool has_transit_out_route() const { return !transit_out_route_.empty(); }
+  const Route & get_transit_in_route() const { return transit_in_route_; }
+  const Route & get_transit_out_route() const { return transit_out_route_; }
+  void set_transit_in_route(const Route & route) { transit_in_route_ = route; }
+  void set_transit_out_route(const Route & route) { transit_out_route_ = route; }
 
   bool reset(
     uint64_t expected_revision,
@@ -98,6 +107,8 @@ private:
   WorkingPlanState state_{WorkingPlanState::READY};
   WorkingPlanDurability durability_state_{WorkingPlanDurability::SYNCED};
   CanonicalSearchRoute source_route_;
+  Route transit_in_route_;
+  Route transit_out_route_;
   SearchCheckpointData checkpoint_;
 };
 

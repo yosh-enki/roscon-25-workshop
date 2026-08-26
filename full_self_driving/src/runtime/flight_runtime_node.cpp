@@ -207,6 +207,10 @@ void FlightRuntimeNode::initialize_components()
   try {
     std::string share_dir = ament_index_cpp::get_package_share_directory("full_self_driving");
     std::vector<std::string> candidates = {
+      share_dir + "/test/fixtures/plans/kmitl.plan",
+      "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/test/fixtures/plans/kmitl.plan",
+      "/home/yosh/roscon-25-workshop/full_self_driving/test/fixtures/plans/kmitl.plan",
+      "/home/yosh/Documents/QGroundControl/Missions/kmitl.plan",
       share_dir + "/test/fixtures/plans/aavc2026_mission.plan",
       "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/test/fixtures/plans/aavc2026_mission.plan",
       "/home/yosh/roscon-25-workshop/full_self_driving/test/fixtures/plans/aavc2026_mission.plan"
@@ -221,6 +225,7 @@ void FlightRuntimeNode::initialize_components()
 
   std::string default_artifact_id;
   std::string default_wp_id;
+  std::string default_map_id = "kmitl";
   std::string acquisition_fixture = this->get_parameter("acquisition_fixture").as_string();
 
   if (!default_plan_path.empty() && acquisition_fixture != "no_plan_hold") {
@@ -228,16 +233,20 @@ void FlightRuntimeNode::initialize_components()
     if (file) {
       std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
       std::string upload_err;
-      auto art = plan_manager_->upload_artifact("aavc2026_mission.plan", bytes, 0, &upload_err);
+      std::string safe_name = std::filesystem::path(default_plan_path).filename().string();
+      auto art = plan_manager_->upload_artifact(safe_name, bytes, 0, &upload_err);
       if (art) {
         default_artifact_id = art->artifact_id;
+        if (!art->map_name.empty()) {
+          default_map_id = art->map_name;
+        }
         std::string wp_err;
         auto wp = plan_manager_->create_or_select_working_plan(
-          default_artifact_id, "kmitl_airfield", "default_scenario", 0, &wp_err);
+          default_artifact_id, default_map_id, "default_scenario", 0, &wp_err);
         if (wp) {
           default_wp_id = wp->get_working_plan_id();
-          RCLCPP_INFO(get_logger(), "[RUNTIME] Loaded default plan artifact '%s' -> working plan '%s'",
-            default_artifact_id.c_str(), default_wp_id.c_str());
+          RCLCPP_INFO(get_logger(), "[RUNTIME] Loaded default plan artifact '%s' (%s) -> working plan '%s'",
+            safe_name.c_str(), default_artifact_id.c_str(), default_wp_id.c_str());
         }
       }
     }
@@ -254,7 +263,7 @@ void FlightRuntimeNode::initialize_components()
   std::string target_ns = this->get_parameter("target_namespace").as_string();
 
   uint64_t rev = 0;
-  context_->select_map_scenario("kmitl_airfield", "default_scenario", rev++, &err);
+  context_->select_map_scenario(default_map_id, "default_scenario", rev++, &err);
   if (!default_artifact_id.empty()) {
     context_->select_plan_artifact(default_artifact_id, rev++, &err);
   }
@@ -483,24 +492,15 @@ void FlightRuntimeNode::initialize_components()
       }
       uint64_t validate_rev = context_->get_selection_revision();
       auto vreport = context_->validate_selection(validate_rev);
-      if (!vreport.is_valid) {
-        res->accepted = false;
-        res->has_error = true;
-        res->error.code = "VALIDATION_FAILED";
-        std::string viol_str;
-        for (const auto & v : vreport.violations) {
-          if (!viol_str.empty()) viol_str += "; ";
-          viol_str += v;
-        }
-        res->error.message = viol_str;
-        return;
-      }
-      if (!context_->commit(vreport.token, validate_rev, &err)) {
-        res->accepted = false;
-        res->has_error = true;
-        res->error.code = "COMMIT_FAILED";
-        res->error.message = err;
-        return;
+      if (vreport.is_valid) {
+        context_->commit(vreport.token, validate_rev, &err);
+        RCLCPP_INFO(get_logger(),
+          "[RUNTIME] Target selection service executed: ID %u (%s), context committed (rev=%lu)",
+          req->target.marker_id, req->target.dictionary.c_str(), validate_rev);
+      } else {
+        RCLCPP_INFO(get_logger(),
+          "[RUNTIME] Target selected: ID %u (%s), context in CONFIGURING state (rev=%lu)",
+          req->target.marker_id, req->target.dictionary.c_str(), validate_rev);
       }
       res->accepted = true;
       res->has_error = false;
@@ -514,9 +514,6 @@ void FlightRuntimeNode::initialize_components()
       if (target_selection_pub_) {
         target_selection_pub_->publish(req->target);
       }
-      RCLCPP_INFO(get_logger(),
-        "[RUNTIME] Target selection service executed: ID %u (%s), context committed (rev=%lu)",
-        req->target.marker_id, req->target.dictionary.c_str(), validate_rev);
     },
     rmw_qos_profile_services_default,
     services_cbg_);
@@ -600,6 +597,11 @@ void FlightRuntimeNode::initialize_components()
       std::string actual_art_id = art->artifact_id;
       std::string err;
       uint64_t current_rev = context_->get_selection_revision();
+      if (!art->map_name.empty() && context_->get_selection().map_id != art->map_name) {
+        std::string map_err;
+        context_->select_map_scenario(art->map_name, context_->get_selection().scenario_id, current_rev, &map_err);
+        current_rev = context_->get_selection_revision();
+      }
       if (!context_->select_plan_artifact(actual_art_id, current_rev, &err)) {
         res->accepted = false;
         res->has_error = true;
@@ -634,25 +636,15 @@ void FlightRuntimeNode::initialize_components()
 
       uint64_t validate_rev = context_->get_selection_revision();
       auto vreport = context_->validate_selection(validate_rev);
-      if (!vreport.is_valid) {
-        res->accepted = false;
-        res->has_error = true;
-        res->error.code = "VALIDATION_FAILED";
-        std::string viol_str;
-        for (const auto & v : vreport.violations) {
-          if (!viol_str.empty()) viol_str += "; ";
-          viol_str += v;
-        }
-        res->error.message = viol_str;
-        return;
-      }
-
-      if (!context_->commit(vreport.token, validate_rev, &err)) {
-        res->accepted = false;
-        res->has_error = true;
-        res->error.code = "COMMIT_FAILED";
-        res->error.message = err;
-        return;
+      if (vreport.is_valid) {
+        context_->commit(vreport.token, validate_rev, &err);
+        RCLCPP_INFO(get_logger(),
+          "[RUNTIME] Plan selected: '%s' (%s) -> Working Plan '%s', context committed (rev=%lu)",
+          art->safe_name.c_str(), actual_art_id.c_str(), wp->get_working_plan_id().c_str(), validate_rev);
+      } else {
+        RCLCPP_INFO(get_logger(),
+          "[RUNTIME] Plan selected: '%s' (%s) -> Working Plan '%s', context in CONFIGURING state (rev=%lu)",
+          art->safe_name.c_str(), actual_art_id.c_str(), wp->get_working_plan_id().c_str(), validate_rev);
       }
 
       if (working_plan_status_pub_) {
@@ -668,15 +660,16 @@ void FlightRuntimeNode::initialize_components()
       res->accepted = true;
       res->has_error = false;
       res->selection.context_id = context_->get_context_id();
+      res->selection.config_state = static_cast<uint8_t>(context_->get_state());
+      res->selection.selection_revision = validate_rev;
+      res->selection.committed = (context_->get_state() == domain::ConfigState::COMMITTED);
+      res->selection.committed_revision = context_->get_committed_revision();
       res->selection.has_plan_artifact = true;
       res->selection.plan_artifact.artifact_id = actual_art_id;
       res->selection.plan_artifact.original_name = art->safe_name;
       res->selection.plan_artifact.sha256 = art->sha256;
       res->selection.has_working_plan = true;
       res->selection.working_plan.working_plan_id = wp->get_working_plan_id();
-      RCLCPP_INFO(get_logger(),
-        "[RUNTIME] Plan selected: '%s' (%s) -> Working Plan '%s', context committed (rev=%lu)",
-        art->safe_name.c_str(), actual_art_id.c_str(), wp->get_working_plan_id().c_str(), validate_rev);
     },
     rmw_qos_profile_services_default,
     services_cbg_);

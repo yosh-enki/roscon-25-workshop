@@ -20,11 +20,14 @@ struct ManagedPlanArtifact
 {
   std::string artifact_id;
   std::string safe_name;
+  std::string map_name;
   std::string sha256;
   uint64_t byte_length{0};
   bool immutable{true};
   std::vector<uint8_t> raw_content;
   domain::CanonicalSearchRoute route;
+  std::vector<domain::RoutePoint> transit_in_waypoints;
+  std::vector<domain::RoutePoint> transit_out_waypoints;
 };
 
 class PlanManager

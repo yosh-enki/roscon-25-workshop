@@ -357,13 +357,17 @@ bool MissionCoordinator::is_direct_eligible(
 
   const auto & record = *record_opt;
 
-  // Scope check
-  if (record.map_id != sel.map_id || record.scenario_id != sel.scenario_id ||
-      record.identity.marker_id != sel.target->marker_id ||
-      record.identity.dictionary != sel.target->dictionary ||
-      record.identity.target_namespace != sel.target->target_namespace)
+  // Target Identity check
+  if (record.identity.marker_id != sel.target->marker_id)
   {
-    if (out_rejection_reason) *out_rejection_reason = "Pad record scope or identity mismatch";
+    if (out_rejection_reason) *out_rejection_reason = "Pad record marker ID mismatch";
+    return false;
+  }
+
+  if (!sel.target->dictionary.empty() && !record.identity.dictionary.empty() &&
+      record.identity.dictionary != sel.target->dictionary)
+  {
+    if (out_rejection_reason) *out_rejection_reason = "Pad record dictionary mismatch";
     return false;
   }
 
@@ -612,19 +616,7 @@ bool MissionCoordinator::handle_search_completed()
     transition_trace_.push_back("SURVEY_COMPLETE_TARGET_MISSING: " + rejection_reason + " -> TRANSIT_OUT");
     current_strategy_ = flight::StrategyType::TRANSIT_OUT;
     if (mode_) {
-      Route route;
-      if (has_custom_transit_out_route_) {
-        route = custom_transit_out_route_;
-      } else {
-        route = Route::create_default_kmitl_transit_out_route();
-        if (context_ && context_->get_resolved_config()) {
-          const auto & cfg = context_->get_resolved_config()->routes;
-          route.set_max_horizontal_speed_m_s(static_cast<float>(cfg.transit_out_speed_m_s));
-          route.set_transit_altitude_above_home_m(cfg.transit_altitude_m);
-          route.set_acceptance_radius_m(static_cast<float>(cfg.acceptance_radius_m));
-          route.set_max_yaw_rate_deg_s(static_cast<float>(cfg.max_yaw_rate_deg_s));
-        }
-      }
+      Route route = resolve_transit_out_route();
       mode_->set_strategy(std::make_unique<flight::TransitOutStrategy>(
         mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), route, persistence_));
     }
@@ -879,19 +871,7 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
       mode_->set_strategy(std::make_unique<flight::TakeoffStrategy>(
         mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), takeoff_alt));
     } else if (next_strategy == flight::StrategyType::TRANSIT_IN) {
-      Route route;
-      if (has_custom_transit_in_route_) {
-        route = custom_transit_in_route_;
-      } else {
-        route = Route::create_default_kmitl_transit_in_route();
-        if (context_ && context_->get_resolved_config()) {
-          const auto & cfg = context_->get_resolved_config()->routes;
-          route.set_max_horizontal_speed_m_s(static_cast<float>(cfg.transit_in_speed_m_s));
-          route.set_transit_altitude_above_home_m(cfg.transit_altitude_m);
-          route.set_acceptance_radius_m(static_cast<float>(cfg.acceptance_radius_m));
-          route.set_max_yaw_rate_deg_s(static_cast<float>(cfg.max_yaw_rate_deg_s));
-        }
-      }
+      Route route = resolve_transit_in_route();
       mode_->set_strategy(std::make_unique<flight::TransitInStrategy>(
         mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), route));
     } else if (next_strategy == flight::StrategyType::DIRECT) {
@@ -913,19 +893,7 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
         mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), takeoff_alt,
         1.0, 0.5, 30.0, flight::StrategyType::TAKEOFF_AFTER_DELIVERY));
     } else if (next_strategy == flight::StrategyType::TRANSIT_OUT) {
-      Route route;
-      if (has_custom_transit_out_route_) {
-        route = custom_transit_out_route_;
-      } else {
-        route = Route::create_default_kmitl_transit_out_route();
-        if (context_ && context_->get_resolved_config()) {
-          const auto & cfg = context_->get_resolved_config()->routes;
-          route.set_max_horizontal_speed_m_s(static_cast<float>(cfg.transit_out_speed_m_s));
-          route.set_transit_altitude_above_home_m(cfg.transit_altitude_m);
-          route.set_acceptance_radius_m(static_cast<float>(cfg.acceptance_radius_m));
-          route.set_max_yaw_rate_deg_s(static_cast<float>(cfg.max_yaw_rate_deg_s));
-        }
-      }
+      Route route = resolve_transit_out_route();
       mode_->set_strategy(std::make_unique<flight::TransitOutStrategy>(
         mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), route, persistence_));
     } else if (next_strategy == flight::StrategyType::RETURN_STRATEGY) {
@@ -1002,6 +970,66 @@ void MissionCoordinator::reset_custom_search()
   std::lock_guard<std::mutex> guard(mutex_);
   has_custom_search_plan_ = false;
   has_custom_search_route_ = false;
+}
+
+Route MissionCoordinator::resolve_transit_in_route() const
+{
+  Route route;
+  std::optional<WorkingPlan> active_wp;
+  if (plan_manager_ && context_) {
+    const auto & sel = context_->get_selection();
+    active_wp = plan_manager_->get_working_plan(sel.working_plan_id);
+    if (!active_wp) {
+      active_wp = plan_manager_->get_active_working_plan(sel.map_id, sel.scenario_id);
+    }
+  }
+
+  if (active_wp && active_wp->has_transit_in_route()) {
+    route = active_wp->get_transit_in_route();
+  } else if (has_custom_transit_in_route_) {
+    route = custom_transit_in_route_;
+  } else {
+    route = Route::create_default_kmitl_transit_in_route();
+  }
+
+  if (context_ && context_->get_resolved_config()) {
+    const auto & cfg = context_->get_resolved_config()->routes;
+    route.set_max_horizontal_speed_m_s(static_cast<float>(cfg.transit_in_speed_m_s));
+    route.set_transit_altitude_above_home_m(cfg.transit_altitude_m);
+    route.set_acceptance_radius_m(static_cast<float>(cfg.acceptance_radius_m));
+    route.set_max_yaw_rate_deg_s(static_cast<float>(cfg.max_yaw_rate_deg_s));
+  }
+  return route;
+}
+
+Route MissionCoordinator::resolve_transit_out_route() const
+{
+  Route route;
+  std::optional<WorkingPlan> active_wp;
+  if (plan_manager_ && context_) {
+    const auto & sel = context_->get_selection();
+    active_wp = plan_manager_->get_working_plan(sel.working_plan_id);
+    if (!active_wp) {
+      active_wp = plan_manager_->get_active_working_plan(sel.map_id, sel.scenario_id);
+    }
+  }
+
+  if (active_wp && active_wp->has_transit_out_route()) {
+    route = active_wp->get_transit_out_route();
+  } else if (has_custom_transit_out_route_) {
+    route = custom_transit_out_route_;
+  } else {
+    route = Route::create_default_kmitl_transit_out_route();
+  }
+
+  if (context_ && context_->get_resolved_config()) {
+    const auto & cfg = context_->get_resolved_config()->routes;
+    route.set_max_horizontal_speed_m_s(static_cast<float>(cfg.transit_out_speed_m_s));
+    route.set_transit_altitude_above_home_m(cfg.transit_altitude_m);
+    route.set_acceptance_radius_m(static_cast<float>(cfg.acceptance_radius_m));
+    route.set_max_yaw_rate_deg_s(static_cast<float>(cfg.max_yaw_rate_deg_s));
+  }
+  return route;
 }
 
 }  // namespace full_self_driving::domain

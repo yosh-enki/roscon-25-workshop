@@ -131,6 +131,8 @@ private:
   void instantiate_search_strategy();
   void instantiate_precision_land_strategy();
   void instantiate_payload_operation_strategy();
+  Route resolve_transit_in_route() const;
+  Route resolve_transit_out_route() const;
 
   mutable std::mutex mutex_;
   std::shared_ptr<MissionContext> context_;

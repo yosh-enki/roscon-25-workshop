@@ -11,7 +11,9 @@ WorkingPlan::WorkingPlan(
   const std::string & map_id,
   const std::string & scenario_id,
   const std::string & source_artifact_sha256,
-  const CanonicalSearchRoute & source_route)
+  const CanonicalSearchRoute & source_route,
+  const Route & transit_in_route,
+  const Route & transit_out_route)
 : working_plan_id_(working_plan_id)
 , source_artifact_id_(source_artifact_id)
 , map_id_(map_id)
@@ -22,6 +24,8 @@ WorkingPlan::WorkingPlan(
 , state_(WorkingPlanState::READY)
 , durability_state_(WorkingPlanDurability::SYNCED)
 , source_route_(source_route)
+, transit_in_route_(transit_in_route)
+, transit_out_route_(transit_out_route)
 {
   checkpoint_.working_plan_id = working_plan_id_;
   checkpoint_.generation = 1;
