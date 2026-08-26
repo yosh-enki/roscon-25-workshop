@@ -179,6 +179,22 @@ else
     fi
 fi
 
+# Optimization: Set CPU governor to performance (prevents throttling during flight)
+if [ -d "/sys/devices/system/cpu/cpu0/cpufreq" ]; then
+    echo -e "${GREEN}⚡ Optimizing CPU Governor to performance...${NC}"
+    for gov in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+        if [ -w "$gov" ]; then
+            echo performance > "$gov" 2>/dev/null || true
+        else
+            echo performance | sudo tee "$gov" >/dev/null 2>&1 || true
+        fi
+    done
+fi
+
+# Ensure high-speed RAM-based volatile storage exists for evidence & journaling (preserves SD card life)
+mkdir -p /tmp/fsd_evidence /tmp/fsd_state /tmp/fsd_plans /tmp/fsd_backups 2>/dev/null || true
+chmod 777 /tmp/fsd_evidence /tmp/fsd_state /tmp/fsd_plans /tmp/fsd_backups 2>/dev/null || true
+
 # Build Docker Arguments (Always add dialout and video group permissions, and run as root)
 DOCKER_ARGS=(
     --name "${CONTAINER_NAME}"
@@ -190,6 +206,10 @@ DOCKER_ARGS=(
     --group-add video
     --shm-size=1g
     -v "${WORKSPACE_ROOT}:/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop"
+    -v "/tmp/fsd_evidence:/tmp/fsd_evidence"
+    -v "/tmp/fsd_state:/tmp/fsd_state"
+    -v "/tmp/fsd_plans:/tmp/fsd_plans"
+    -v "/tmp/fsd_backups:/tmp/fsd_backups"
     -w "/home/ubuntu/roscon-25-workshop_ws"
     -e "RASPBERRY_PI=1"
     -e "PIXHAWK_DEV=${SERIAL_DEV}"
@@ -283,6 +303,14 @@ EOF
             grep -q 'px4_ros_ws/install/setup.bash' \$rc 2>/dev/null || echo 'source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null' >> \$rc
             grep -q 'roscon-25-workshop_ws/install/setup.bash' \$rc 2>/dev/null || echo 'source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null' >> \$rc
         done
+
+        # Ensure volatile storage and camera calibration are available inside container
+        mkdir -p /tmp/fsd_evidence /tmp/fsd_state /tmp/fsd_plans /tmp/fsd_backups /root/.ros/camera_info /home/ubuntu/.ros/camera_info 2>/dev/null || true
+        chmod 777 /tmp/fsd_evidence /tmp/fsd_state /tmp/fsd_plans /tmp/fsd_backups 2>/dev/null || true
+        if [ -f "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/config/camera_calibrations/c270_720p.yaml" ]; then
+            cp "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/config/camera_calibrations/c270_720p.yaml" /root/.ros/camera_info/c270.yaml 2>/dev/null || true
+            cp "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/config/camera_calibrations/c270_720p.yaml" /home/ubuntu/.ros/camera_info/c270.yaml 2>/dev/null || true
+        fi
     " 2>/dev/null || true
 }
 

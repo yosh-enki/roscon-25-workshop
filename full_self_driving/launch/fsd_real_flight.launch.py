@@ -35,6 +35,10 @@ def launch_setup(context, *args, **kwargs):
     start_foxglove = LaunchConfiguration("start_foxglove").perform(context).lower() in ["true", "1", "yes"]
     foxglove_port_val = int(LaunchConfiguration("foxglove_port").perform(context).strip())
     camera_device = LaunchConfiguration("camera_device").perform(context).strip()
+    camera_driver = LaunchConfiguration("camera_driver").perform(context).strip().lower()
+    camera_fps_val = float(LaunchConfiguration("camera_fps").perform(context).strip())
+    camera_pixel_format = LaunchConfiguration("camera_pixel_format").perform(context).strip()
+    camera_info_url_arg = LaunchConfiguration("camera_info_url").perform(context).strip()
     world_name = LaunchConfiguration("world").perform(context).strip()
     payload_adapter = LaunchConfiguration("payload_adapter").perform(context).strip()
     gripper_inst = int(LaunchConfiguration("gripper_instance").perform(context).strip())
@@ -50,6 +54,19 @@ def launch_setup(context, *args, **kwargs):
         pkg_share = FindPackageShare("full_self_driving").find("full_self_driving")
     except Exception:
         pkg_share = "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving"
+
+    # Resolve Camera Calibration URL
+    if not camera_info_url_arg:
+        calib_candidates = [
+            os.path.join(pkg_share, "config", "camera_calibrations", "c270_720p.yaml"),
+            "/root/.ros/camera_info/c270.yaml",
+            "/home/ubuntu/.ros/camera_info/c270.yaml",
+            "/home/yosh/roscon-25-workshop/full_self_driving/config/camera_calibrations/c270_720p.yaml",
+        ]
+        for c in calib_candidates:
+            if os.path.exists(c):
+                camera_info_url_arg = f"file://{c}"
+                break
 
     # 1. Resolve Authoritative Config
     if not config_path_arg:
@@ -129,28 +146,55 @@ def launch_setup(context, *args, **kwargs):
     entities.append(camera_static_tf_node)
 
     # --------------------------------------------------------------------------
-    # C. Camera Driver (Real V4L2 / USB / Raspberry Pi Camera)
+    # C. Camera Driver (Real USB Logitech C270 / V4L2 Camera)
     # --------------------------------------------------------------------------
     if start_camera:
-        v4l2_camera_node = Node(
-            package="v4l2_camera",
-            executable="v4l2_camera_node",
-            name="v4l2_camera",
-            output="screen",
-            parameters=[{
+        if camera_driver == "usb_cam":
+            usb_cam_params = {
                 "video_device": camera_device,
-                "image_size": [1280, 720],  # 1280x720 HD @ 30fps matching imx219_720p.yaml calibration
-                "camera_frame_id": "camera_frame",
-                "pixel_format": "YUYV",
-                "output_encoding": "rgb8",
+                "image_width": 1280,
+                "image_height": 720,
+                "framerate": camera_fps_val,
+                "pixel_format": camera_pixel_format,
+                "camera_name": "c270",
+                "frame_id": "camera_frame",
                 "use_sim_time": use_sim_time,
-            }],
-            remappings=[
-                ("image_raw", "/camera"),
-                ("camera_info", "/camera_info"),
-            ],
-        )
-        entities.append(v4l2_camera_node)
+            }
+            if camera_info_url_arg:
+                usb_cam_params["camera_info_url"] = camera_info_url_arg
+
+            camera_node = Node(
+                package="usb_cam",
+                executable="usb_cam_node_exe",
+                name="usb_cam",
+                output="screen",
+                parameters=[usb_cam_params],
+                remappings=[
+                    ("image_raw", "/camera"),
+                    ("camera_info", "/camera_info"),
+                ],
+            )
+            entities.append(camera_node)
+        else:
+            v4l2_camera_node = Node(
+                package="v4l2_camera",
+                executable="v4l2_camera_node",
+                name="v4l2_camera",
+                output="screen",
+                parameters=[{
+                    "video_device": camera_device,
+                    "image_size": [1280, 720],
+                    "camera_frame_id": "camera_frame",
+                    "pixel_format": camera_pixel_format if camera_pixel_format != "mjpeg2rgb" else "YUYV",
+                    "output_encoding": "rgb8",
+                    "use_sim_time": use_sim_time,
+                }],
+                remappings=[
+                    ("image_raw", "/camera"),
+                    ("camera_info", "/camera_info"),
+                ],
+            )
+            entities.append(v4l2_camera_node)
 
     # --------------------------------------------------------------------------
     # D. Foxglove Studio WebSocket Bridge (GCS Telemetry & Mission Control)
@@ -290,12 +334,32 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "start_camera",
             default_value="false",
-            description="Whether to start v4l2_camera driver node for physical camera",
+            description="Whether to start camera driver node for physical camera",
+        ),
+        DeclareLaunchArgument(
+            "camera_driver",
+            default_value="usb_cam",
+            description="Camera driver type: 'usb_cam' (recommended, 30fps mjpeg) or 'v4l2_camera'",
         ),
         DeclareLaunchArgument(
             "camera_device",
             default_value="/dev/video0",
             description="Linux video device path for camera (Default: /dev/video0)",
+        ),
+        DeclareLaunchArgument(
+            "camera_fps",
+            default_value="30.0",
+            description="Camera capture framerate (Default: 30.0)",
+        ),
+        DeclareLaunchArgument(
+            "camera_pixel_format",
+            default_value="mjpeg2rgb",
+            description="Camera pixel format ('mjpeg2rgb' for usb_cam, 'YUYV' for v4l2_camera)",
+        ),
+        DeclareLaunchArgument(
+            "camera_info_url",
+            default_value="",
+            description="URL or path to camera calibration file (e.g. file:///root/.ros/camera_info/c270.yaml)",
         ),
         DeclareLaunchArgument(
             "start_foxglove",
