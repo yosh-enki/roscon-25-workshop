@@ -288,3 +288,33 @@ TEST_F(RegistryIsolationPropertyTest, Property6_ClearPreconditionsAndScopeIsolat
     EXPECT_TRUE(found.has_value());
   }
 }
+
+// Property 6.4: Defense-in-Depth - Reject Untransformed Camera-Frame Observations
+// Raw metric camera coordinates (e.g. from OpenCV solvePnP) must NEVER be recorded as WGS84 degrees.
+TEST_F(RegistryIsolationPropertyTest, Property6_RejectCameraFrameUntransformedObservations)
+{
+  registry::PadRegistry registry;
+
+  msg::AllIdObservation raw_obs;
+  raw_obs.map_id = "kmitl_airfield";
+  raw_obs.scenario_id = "default_scenario";
+  raw_obs.identity.marker_id = 8;
+  raw_obs.identity.dictionary = "DICT_4X4_50";
+  raw_obs.identity.target_namespace = "aavc2026";
+  raw_obs.pose_frame = "camera_frame"; // Raw camera optical frame
+  raw_obs.pose.position.x = -0.1602596; // Meters
+  raw_obs.pose.position.y = -0.6244323; // Meters
+  raw_obs.pose.position.z = 2.45;       // Meters
+  raw_obs.quality = 0.9f;
+  raw_obs.calibration_sha256 = "calib_hash_valid";
+  raw_obs.observation_state = msg::AllIdObservation::QUALITY_ACCEPTED;
+
+  msg::AllIdObservationBatch batch;
+  batch.map_id = "kmitl_airfield";
+  batch.scenario_id = "default_scenario";
+  batch.observations.push_back(raw_obs);
+
+  size_t accepted = registry.observe(batch, 1000000);
+  EXPECT_EQ(accepted, 0u);
+  EXPECT_EQ(registry.size(), 0u);
+}

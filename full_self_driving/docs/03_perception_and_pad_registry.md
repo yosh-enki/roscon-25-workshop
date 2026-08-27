@@ -102,10 +102,11 @@ PadKey = { map_id, scenario_id, target_namespace, dictionary, marker_id }
 
 ### 4.2 Dynamic TF2 Geodetic Projection (Zero Hardcoding)
 Rather than hardcoding GPS origin reference coordinates:
-1. `PadRegistryNode` subscribes to live PX4 GPS coordinates (`/fmu/out/vehicle_global_position` and `/fmu/out/home_position`).
+1. `PadRegistryNode` subscribes to live PX4 GPS coordinates (`/fmu/out/vehicle_global_position` or `/fmu/out/vehicle_gps_position`).
 2. When an ArUco marker is observed in camera frame, `tf2_ros` transforms the pose:
    $$\text{camera\_frame} \xrightarrow{\text{static TF}} \text{base\_link} \xrightarrow{\text{px4\_tf}} \text{odom} \xrightarrow{\text{geodesic}} (\text{Latitude}, \text{Longitude}, \text{Altitude})$$
-3. WGS84 geodesic conversions compute true global coordinates automatically regardless of simulation world origin or real-world physical airfield.
+3. **Fail-Safe Gating & Frame Invariant**: If GPS datum is not locked or TF is unavailable, `PadRegistryNode` drops untransformed observations to prevent raw camera metric offsets from entering the geodetic database. `PadRegistry` enforces defense-in-depth rejection of any observation bearing an optical/camera frame name.
+4. WGS84 geodesic conversions compute true global coordinates automatically regardless of simulation world origin or real-world physical airfield.
 
 ### 4.3 Pad Record Structure ([`PadRecord.msg`](file:///home/yosh/roscon-25-workshop/full_self_driving/msg/PadRecord.msg))
 - `latitude_deg`, `longitude_deg`, `altitude_amsl_m`

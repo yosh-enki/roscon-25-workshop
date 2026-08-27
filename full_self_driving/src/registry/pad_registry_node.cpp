@@ -203,60 +203,76 @@ void PadRegistryNode::all_id_callback(const full_self_driving::msg::AllIdObserva
     }
   }
 
+  if (!has_origin || !tf_buffer_) {
+    RCLCPP_WARN_THROTTLE(
+      get_logger(), *get_clock(), 5000,
+      "[fsd_pad_registry] GPS Origin datum not locked yet. Waiting for live GPS fix on '%s'...",
+      global_position_topic_.c_str());
+    return;
+  }
+
   full_self_driving::msg::AllIdObservationBatch transformed_batch = *msg;
+  transformed_batch.observations.clear();
 
-  for (auto & obs : transformed_batch.observations) {
-    if (tf_buffer_ && has_origin) {
-      try {
-        geometry_msgs::msg::TransformStamped world_transform = tf_buffer_->lookupTransform(
-          world_frame_,
-          obs.pose_frame,
-          tf2::TimePointZero,
-          tf2::durationFromSec(transform_timeout_s_));
+  for (const auto & raw_obs : msg->observations) {
+    try {
+      geometry_msgs::msg::TransformStamped world_transform = tf_buffer_->lookupTransform(
+        world_frame_,
+        raw_obs.pose_frame,
+        tf2::TimePointZero,
+        tf2::durationFromSec(transform_timeout_s_));
 
-        geometry_msgs::msg::PoseStamped src_pose;
-        src_pose.header.frame_id = obs.pose_frame;
-        src_pose.header.stamp = obs.image_time;
-        src_pose.pose = obs.pose;
+      geometry_msgs::msg::PoseStamped src_pose;
+      src_pose.header.frame_id = raw_obs.pose_frame;
+      src_pose.header.stamp = raw_obs.image_time;
+      src_pose.pose = raw_obs.pose;
 
-        geometry_msgs::msg::PoseStamped world_pose;
-        tf2::doTransform(src_pose, world_pose, world_transform);
+      geometry_msgs::msg::PoseStamped world_pose;
+      tf2::doTransform(src_pose, world_pose, world_transform);
 
-        // ROS "map" frame is ENU (East-North-Up): X is East, Y is North
-        const double east_m = world_pose.pose.position.x;
-        const double north_m = world_pose.pose.position.y;
+      // ROS "map" frame is ENU (East-North-Up): X is East, Y is North
+      const double east_m = world_pose.pose.position.x;
+      const double north_m = world_pose.pose.position.y;
 
-        const double origin_lat_rad = origin_lat * kPi / 180.0;
-        const double sin_lat = std::sin(origin_lat_rad);
-        const double sin_sq = sin_lat * sin_lat;
-        const double prime_vertical_radius = kWgs84SemiMajorAxisM /
-          std::sqrt(1.0 - kWgs84EccentricitySquared * sin_sq);
-        const double meridian_radius = kWgs84SemiMajorAxisM *
-          (1.0 - kWgs84EccentricitySquared) /
-          std::pow(1.0 - kWgs84EccentricitySquared * sin_sq, 1.5);
-        const double cos_lat = std::cos(origin_lat_rad);
+      const double origin_lat_rad = origin_lat * kPi / 180.0;
+      const double sin_lat = std::sin(origin_lat_rad);
+      const double sin_sq = sin_lat * sin_lat;
+      const double prime_vertical_radius = kWgs84SemiMajorAxisM /
+        std::sqrt(1.0 - kWgs84EccentricitySquared * sin_sq);
+      const double meridian_radius = kWgs84SemiMajorAxisM *
+        (1.0 - kWgs84EccentricitySquared) /
+        std::pow(1.0 - kWgs84EccentricitySquared * sin_sq, 1.5);
+      const double cos_lat = std::cos(origin_lat_rad);
 
-        if (std::isfinite(north_m) && std::isfinite(east_m) && std::abs(cos_lat) > 1e-9) {
-          double lat = origin_lat + (north_m / meridian_radius) * 180.0 / kPi;
-          double lon = origin_lon + (east_m / (prime_vertical_radius * cos_lat)) * 180.0 / kPi;
-          double alt = origin_alt + world_pose.pose.position.z;
+      if (std::isfinite(north_m) && std::isfinite(east_m) && std::abs(cos_lat) > 1e-9) {
+        double lat = origin_lat + (north_m / meridian_radius) * 180.0 / kPi;
+        double lon = origin_lon + (east_m / (prime_vertical_radius * cos_lat)) * 180.0 / kPi;
+        double alt = origin_alt + world_pose.pose.position.z;
 
+        if (std::isfinite(lat) && std::isfinite(lon) && std::isfinite(alt) &&
+            lat >= -90.0 && lat <= 90.0 && lon >= -180.0 && lon <= 180.0)
+        {
+          auto obs = raw_obs;
           obs.pose.position.x = lat;
           obs.pose.position.y = lon;
           obs.pose.position.z = alt;
+          obs.pose_frame = "wgs84";
+          transformed_batch.observations.push_back(obs);
         }
-      } catch (const tf2::TransformException & error) {
-        RCLCPP_WARN_THROTTLE(
-          get_logger(), *get_clock(), 5000,
-          "Could not transform observation frame '%s' to '%s': %s",
-          obs.pose_frame.c_str(), world_frame_.c_str(), error.what());
       }
+    } catch (const tf2::TransformException & error) {
+      RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 5000,
+        "Could not transform observation frame '%s' to '%s': %s",
+        raw_obs.pose_frame.c_str(), world_frame_.c_str(), error.what());
     }
   }
 
-  size_t accepted = registry_.observe(transformed_batch, monotonic_ns);
-  if (accepted > 0) {
-    publish_snapshot_and_status();
+  if (!transformed_batch.observations.empty()) {
+    size_t accepted = registry_.observe(transformed_batch, monotonic_ns);
+    if (accepted > 0) {
+      publish_snapshot_and_status();
+    }
   }
 }
 

@@ -173,3 +173,20 @@ This document provides a comprehensive historical analysis of the engineering jo
 - **Solution**: Corrected the configuration binding across `TAKEOFF_AFTER_DELIVERY -> TRANSIT_OUT` and `TRANSIT_OUT -> RETURN_STRATEGY` to authoritative `cfg.transit_altitude_m`.
 - **Architectural Lesson**: Parameter bindings in state machine transition matrices must strictly reflect distinct operational flight corridors (transit corridor vs survey grid).
 
+---
+
+### Bug 12: Real-Flight Companion Missing Static TF & Untransformed Camera Metric Passthrough
+- **Commit**: `fix(registry): add companion static TF tree and fail-safe WGS84 gating for real flight`
+- **Symptom**: During real flight execution (`fsd_companion_rpi.launch.py`), detected landing pads in `PadRegistry` reported near-zero coordinates (e.g., `PAD #8: -0.1602596°, -0.6244323°`), failing to match the vehicle's true GPS position (`14.8852978°, 102.0157036°`).
+- **Root Cause**:
+  1. `fsd_companion_rpi.launch.py` omitted `static_tf_container` (`map -> odom` and `base_link -> camera_frame`), causing `tf_buffer_->lookupTransform("map", "camera_frame")` in `PadRegistryNode` to throw `tf2::TransformException`.
+  2. When TF lookup failed or GPS origin datum was not yet locked, `PadRegistryNode::all_id_callback` failed open: it skipped the WGS84 geodesic projection math but still passed the untransformed camera translation vector (in meters: $x=-0.16\text{ m}, y=-0.62\text{ m}$) into `PadRegistry::observe`.
+  3. `PadRegistry` assigned `obs.pose.position.x/y` directly to `latitude_deg/longitude_deg`, recording raw camera metrics as geodetic degrees.
+- **Solution**:
+  1. Added `static_tf_container` to `fsd_companion_rpi.launch.py` with configurable `camera_frame` and `global_position_topic` parameters.
+  2. Implemented fail-safe gating in `PadRegistryNode::all_id_callback` to drop untransformed observations when GPS datum is unlocked or TF throws exceptions.
+  3. Enforced defense-in-depth frame validation in `PadRegistry::validate_observation` to reject any observation bearing an optical/camera frame name.
+- **Architectural Lesson**:
+  1. Hardware launch profiles must maintain the full coordinate transform chain identical to simulation profiles.
+  2. Perception-to-database boundaries must enforce strict frame invariants so that local camera-frame translations can never be stored as world geodetic coordinates.
+

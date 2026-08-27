@@ -7,7 +7,8 @@ import yaml
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import ComposableNodeContainer, Node
+from launch_ros.descriptions import ComposableNode
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -24,6 +25,8 @@ def launch_setup(context, *args, **kwargs):
     marker_size_val = float(LaunchConfiguration("marker_size").perform(context).strip())
     hardware_manifest_arg = LaunchConfiguration("hardware_manifest").perform(context).strip()
     use_sim_time_arg = LaunchConfiguration("use_sim_time").perform(context).lower()
+    global_pos_topic = LaunchConfiguration("global_position_topic").perform(context).strip()
+    camera_frame_val = LaunchConfiguration("camera_frame").perform(context).strip()
 
     start_agent = start_agent_arg in ["true", "1", "yes"]
     use_sim_time = use_sim_time_arg in ["true", "1", "yes"]
@@ -59,7 +62,52 @@ def launch_setup(context, *args, **kwargs):
     )
     entities.append(px4_tf_node)
 
-    # 3. Launch Probe (Health & Readiness)
+    # 3. Static TF Broadcasters (Coordinate Frames: map -> odom, base_link -> camera_frame)
+    tf_container = ComposableNodeContainer(
+        name="static_tf_container",
+        package="rclcpp_components",
+        executable="component_container",
+        namespace="",
+        composable_node_descriptions=[
+            ComposableNode(
+                package="tf2_ros",
+                plugin="tf2_ros::StaticTransformBroadcasterNode",
+                name="map_to_odom_broadcaster",
+                parameters=[{
+                    "use_sim_time": use_sim_time,
+                    "translation.x": 0.0,
+                    "translation.y": 0.0,
+                    "translation.z": 0.0,
+                    "rotation.x": 0.0,
+                    "rotation.y": 0.0,
+                    "rotation.z": 0.0,
+                    "rotation.w": 1.0,
+                    "frame_id": "map",
+                    "child_frame_id": "odom",
+                }],
+            ),
+            ComposableNode(
+                package="tf2_ros",
+                plugin="tf2_ros::StaticTransformBroadcasterNode",
+                name="base_link_to_camera_broadcaster",
+                parameters=[{
+                    "use_sim_time": use_sim_time,
+                    "translation.x": 0.10,
+                    "translation.y": 0.0,
+                    "translation.z": -0.05,
+                    "rotation.x": -0.7071068,
+                    "rotation.y": 0.7071068,
+                    "rotation.z": 0.0,
+                    "rotation.w": 0.0,
+                    "frame_id": "base_link",
+                    "child_frame_id": camera_frame_val,
+                }],
+            ),
+        ],
+    )
+    entities.append(tf_container)
+
+    # 4. Launch Probe (Health & Readiness)
     launch_probe_node = Node(
         package="full_self_driving",
         executable="fsd_launch_probe",
@@ -74,7 +122,7 @@ def launch_setup(context, *args, **kwargs):
     )
     entities.append(launch_probe_node)
 
-    # 4. Delivery Pad Registry
+    # 5. Delivery Pad Registry
     fsd_pad_registry_node = Node(
         package="full_self_driving",
         executable="fsd_pad_registry",
@@ -84,12 +132,13 @@ def launch_setup(context, *args, **kwargs):
             "use_sim_time": use_sim_time,
             "map_id": world_name,
             "scenario_id": "default_scenario",
+            "global_position_topic": global_pos_topic,
             "autostart": True,
         }],
     )
     entities.append(fsd_pad_registry_node)
 
-    # 5. ArUco Perception Lifecycle Node
+    # 6. ArUco Perception Lifecycle Node
     fsd_perception_node = Node(
         package="full_self_driving",
         executable="fsd_perception",
@@ -97,7 +146,7 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
         parameters=[{
             "use_sim_time": use_sim_time,
-            "camera_frame": "camera_frame",
+            "camera_frame": camera_frame_val,
             "map_id": world_name,
             "scenario_id": "default_scenario",
             "target_namespace": "aavc2026",
@@ -211,9 +260,14 @@ def generate_launch_description():
             description="Path to approved hardware manifest",
         ),
         DeclareLaunchArgument(
-            "use_sim_time",
-            default_value="true",
-            description="Use simulation clock (/clock from Gazebo over LAN)",
+            "global_position_topic",
+            default_value="/fmu/out/vehicle_global_position",
+            description="PX4 fused global position topic (/fmu/out/vehicle_global_position or /fmu/out/vehicle_gps_position)",
+        ),
+        DeclareLaunchArgument(
+            "camera_frame",
+            default_value="camera_frame",
+            description="Optical camera coordinate frame ID",
         ),
         OpaqueFunction(function=launch_setup),
     ])

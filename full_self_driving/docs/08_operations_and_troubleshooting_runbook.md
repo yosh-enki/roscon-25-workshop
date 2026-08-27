@@ -129,6 +129,7 @@ python3 /home/yosh/roscon-25-workshop/full_self_driving/test/acceptance/full_sor
 | **`HARDWARE_PROFILE_NOT_CONFIGURED` error** | Launched with `simulation:=false` without approved manifest | Check launch arguments | Pass `--hardware_manifest /path/to/approved_manifest.yaml` or use `simulation:=true`. |
 | **ArUco markers not detected at 15m altitude** | Camera out of focus or marker size mismatch | `ros2 param get /fsd_perception marker_size` | Verify `marker_size_m` in `fsd_parameters.yaml` matches physical pad size (0.4m or 0.5m). |
 | **RTL returns to delivery pad instead of home base** | Sortie origin coordinate not locked upon initial takeoff | Check `flight_runtime_node` log for `[ORIGIN]` | Ensure you are on latest firmware commit with `lock sortie origin` fix (`f15551e`). |
+| **Pad coordinates near 0° (`-0.16°, -0.62°`)** | Missing companion static TF tree or unlocked GPS origin datum | `ros2 run tf2_tools view_frames` | Ensure `static_tf_container` is running (`map -> odom`, `base_link -> camera_frame`) and GPS fix is active on `/fmu/out/vehicle_global_position`. |
 
 ---
 

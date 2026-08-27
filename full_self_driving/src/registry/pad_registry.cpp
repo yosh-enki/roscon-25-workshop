@@ -20,6 +20,10 @@ void PadRegistry::set_config(const RegistryConfig & config)
 
 bool PadRegistry::validate_observation(const full_self_driving::msg::AllIdObservation & obs) const
 {
+  // Defense-in-depth: Reject raw optical/camera-frame observations (must be transformed to world/wgs84)
+  if (obs.pose_frame == "camera_frame" || obs.pose_frame.find("camera") != std::string::npos) {
+    return false;
+  }
   if (obs.map_id.empty() || obs.scenario_id.empty()) {
     return false;
   }
@@ -147,13 +151,19 @@ std::optional<full_self_driving::msg::PadRecord> PadRegistry::lookup(
     return it->second;
   }
 
-  // Fallback: match by marker_id across any map scope in active registry
-  for (const auto & [_, rec] : records_) {
-    if (rec.identity.marker_id == identity.marker_id) {
-      if (identity.dictionary.empty() || rec.identity.dictionary.empty() ||
-          rec.identity.dictionary == identity.dictionary)
-      {
-        return rec;
+  // Fallback ONLY when map_id and scenario_id are not explicitly specified
+  if (map_id.empty() && scenario_id.empty()) {
+    for (const auto & [_, rec] : records_) {
+      if (rec.identity.marker_id == identity.marker_id) {
+        if (identity.dictionary.empty() || rec.identity.dictionary.empty() ||
+            rec.identity.dictionary == identity.dictionary)
+        {
+          if (identity.target_namespace.empty() || rec.identity.target_namespace.empty() ||
+              rec.identity.target_namespace == identity.target_namespace)
+          {
+            return rec;
+          }
+        }
       }
     }
   }

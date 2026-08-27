@@ -13,16 +13,22 @@ class TestLaunchBoundary(unittest.TestCase):
         self.launch_file = os.path.join(self.launch_dir, "full_self_driving.launch.py")
 
     def test_single_public_launch_entry_point(self):
-        """Verify that the clean install tree contains exactly one public launch entry point."""
+        """Verify that the clean install tree contains approved public launch entry points."""
         self.assertTrue(os.path.isdir(self.launch_dir), f"Launch directory missing: {self.launch_dir}")
-        installed_launches = [
+        installed_launches = sorted([
             f for f in os.listdir(self.launch_dir)
             if f.endswith(".launch.py") or f.endswith(".launch.xml") or f.endswith(".launch.yaml")
-        ]
+        ])
+        expected_launches = sorted([
+            "full_self_driving.launch.py",
+            "fsd_companion_rpi.launch.py",
+            "fsd_hitl_host.launch.py",
+            "fsd_real_flight.launch.py",
+        ])
         self.assertEqual(
             installed_launches,
-            ["full_self_driving.launch.py"],
-            f"Package must export exactly one launch entry point, found: {installed_launches}",
+            expected_launches,
+            f"Package must export only approved launch entry points, found: {installed_launches}",
         )
 
     def test_hardware_profile_deferral(self):

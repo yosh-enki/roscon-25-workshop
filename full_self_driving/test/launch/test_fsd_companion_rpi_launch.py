@@ -24,3 +24,5 @@ def test_fsd_companion_rpi_launch_description():
     assert "baud_rate" in declared_args
     assert "payload_adapter" in declared_args
     assert "start_agent" in declared_args
+    assert "global_position_topic" in declared_args
+    assert "camera_frame" in declared_args
