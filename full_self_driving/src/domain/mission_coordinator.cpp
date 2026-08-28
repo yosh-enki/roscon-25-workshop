@@ -811,19 +811,7 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
     transition_trace_.push_back("FLY-017 / EVT_TAKEOFF_AFTER_DELIVERY_COMPLETE -> TRANSIT_OUT");
     current_strategy_ = flight::StrategyType::TRANSIT_OUT;
     if (mode_) {
-      Route route;
-      if (has_custom_transit_out_route_) {
-        route = custom_transit_out_route_;
-      } else {
-        route = Route::create_default_kmitl_transit_out_route();
-        if (context_ && context_->get_resolved_config()) {
-          const auto & cfg = context_->get_resolved_config()->routes;
-          route.set_max_horizontal_speed_m_s(static_cast<float>(cfg.transit_out_speed_m_s));
-          route.set_transit_altitude_above_home_m(cfg.transit_altitude_m);
-          route.set_acceptance_radius_m(static_cast<float>(cfg.acceptance_radius_m));
-          route.set_max_yaw_rate_deg_s(static_cast<float>(cfg.max_yaw_rate_deg_s));
-        }
-      }
+      Route route = resolve_transit_out_route();
       mode_->set_strategy(std::make_unique<flight::TransitOutStrategy>(
         mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), route, persistence_));
     }
@@ -988,6 +976,10 @@ Route MissionCoordinator::resolve_transit_in_route() const
     route = active_wp->get_transit_in_route();
   } else if (has_custom_transit_in_route_) {
     route = custom_transit_in_route_;
+  } else if (active_wp) {
+    // A mission plan is loaded, but contains no separate transit-in corridor.
+    // Return an empty route so TransitIn instantly passes through to Search without falling back to KMITL.
+    route = Route();
   } else {
     route = Route::create_default_kmitl_transit_in_route();
   }
@@ -1018,6 +1010,10 @@ Route MissionCoordinator::resolve_transit_out_route() const
     route = active_wp->get_transit_out_route();
   } else if (has_custom_transit_out_route_) {
     route = custom_transit_out_route_;
+  } else if (active_wp) {
+    // A mission plan is loaded, but contains no separate transit-out corridor.
+    // Return an empty route so TransitOut instantly passes through to Return RTL without falling back to KMITL.
+    route = Route();
   } else {
     route = Route::create_default_kmitl_transit_out_route();
   }

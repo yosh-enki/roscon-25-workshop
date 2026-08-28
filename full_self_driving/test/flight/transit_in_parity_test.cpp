@@ -376,3 +376,20 @@ TEST_F(TransitInParityTest, CoordinatorTransitionSequence)
   EXPECT_TRUE(coordinator_->is_takeover_active());
   EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::HOLD);
 }
+
+// Test 6: Empty TransitIn Route completes immediately without failing
+TEST_F(TransitInParityTest, EmptyTransitInRouteCompletesImmediately)
+{
+  domain::Route empty_route;
+  bool completed_called = false;
+  auto strat = std::make_unique<flight::TransitInStrategy>(*node_, mode_->goto_global_setpoint(), state_cache_, empty_route);
+  strat->set_completion_callback([&completed_called](bool ok) {
+    if (ok) completed_called = true;
+  });
+
+  strat->on_enter();
+  EXPECT_TRUE(strat->is_completed());
+  EXPECT_FALSE(strat->is_failed());
+  EXPECT_TRUE(completed_called);
+}
+

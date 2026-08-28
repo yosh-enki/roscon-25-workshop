@@ -168,3 +168,20 @@ TEST_F(TransitOutParityTest, CoordinatorTransitionsToTransitOut)
   EXPECT_TRUE(ok) << "Error: " << err;
   EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::TRANSIT_OUT);
 }
+
+// 5. Test Empty TransitOut Route completes immediately without failing
+TEST_F(TransitOutParityTest, EmptyTransitOutRouteCompletesImmediately)
+{
+  domain::Route empty_route;
+  bool completed_called = false;
+  flight::TransitOutStrategy strategy(*node_, *context_, state_cache_, empty_route);
+  strategy.set_completion_callback([&completed_called](bool ok) {
+    if (ok) completed_called = true;
+  });
+
+  strategy.on_enter();
+  EXPECT_TRUE(strategy.is_completed());
+  EXPECT_FALSE(strategy.is_failed());
+  EXPECT_TRUE(completed_called);
+}
+

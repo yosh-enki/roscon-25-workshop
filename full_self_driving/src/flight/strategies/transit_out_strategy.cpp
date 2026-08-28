@@ -47,6 +47,19 @@ void TransitOutStrategy::on_enter()
   setpoint_sent_for_current_waypoint_ = false;
   activation_time_ = std::chrono::steady_clock::now();
 
+  waypoints_ = route_.get_waypoints();
+  if (waypoints_.empty()) {
+    parameters_valid_ = true;
+    mode_finished_ = true;
+    RCLCPP_INFO(
+      node_.get_logger(),
+      "[TRANSIT_OUT] No Transit Out waypoints specified in plan. Skipping directly to Return RTL.");
+    if (completion_cb_) {
+      completion_cb_(true);
+    }
+    return;
+  }
+
   std::vector<std::string> validation_errors;
   parameters_valid_ = route_.validate(&validation_errors);
   if (!parameters_valid_) {
@@ -58,7 +71,6 @@ void TransitOutStrategy::on_enter()
     return;
   }
 
-  waypoints_ = route_.get_waypoints();
   transit_altitude_above_home_m_ = route_.get_transit_altitude_above_home_m();
   arrival_radius_m_ = route_.get_arrival_radius_m();
   max_horizontal_speed_m_s_ = route_.get_max_horizontal_speed_m_s();
@@ -93,6 +105,14 @@ void TransitOutStrategy::on_update(float dt_s)
   (void)dt_s;
 
   if (mode_finished_ || failed_) {
+    return;
+  }
+
+  if (waypoints_.empty()) {
+    mode_finished_ = true;
+    if (completion_cb_) {
+      completion_cb_(true);
+    }
     return;
   }
 

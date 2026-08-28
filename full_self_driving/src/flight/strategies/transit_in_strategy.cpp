@@ -27,11 +27,15 @@ TransitInStrategy::TransitInStrategy(
   altitude_settle_speed_m_s_ = route_.get_altitude_settle_speed_m_s();
   data_timeout_s_ = route_.get_data_timeout_s();
 
-  std::vector<std::string> errors;
-  parameters_valid_ = route_.validate(&errors);
-  if (!parameters_valid_) {
-    for (const auto & err : errors) {
-      RCLCPP_ERROR(node_.get_logger(), "[TRANSIT_IN] Route validation error: %s", err.c_str());
+  if (waypoints_.empty()) {
+    parameters_valid_ = true;
+  } else {
+    std::vector<std::string> errors;
+    parameters_valid_ = route_.validate(&errors);
+    if (!parameters_valid_) {
+      for (const auto & err : errors) {
+        RCLCPP_ERROR(node_.get_logger(), "[TRANSIT_IN] Route validation error: %s", err.c_str());
+      }
     }
   }
 }
@@ -59,11 +63,15 @@ TransitInStrategy::TransitInStrategy(
   altitude_settle_speed_m_s_ = route_.get_altitude_settle_speed_m_s();
   data_timeout_s_ = route_.get_data_timeout_s();
 
-  std::vector<std::string> errors;
-  parameters_valid_ = route_.validate(&errors);
-  if (!parameters_valid_) {
-    for (const auto & err : errors) {
-      RCLCPP_ERROR(node_.get_logger(), "[TRANSIT_IN] Route validation error: %s", err.c_str());
+  if (waypoints_.empty()) {
+    parameters_valid_ = true;
+  } else {
+    std::vector<std::string> errors;
+    parameters_valid_ = route_.validate(&errors);
+    if (!parameters_valid_) {
+      for (const auto & err : errors) {
+        RCLCPP_ERROR(node_.get_logger(), "[TRANSIT_IN] Route validation error: %s", err.c_str());
+      }
     }
   }
 }
@@ -79,6 +87,17 @@ void TransitInStrategy::on_enter()
   last_heading_valid_ = false;
   setpoint_sent_for_current_waypoint_ = false;
   activation_time_ = std::chrono::steady_clock::now();
+
+  if (waypoints_.empty()) {
+    mode_finished_ = true;
+    RCLCPP_INFO(
+      node_.get_logger(),
+      "[TRANSIT_IN] No Transit In waypoints specified in plan. Skipping directly to Search phase.");
+    if (completion_cb_) {
+      completion_cb_(true);
+    }
+    return;
+  }
 
   if (state_cache_) {
     auto snapshot = state_cache_->capture_snapshot();
@@ -103,6 +122,14 @@ void TransitInStrategy::on_update(float dt_s)
 {
   (void)dt_s;
   if (mode_finished_ || failed_) {
+    return;
+  }
+
+  if (waypoints_.empty()) {
+    mode_finished_ = true;
+    if (completion_cb_) {
+      completion_cb_(true);
+    }
     return;
   }
 
