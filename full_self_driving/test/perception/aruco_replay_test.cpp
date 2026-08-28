@@ -24,7 +24,7 @@ protected:
     } else if (std::filesystem::exists(package_share_ + "/../../src/roscon-25-workshop/full_self_driving/test/fixtures/prototype_behavior/aruco/camera_info.yaml")) {
       fixture_dir_ = package_share_ + "/../../src/roscon-25-workshop/full_self_driving/test/fixtures/prototype_behavior/aruco";
     } else {
-      fixture_dir_ = "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/test/fixtures/prototype_behavior/aruco";
+      fixture_dir_ = "test/fixtures/prototype_behavior/aruco";
     }
 
     load_camera_info();

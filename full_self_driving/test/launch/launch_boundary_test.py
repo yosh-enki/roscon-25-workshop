@@ -21,8 +21,6 @@ class TestLaunchBoundary(unittest.TestCase):
         ])
         expected_launches = sorted([
             "full_self_driving.launch.py",
-            "fsd_companion_rpi.launch.py",
-            "fsd_hitl_host.launch.py",
             "fsd_real_flight.launch.py",
         ])
         self.assertEqual(
@@ -48,7 +46,7 @@ class TestLaunchBoundary(unittest.TestCase):
             self.pkg_share, "test", "fixtures", "manifests", "unapproved_hardware_manifest.yaml"
         )
         if not os.path.exists(manifest_path):
-            manifest_path = "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/test/fixtures/manifests/unapproved_hardware_manifest.yaml"
+            manifest_path = os.path.join(os.path.dirname(__file__), "..", "fixtures", "manifests", "unapproved_hardware_manifest.yaml")
         cmd = [
             "ros2", "launch", "full_self_driving", "full_self_driving.launch.py",
             "simulation:=false", f"hardware_manifest:={manifest_path}"

@@ -64,9 +64,7 @@ private:
 
     std::vector<std::string> search_roots = {
       pkg_share + "/" + rel_fixture,
-      pkg_share + "/../../src/roscon-25-workshop/full_self_driving/" + rel_fixture,
-      "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/" + rel_fixture,
-      "/home/yosh/roscon-25-workshop/full_self_driving/" + rel_fixture
+      pkg_share + "/share/full_self_driving/" + rel_fixture
     };
 
     for (const auto & root : search_roots) {

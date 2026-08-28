@@ -3,6 +3,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <ament_index_cpp/get_package_share_directory.hpp>
 
 #include "domain/plan_parser.hpp"
 #include "domain/plan_printer.hpp"
@@ -103,7 +104,12 @@ TEST_F(PlanRoundTripTest, RoundTripWithSearchPlannerMetadata)
 // Test 3: Plan-centric classified waypoint extraction (Transit In, Search, Transit Out)
 TEST_F(PlanRoundTripTest, ClassifiedWaypointsExtraction)
 {
-  std::string kmitl_path = "/home/yosh/Documents/QGroundControl/Missions/kmitl.plan";
+  std::string kmitl_path;
+  try {
+    kmitl_path = ament_index_cpp::get_package_share_directory("full_self_driving") + "/test/fixtures/plans/kmitl.plan";
+  } catch (...) {
+    kmitl_path = "test/fixtures/plans/kmitl.plan";
+  }
   if (std::filesystem::is_regular_file(kmitl_path)) {
     auto parsed = domain::PlanParser::parse_file(kmitl_path);
     ASSERT_TRUE(parsed.is_valid) << "Parse error: " << parsed.error_message;

@@ -97,8 +97,7 @@ protected:
 
     std::vector<std::string> candidates = {
       share_dir + "/test/fixtures/prototype_behavior/transit_in/golden_waypoints.yaml",
-      "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/test/fixtures/prototype_behavior/transit_in/golden_waypoints.yaml",
-      "/home/yosh/roscon-25-workshop/full_self_driving/test/fixtures/prototype_behavior/transit_in/golden_waypoints.yaml"
+      share_dir + "/share/full_self_driving/test/fixtures/prototype_behavior/transit_in/golden_waypoints.yaml"
     };
 
     for (const auto & path : candidates) {

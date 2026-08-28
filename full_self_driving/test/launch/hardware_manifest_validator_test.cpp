@@ -12,13 +12,11 @@ class HardwareManifestValidatorTest : public ::testing::Test
 protected:
   void SetUp() override
   {
-    std::vector<std::string> candidates = {
-      "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving",
-      "/home/yosh/roscon-25-workshop/full_self_driving",
-    };
+    std::vector<std::string> candidates;
     try {
-      candidates.insert(candidates.begin(), ament_index_cpp::get_package_share_directory("full_self_driving"));
+      candidates.push_back(ament_index_cpp::get_package_share_directory("full_self_driving"));
     } catch (const std::exception &) {}
+    candidates.push_back(fs::current_path().string());
 
     for (const auto & cand : candidates) {
       if (fs::exists(fs::path(cand) / "test" / "fixtures" / "manifests")) {

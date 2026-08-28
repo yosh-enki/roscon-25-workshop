@@ -28,8 +28,8 @@ protected:
 
     std::vector<std::string> candidates = {
       share_dir + "/test/fixtures/plans/aavc2026_mission.plan",
-      "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/test/fixtures/plans/aavc2026_mission.plan",
-      "/home/yosh/roscon-25-workshop/full_self_driving/test/fixtures/plans/aavc2026_mission.plan"
+      share_dir + "/share/full_self_driving/test/fixtures/plans/aavc2026_mission.plan",
+      "test/fixtures/plans/aavc2026_mission.plan"
     };
 
     for (const auto & path : candidates) {
@@ -127,13 +127,7 @@ TEST_F(WorkingPlanParityTest, SearchPlannerAlgorithmParity)
 // Test 3: Test parsing the original Desktop .plan file directly
 TEST_F(WorkingPlanParityTest, DesktopOriginalPlanVerification)
 {
-  std::string desktop_plan = "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/test/fixtures/plans/desktop_aavc2026_mission.plan";
-  if (!std::filesystem::is_regular_file(desktop_plan)) {
-    desktop_plan = "/home/ubuntu/roscon-25-workshop/full_self_driving/test/fixtures/plans/aavc2026_mission.plan";
-  }
-  if (!std::filesystem::is_regular_file(desktop_plan)) {
-    desktop_plan = "/home/yosh/Desktop/aavc2026_mission.plan";
-  }
+  std::string desktop_plan = fixture_path_;
 
   ASSERT_TRUE(std::filesystem::is_regular_file(desktop_plan))
     << "Desktop plan file not found at " << desktop_plan;
@@ -168,7 +162,14 @@ TEST_F(WorkingPlanParityTest, DesktopOriginalPlanVerification)
 // Test 4: WorkingPlan with Transit In and Transit Out routes
 TEST_F(WorkingPlanParityTest, WorkingPlanWithTransitRoutes)
 {
-  std::string kmitl_path = "/home/yosh/Documents/QGroundControl/Missions/kmitl.plan";
+  std::string share_dir;
+  try {
+    share_dir = ament_index_cpp::get_package_share_directory("full_self_driving");
+  } catch (...) {}
+  std::string kmitl_path = share_dir + "/test/fixtures/plans/kmitl.plan";
+  if (!std::filesystem::is_regular_file(kmitl_path)) {
+    kmitl_path = "test/fixtures/plans/kmitl.plan";
+  }
   if (std::filesystem::is_regular_file(kmitl_path)) {
     runtime::PlanManager pm;
     std::ifstream file(kmitl_path, std::ios::binary);

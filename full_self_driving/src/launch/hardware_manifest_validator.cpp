@@ -4,8 +4,8 @@
 #include <sstream>
 #include <iomanip>
 #include <filesystem>
-#include <unistd.h>
 #include <openssl/evp.h>
+#include <ament_index_cpp/get_package_share_directory.hpp>
 
 namespace fs = std::filesystem;
 
@@ -213,8 +213,9 @@ ValidationResult HardwareManifestValidator::validate_yaml(
           search_roots.push_back(fs::path(base_dir).parent_path().parent_path());
           search_roots.push_back(fs::path(base_dir).parent_path().parent_path().parent_path());
         }
-        search_roots.push_back("/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving");
-        search_roots.push_back("/home/yosh/roscon-25-workshop/full_self_driving");
+        try {
+          search_roots.push_back(ament_index_cpp::get_package_share_directory("full_self_driving"));
+        } catch (...) {}
         search_roots.push_back(fs::current_path());
 
         for (const auto & root_dir : search_roots) {

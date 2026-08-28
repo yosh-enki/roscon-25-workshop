@@ -54,54 +54,60 @@ def launch_setup(context, *args, **kwargs):
     try:
         pkg_share = FindPackageShare("full_self_driving").find("full_self_driving")
     except Exception:
-        pkg_share = "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving"
+        pkg_share = ""
 
     # Resolve Camera Calibration URL
     if not camera_info_url_arg:
-        calib_candidates = [
-            os.path.join(pkg_share, "config", "camera_calibrations", "c270_720p.yaml"),
+        calib_candidates = []
+        if pkg_share:
+            calib_candidates.append(os.path.join(pkg_share, "config", "camera_calibrations", "c270_720p.yaml"))
+        calib_candidates.extend([
+            os.path.expanduser("~/.ros/camera_info/c270.yaml"),
             "/root/.ros/camera_info/c270.yaml",
-            "/home/ubuntu/.ros/camera_info/c270.yaml",
-            "/home/yosh/roscon-25-workshop/full_self_driving/config/camera_calibrations/c270_720p.yaml",
-        ]
+        ])
         for c in calib_candidates:
             if os.path.exists(c):
                 camera_info_url_arg = f"file://{c}"
                 break
 
     # 1. Resolve Authoritative Config
-    if not config_path_arg:
-        candidates = [
+    if not config_path_arg and pkg_share:
+        for c in [
             os.path.join(pkg_share, "config", "fsd_parameters_real.yaml"),
             os.path.join(pkg_share, "config", "fsd_parameters.yaml"),
-            "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/config/fsd_parameters_real.yaml",
-            "/home/yosh/roscon-25-workshop/full_self_driving/config/fsd_parameters_real.yaml",
-        ]
-        for c in candidates:
+        ]:
             if os.path.exists(c):
                 config_path_arg = c
                 break
 
+    # If authoritative config exists, extract perception defaults if not overridden
+    if config_path_arg and os.path.exists(config_path_arg):
+        try:
+            with open(config_path_arg, "r", encoding="utf-8") as f:
+                cfg_yaml = yaml.safe_load(f) or {}
+            perc_cfg = cfg_yaml.get("perception", {})
+            if "dictionary" in perc_cfg and LaunchConfiguration("dictionary").perform(context) == "DICT_4X4_50":
+                dictionary_name = perc_cfg["dictionary"]
+            if "marker_size_m" in perc_cfg and LaunchConfiguration("marker_size").perform(context) == "0.40":
+                marker_size_val = float(perc_cfg["marker_size_m"])
+        except Exception as exc:
+            print(f"[WARN] Error extracting parameters from {config_path_arg}: {exc}", file=sys.stderr)
+
     # 2. Resolve Hardware Manifest
-    if not hardware_manifest_arg:
-        manifest_candidates = [
-            os.path.join(pkg_share, "config", "manifests", "hitl_rpi4_pixhawk.yaml"),
-            "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/config/manifests/hitl_rpi4_pixhawk.yaml",
-            "/home/yosh/roscon-25-workshop/full_self_driving/config/manifests/hitl_rpi4_pixhawk.yaml",
-        ]
-        for m in manifest_candidates:
-            if os.path.exists(m):
-                hardware_manifest_arg = m
-                break
+    if not hardware_manifest_arg and pkg_share:
+        default_manifest = os.path.join(pkg_share, "config", "manifests", "hitl_rpi4_pixhawk.yaml")
+        if os.path.exists(default_manifest):
+            hardware_manifest_arg = default_manifest
 
     entities = [
         LogInfo(msg="==============================================================="),
         LogInfo(msg=" 🚁 Starting FSD Autonomous Real Hardware Flight Stack"),
         LogInfo(msg=f"    • Serial Port:     {serial_port} @ {baud_rate} baud"),
+        LogInfo(msg=f"    • MicroXRCEAgent:  {'INTERNAL (Launch managed)' if start_agent else 'EXTERNAL (Daemon managed via ./run_raspi.sh)'}"),
         LogInfo(msg=f"    • Config:          {config_path_arg}"),
         LogInfo(msg=f"    • Manifest:        {hardware_manifest_arg}"),
         LogInfo(msg=f"    • World / Map:     {world_name}"),
-        LogInfo(msg=f"    • Target Marker:   ID {target_marker_id} ({dictionary_name})"),
+        LogInfo(msg=f"    • Target Marker:   ID {target_marker_id} ({dictionary_name}, {marker_size_val}m)"),
         LogInfo(msg="==============================================================="),
     ]
 
@@ -114,6 +120,8 @@ def launch_setup(context, *args, **kwargs):
             output="screen",
         )
         entities.append(dds_agent_process)
+    else:
+        entities.append(LogInfo(msg="ℹ️ MicroXRCEAgent spawn skipped (start_agent:=false). Assuming active daemon on " + serial_port))
 
     # --------------------------------------------------------------------------
     # B. Transforms (TF Tree: map -> odom -> base_link -> camera_frame)
@@ -415,7 +423,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "marker_size",
-            default_value="0.50",
+            default_value="0.40",
             description="Physical ArUco marker size in meters",
         ),
         DeclareLaunchArgument(

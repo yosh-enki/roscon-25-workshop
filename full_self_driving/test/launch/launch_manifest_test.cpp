@@ -18,8 +18,7 @@ protected:
     try {
       pkg_share_dir_ = ament_index_cpp::get_package_share_directory("full_self_driving");
     } catch (const std::exception & e) {
-      // Fallback for direct testing
-      pkg_share_dir_ = "/home/yosh/roscon-25-workshop/full_self_driving";
+      pkg_share_dir_ = fs::current_path().string();
     }
   }
 

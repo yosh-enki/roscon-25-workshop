@@ -75,15 +75,9 @@ def launch_setup(context, *args, **kwargs):
 
     # Auto-resolve authoritative parameter configuration file (fsd_parameters.yaml)
     if not config_path:
-        for cand in [
-            os.path.join(pkg_share, "config", "fsd_parameters.yaml"),
-            os.path.join(pkg_share, "config", "engineering_config_simulation.yaml"),
-            "/home/ubuntu/roscon-25-workshop/full_self_driving/config/fsd_parameters.yaml",
-            "/home/yosh/roscon-25-workshop/full_self_driving/config/fsd_parameters.yaml",
-        ]:
-            if os.path.exists(cand):
-                config_path = cand
-                break
+        cand = os.path.join(pkg_share, "config", "fsd_parameters.yaml")
+        if os.path.exists(cand):
+            config_path = cand
 
     # If authoritative config exists, extract perception & payload defaults if not overridden
     if config_path and os.path.exists(config_path):
@@ -153,8 +147,8 @@ def launch_setup(context, *args, **kwargs):
         x500_desc = infp.read()
 
     # Environment for Gazebo
-    gz_models_dir = profile_manifest.get("gazebo", {}).get("model_store", "/home/ubuntu/PX4-gazebo-models/models")
-    gz_server_config = profile_manifest.get("gazebo", {}).get("server_config_path", "/home/ubuntu/PX4-gazebo-models/server.config")
+    gz_models_dir = profile_manifest.get("gazebo", {}).get("model_store", os.path.expanduser("~/PX4-gazebo-models/models"))
+    gz_server_config = profile_manifest.get("gazebo", {}).get("server_config_path", os.path.expanduser("~/PX4-gazebo-models/server.config"))
     worlds_dir = os.path.join(pkg_share, "simulation", "worlds")
 
     gz_env = {
@@ -174,8 +168,8 @@ def launch_setup(context, *args, **kwargs):
     )
 
     # PX4 SITL command
-    px4_bin = profile_manifest.get("px4_sitl", {}).get("executable", "/home/ubuntu/px4_sitl/bin/px4")
-    px4_romfs = profile_manifest.get("px4_sitl", {}).get("working_dir", "/home/ubuntu/px4_sitl/romfs")
+    px4_bin = profile_manifest.get("px4_sitl", {}).get("executable", os.path.expanduser("~/px4_sitl/bin/px4"))
+    px4_romfs = profile_manifest.get("px4_sitl", {}).get("working_dir", os.path.expanduser("~/px4_sitl/romfs"))
     px4_model = profile_manifest.get("px4_sitl", {}).get("model_default", "x500_mono_cam_down")
     px4_env = {
         "PX4_GZ_STANDALONE": "1",

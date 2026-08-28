@@ -1,6 +1,0 @@
-aruco_tracker:
-  ros__parameters:
-    aruco_id: 5
-    dictionary: 0
-    marker_size: 0.4
-    camera_frame: "camera_frame"

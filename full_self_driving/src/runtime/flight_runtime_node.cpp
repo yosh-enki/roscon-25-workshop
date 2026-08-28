@@ -168,9 +168,7 @@ void FlightRuntimeNode::initialize_components()
       std::string share_dir = ament_index_cpp::get_package_share_directory("full_self_driving");
       std::vector<std::string> cands = {
         share_dir + "/config/fsd_parameters.yaml",
-        share_dir + "/config/engineering_config_simulation.yaml",
-        "/home/ubuntu/roscon-25-workshop/full_self_driving/config/fsd_parameters.yaml",
-        "/home/yosh/roscon-25-workshop/full_self_driving/config/fsd_parameters.yaml"
+        share_dir + "/config/fsd_parameters_real.yaml"
       };
       for (const auto & c : cands) {
         if (std::filesystem::exists(c)) {
@@ -208,12 +206,7 @@ void FlightRuntimeNode::initialize_components()
     std::string share_dir = ament_index_cpp::get_package_share_directory("full_self_driving");
     std::vector<std::string> candidates = {
       share_dir + "/test/fixtures/plans/kmitl.plan",
-      "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/test/fixtures/plans/kmitl.plan",
-      "/home/yosh/roscon-25-workshop/full_self_driving/test/fixtures/plans/kmitl.plan",
-      "/home/yosh/Documents/QGroundControl/Missions/kmitl.plan",
-      share_dir + "/test/fixtures/plans/aavc2026_mission.plan",
-      "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/test/fixtures/plans/aavc2026_mission.plan",
-      "/home/yosh/roscon-25-workshop/full_self_driving/test/fixtures/plans/aavc2026_mission.plan"
+      share_dir + "/test/fixtures/plans/aavc2026_mission.plan"
     };
     for (const auto & c : candidates) {
       if (std::filesystem::is_regular_file(c)) {

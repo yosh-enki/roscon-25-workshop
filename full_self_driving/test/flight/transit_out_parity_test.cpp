@@ -95,8 +95,7 @@ protected:
 
     std::vector<std::string> candidates = {
       share_dir + "/test/fixtures/prototype_behavior/transit_out/golden_transit_out_waypoints.yaml",
-      "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/test/fixtures/prototype_behavior/transit_out/golden_transit_out_waypoints.yaml",
-      "/home/yosh/roscon-25-workshop/full_self_driving/test/fixtures/prototype_behavior/transit_out/golden_transit_out_waypoints.yaml"
+      share_dir + "/share/full_self_driving/test/fixtures/prototype_behavior/transit_out/golden_transit_out_waypoints.yaml"
     };
 
     for (const auto & path : candidates) {
@@ -104,7 +103,7 @@ protected:
         return path;
       }
     }
-    return candidates.back();
+    return candidates.front();
   }
 
   std::shared_ptr<rclcpp::Node> node_;
