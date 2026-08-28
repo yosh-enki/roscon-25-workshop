@@ -118,15 +118,16 @@
 
 ### Task 6: Full Verification and Regression Gate
 
-- [ ] **Step 1: Clean build of entire workspace (`cbuild-all` / colcon build)**
+- [x] **Step 1: Clean build of entire workspace (`cbuild-all` / colcon build)**
   ```bash
   colcon build --symlink-install --parallel-workers 2 --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL=2
   ```
-- [ ] **Step 2: Run all unit and parity tests**
+- [x] **Step 2: Run all unit and parity tests**
   ```bash
   colcon test --packages-select full_self_driving px4_tf --parallel-workers 2
   colcon test-result --verbose
   ```
-- [ ] **Step 3: Perform SITL dry-run test with `full_self_driving.launch.py`**
-- [ ] **Step 4: Validate Foxglove layout compatibility with `foxglove/fsd_management.json`**
-- [ ] **Step 5: Final review and commit**
+- [x] **Step 3: Perform SITL dry-run test with `full_self_driving.launch.py` (Full Sortie Mission Verified: Takeoff -> Search 6 WPs -> Precision Land -> Release Payload -> Takeoff -> Return RTL)**
+- [x] **Step 4: Validate Foxglove layout compatibility with `foxglove/fsd_management.json` and create `FIELD_RUNBOOK.md`**
+- [x] **Step 5: Final review and commit**
+
