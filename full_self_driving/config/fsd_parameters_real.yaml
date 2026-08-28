@@ -26,8 +26,8 @@ safety:
 routes:
   transit_in_speed_m_s: 3.0
   transit_out_speed_m_s: 3.0
-  transit_altitude_m: 20.0
-  search_altitude_m: 12.0
+  transit_altitude_m: 10.0
+  search_altitude_m: 8.0
   approach_altitude_m: 2.0
   max_horizontal_velocity_m_s: 3.0
   landing_descent_rate_m_s: 0.25
