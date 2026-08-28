@@ -283,6 +283,9 @@ target_link_libraries(fsd_launch_core
   yaml-cpp
   OpenSSL::Crypto
 )
+ament_target_dependencies(fsd_launch_core
+  ament_index_cpp
+)
 
 
 # Flight Core Library
@@ -758,6 +761,7 @@ if(BUILD_TESTING)
   ament_target_dependencies(plan_round_trip_test
     rclcpp
     geometry_msgs
+    ament_index_cpp
   )
 
   ament_add_gtest(working_plan_parity_test
