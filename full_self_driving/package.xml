@@ -24,6 +24,7 @@
   <depend>px4_ros2_cpp</depend>
   <depend>cv_bridge</depend>
   <depend>yaml-cpp</depend>
+  <depend>ament_index_cpp</depend>
 
   <exec_depend>rosidl_default_runtime</exec_depend>
   <exec_depend>ros_gz_bridge</exec_depend>

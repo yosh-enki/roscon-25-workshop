@@ -264,8 +264,9 @@ source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true
 source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true
 export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:\$PATH
 cd /home/ubuntu/roscon-25-workshop_ws
-echo -e '\033[0;32m🔨 Building full_self_driving and px4_tf (2 workers, symlink-install)...\033[0m'
-exec colcon build --packages-select full_self_driving px4_tf --symlink-install --parallel-workers 2 \"\$@\"
+WORKERS=${PARALLEL_WORKERS:-2}
+echo -e "\033[0;32m🔨 Building full_self_driving and px4_tf (\${WORKERS} workers, symlink-install)...\033[0m"
+exec colcon build --packages-select full_self_driving px4_tf --symlink-install --parallel-workers "\${WORKERS}" --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL="\${WORKERS}" "\$@"
 EOF
         chmod +x /usr/local/bin/cbuild
 
@@ -277,8 +278,9 @@ source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true
 source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true
 export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:\$PATH
 cd /home/ubuntu/roscon-25-workshop_ws
-echo -e '\033[0;32m🔨 Building workspace (2 workers, symlink-install)...\033[0m'
-exec colcon build --symlink-install --parallel-workers 2 \"\$@\"
+WORKERS=${PARALLEL_WORKERS:-2}
+echo -e "\033[0;32m🔨 Building workspace (\${WORKERS} workers, symlink-install)...\033[0m"
+exec colcon build --symlink-install --parallel-workers "\${WORKERS}" --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL="\${WORKERS}" "\$@"
 EOF
         chmod +x /usr/local/bin/cbuild-all
 
