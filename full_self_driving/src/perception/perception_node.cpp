@@ -252,7 +252,7 @@ void PerceptionNode::image_callback(const sensor_msgs::msg::Image::SharedPtr msg
   }
 
   try {
-    cv_bridge::CvImageConstPtr cv_ptr = cv_bridge::toCvShare(msg, sensor_msgs::image_encodings::BGR8);
+    cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
 
     uint64_t monotonic_ns = static_cast<uint64_t>(
       std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -289,10 +289,15 @@ void PerceptionNode::image_callback(const sensor_msgs::msg::Image::SharedPtr msg
     }
 
     if (res.total_detected > 0) {
+      std::ostringstream ss;
+      for (const auto & obs : res.batch.observations) {
+        ss << " [ID " << obs.identity.marker_id << " (" << obs.identity.dictionary << ") xyz=("
+           << std::fixed << std::setprecision(2) << obs.pose.position.x << ", " << obs.pose.position.y << ", " << obs.pose.position.z << "m)]";
+      }
       RCLCPP_INFO_THROTTLE(
-        get_logger(), *get_clock(), 500,
-        "[PERCEPTION] Detected %zu markers in frame. Lock state: %d (consecutive: %u)",
-        res.batch.observations.size(), static_cast<int>(lock.lock_state), lock.consecutive_observations);
+        get_logger(), *get_clock(), 1000,
+        "[fsd_perception] 🎯 Detected %zu marker(s) in frame:%s | Lock: %s (consec: %u)",
+        res.total_detected, ss.str().c_str(), domain::to_string(lock.lock_state), lock.consecutive_observations);
     }
 
   } catch (const cv_bridge::Exception & e) {

@@ -18,20 +18,41 @@ def launch_setup(context, *args, **kwargs):
     serial_port = LaunchConfiguration("serial_port").perform(context).strip()
     baud_rate = LaunchConfiguration("baud_rate").perform(context).strip()
     start_agent_arg = LaunchConfiguration("start_agent").perform(context).lower()
+    start_camera_arg = LaunchConfiguration("start_camera").perform(context).lower()
+    camera_device = LaunchConfiguration("camera_device").perform(context).strip()
+    camera_driver = LaunchConfiguration("camera_driver").perform(context).strip().lower()
+    camera_fps_val = float(LaunchConfiguration("camera_fps").perform(context).strip())
+    camera_pixel_format = LaunchConfiguration("camera_pixel_format").perform(context).strip()
+    camera_info_url_arg = LaunchConfiguration("camera_info_url").perform(context).strip()
     world_name = LaunchConfiguration("world").perform(context).strip()
     payload_adapter = LaunchConfiguration("payload_adapter").perform(context).strip()
     gripper_inst = int(LaunchConfiguration("gripper_instance").perform(context).strip())
     dictionary_name = LaunchConfiguration("dictionary").perform(context).strip()
     marker_size_val = float(LaunchConfiguration("marker_size").perform(context).strip())
+    target_marker_id = int(LaunchConfiguration("target_marker_id").perform(context).strip())
     hardware_manifest_arg = LaunchConfiguration("hardware_manifest").perform(context).strip()
     use_sim_time_arg = LaunchConfiguration("use_sim_time").perform(context).lower()
     global_pos_topic = LaunchConfiguration("global_position_topic").perform(context).strip()
     camera_frame_val = LaunchConfiguration("camera_frame").perform(context).strip()
 
     start_agent = start_agent_arg in ["true", "1", "yes"]
+    start_camera = start_camera_arg in ["true", "1", "yes"]
     use_sim_time = use_sim_time_arg in ["true", "1", "yes"]
 
     pkg_share = FindPackageShare("full_self_driving").find("full_self_driving")
+
+    # Resolve Camera Calibration URL
+    if not camera_info_url_arg:
+        calib_candidates = [
+            os.path.join(pkg_share, "config", "camera_calibrations", "c270_720p.yaml"),
+            "/root/.ros/camera_info/c270.yaml",
+            "/home/ubuntu/.ros/camera_info/c270.yaml",
+            "/home/yosh/roscon-25-workshop/full_self_driving/config/camera_calibrations/c270_720p.yaml",
+        ]
+        for c in calib_candidates:
+            if os.path.exists(c):
+                camera_info_url_arg = f"file://{c}"
+                break
 
     # Resolve Hardware Manifest
     if not hardware_manifest_arg:

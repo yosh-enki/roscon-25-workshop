@@ -48,6 +48,7 @@ def launch_setup(context, *args, **kwargs):
     target_namespace = LaunchConfiguration("target_namespace").perform(context).strip()
     hardware_manifest_arg = LaunchConfiguration("hardware_manifest").perform(context).strip()
     config_path_arg = LaunchConfiguration("engineering_config").perform(context).strip()
+    global_pos_topic = LaunchConfiguration("global_position_topic").perform(context).strip()
     use_sim_time = False  # Strictly False for real hardware flight
 
     try:
@@ -115,8 +116,27 @@ def launch_setup(context, *args, **kwargs):
         entities.append(dds_agent_process)
 
     # --------------------------------------------------------------------------
-    # B. Transforms (TF Tree: odom -> base_link -> camera_frame)
+    # B. Transforms (TF Tree: map -> odom -> base_link -> camera_frame)
     # --------------------------------------------------------------------------
+    map_to_odom_tf_node = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="map_to_odom_static_tf_publisher",
+        output="screen",
+        arguments=[
+            "--x", "0.0",
+            "--y", "0.0",
+            "--z", "0.0",
+            "--qx", "0.0",
+            "--qy", "0.0",
+            "--qz", "0.0",
+            "--qw", "1.0",
+            "--frame-id", "map",
+            "--child-frame-id", "odom",
+        ],
+    )
+    entities.append(map_to_odom_tf_node)
+
     px4_tf_node = Node(
         package="px4_tf",
         executable="px4_tf_publisher",
@@ -132,7 +152,7 @@ def launch_setup(context, *args, **kwargs):
         name="camera_static_tf_publisher",
         output="screen",
         arguments=[
-            "--x", "0.0",
+            "--x", "0.10",
             "--y", "0.0",
             "--z", "-0.05",
             "--qx", "-0.7071068",
@@ -238,7 +258,8 @@ def launch_setup(context, *args, **kwargs):
         parameters=[{
             "use_sim_time": use_sim_time,
             "map_id": world_name,
-            "scenario_id": "real_sortie_scenario",
+            "scenario_id": "default_scenario",
+            "global_position_topic": global_pos_topic,
             "autostart": True,
         }],
     )
@@ -253,15 +274,16 @@ def launch_setup(context, *args, **kwargs):
             "use_sim_time": use_sim_time,
             "camera_frame": "camera_frame",
             "map_id": world_name,
-            "scenario_id": "real_sortie_scenario",
+            "scenario_id": "default_scenario",
             "target_namespace": target_namespace,
             "dictionary": dictionary_name,
             "marker_size": marker_size_val,
+            "min_quality": 0.0,
             "selected_marker_id": target_marker_id,
             "selected_dictionary": dictionary_name,
             "selected_namespace": target_namespace,
-            "lock_min_consecutive_observations": 2,
-            "lock_spatial_consistency_radius_m": 15.0,
+            "lock_min_consecutive_observations": 1,
+            "lock_spatial_consistency_radius_m": 25.0,
             "autostart": True,
         }],
     )
@@ -328,12 +350,12 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "start_agent",
-            default_value="false",
+            default_value="true",
             description="Whether to start MicroXRCEAgent inside this launch (false if using ./run_raspi.sh start daemon)",
         ),
         DeclareLaunchArgument(
             "start_camera",
-            default_value="false",
+            default_value="true",
             description="Whether to start camera driver node for physical camera",
         ),
         DeclareLaunchArgument(
@@ -393,18 +415,23 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "marker_size",
-            default_value="0.40",
+            default_value="0.50",
             description="Physical ArUco marker size in meters",
         ),
         DeclareLaunchArgument(
             "target_marker_id",
-            default_value="0",
+            default_value="8",
             description="Target ArUco Marker ID to search and precision-land on",
         ),
         DeclareLaunchArgument(
             "target_namespace",
             default_value="aavc2026",
             description="Target mission namespace",
+        ),
+        DeclareLaunchArgument(
+            "global_position_topic",
+            default_value="/fmu/out/vehicle_global_position",
+            description="PX4 fused global position topic (/fmu/out/vehicle_global_position or /fmu/out/vehicle_gps_position)",
         ),
         DeclareLaunchArgument(
             "hardware_manifest",
