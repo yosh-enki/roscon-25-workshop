@@ -8,13 +8,32 @@ Px4TfPublisherNode::Px4TfPublisherNode()
             std::make_unique<tf2_ros::TransformBroadcaster>(*this);
         tf_static_broadcaster_ = 
             std::make_unique<tf2_ros::StaticTransformBroadcaster>(*this);
+        
+        // Initialize default continuous transform (identity at origin before odometry arrives)
+        current_transform_.header.frame_id = px4_tf_prefix_ + "odom_ned";
+        current_transform_.child_frame_id = px4_tf_prefix_ + "base_link_frd";
+        current_transform_.transform.translation.x = 0.0;
+        current_transform_.transform.translation.y = 0.0;
+        current_transform_.transform.translation.z = 0.0;
+        current_transform_.transform.rotation.x = 0.0;
+        current_transform_.transform.rotation.y = 0.0;
+        current_transform_.transform.rotation.z = 0.0;
+        current_transform_.transform.rotation.w = 1.0;
+
         this->make_static_transforms();
+
         odom_sub_ = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
-            "fmu/out/vehicle_odometry",
+            "/fmu/out/vehicle_odometry",
             rclcpp::SensorDataQoS(),
             [this](const px4_msgs::msg::VehicleOdometry::SharedPtr msg) {
                 this->handle_odometry(msg);
             }
+        );
+
+        // 20 Hz heartbeat timer to ensure TF tree is always connected
+        timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(50),
+            std::bind(&Px4TfPublisherNode::timer_callback, this)
         );
 }
 
@@ -52,16 +71,23 @@ void Px4TfPublisherNode::make_static_transforms() {
 
 void Px4TfPublisherNode::handle_odometry(
     const px4_msgs::msg::VehicleOdometry::SharedPtr msg) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    current_transform_.transform.translation.x = msg->position[0];
+    current_transform_.transform.translation.y = msg->position[1];
+    current_transform_.transform.translation.z = msg->position[2];
+    current_transform_.transform.rotation.x = msg->q[1];
+    current_transform_.transform.rotation.y = msg->q[2];
+    current_transform_.transform.rotation.z = msg->q[3];
+    current_transform_.transform.rotation.w = msg->q[0];
+    has_odom_ = true;
+}
+
+void Px4TfPublisherNode::timer_callback() {
     geometry_msgs::msg::TransformStamped t;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        t = current_transform_;
+    }
     t.header.stamp = this->get_clock()->now();
-    t.header.frame_id = px4_tf_prefix_ + "odom_ned";
-    t.child_frame_id = px4_tf_prefix_ + "base_link_frd";
-    t.transform.translation.x = msg->position[0];
-    t.transform.translation.y = msg->position[1];
-    t.transform.translation.z = msg->position[2];
-    t.transform.rotation.x = msg->q[1];
-    t.transform.rotation.y = msg->q[2];
-    t.transform.rotation.z = msg->q[3];
-    t.transform.rotation.w = msg->q[0];
     tf_broadcaster_->sendTransform(t);
 }
