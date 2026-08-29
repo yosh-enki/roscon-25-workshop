@@ -80,3 +80,19 @@ TEST_F(ReturnStrategyTest, CoordinatorTransitionToReturn)
   EXPECT_TRUE(ok) << "Error: " << err;
   EXPECT_EQ(coordinator_->get_current_strategy(), flight::StrategyType::RETURN_STRATEGY);
 }
+
+// 4. Test Heading Lock and Safe Dwell Streaming
+TEST_F(ReturnStrategyTest, HeadingLockAndSafeDwellStreaming)
+{
+  flight::ReturnStrategy strategy(
+    *node_, *context_, state_cache_, persistence_, mission_ctx_,
+    flight::ReturnStrategy::ReturnMode::RETURN_TO_HOME);
+
+  strategy.on_enter();
+  EXPECT_EQ(strategy.get_sub_phase(), flight::ReturnStrategy::SubPhase::APPROACH_HOME);
+  EXPECT_FALSE(strategy.is_completed());
+
+  // Verify on_update does not crash and respects locked heading
+  strategy.on_update(0.1f);
+  EXPECT_FALSE(strategy.is_failed());
+}

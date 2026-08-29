@@ -52,6 +52,16 @@ void ReturnStrategy::on_enter()
   dwell_timer_s_ = 0.0f;
   hover_settle_timer_s_ = 0.0f;
   home_initialized_ = false;
+  heading_locked_ = false;
+  hold_heading_rad_ = 0.0f;
+
+  if (state_cache_) {
+    auto snapshot = state_cache_->capture_snapshot();
+    if (snapshot.local_pos_valid && std::isfinite(snapshot.heading)) {
+      hold_heading_rad_ = snapshot.heading;
+      heading_locked_ = true;
+    }
+  }
 
   if (return_mode_ == ReturnMode::LAND_IMMEDIATELY) {
     sub_phase_ = SubPhase::DESCEND_HOME;
@@ -69,7 +79,24 @@ void ReturnStrategy::on_exit()
 
 void ReturnStrategy::on_update(float dt_s)
 {
-  if (completed_ || failed_) {
+  if (failed_) {
+    return;
+  }
+
+  // Keep streaming zero-velocity setpoint with locked heading after touchdown
+  // until the vehicle is fully disarmed. This prevents setpoint starvation and avoids
+  // PX4 Offboard Loss / Safe Recovery Failsafe from triggering on the ground.
+  if (completed_) {
+    if (goto_setpoint_ && home_initialized_) {
+      Eigen::Vector3d target{home_lat_, home_lon_, home_alt_msl_};
+      goto_setpoint_->update(target, hold_heading_rad_, 0.0f, 0.0f, 0.0f);
+    }
+    if (traj_setpoint_) {
+      traj_setpoint_->update(
+        Eigen::Vector3f{0.0f, 0.0f, 0.0f},
+        std::nullopt,
+        hold_heading_rad_);
+    }
     return;
   }
 
@@ -79,6 +106,11 @@ void ReturnStrategy::on_update(float dt_s)
   }
 
   auto snapshot = state_cache_->capture_snapshot();
+
+  if (!heading_locked_ && snapshot.local_pos_valid && std::isfinite(snapshot.heading)) {
+    hold_heading_rad_ = snapshot.heading;
+    heading_locked_ = true;
+  }
 
   if (!home_initialized_) {
     if (mission_ctx_ && mission_ctx_->has_origin_home_position()) {
@@ -107,7 +139,7 @@ void ReturnStrategy::on_update(float dt_s)
   if (return_mode_ == ReturnMode::HOLD_AT_FINAL_WAYPOINT) {
     if (goto_setpoint_ && snapshot.global_pos_valid) {
       Eigen::Vector3d hold_target{snapshot.global_position.x(), snapshot.global_position.y(), snapshot.global_position.z()};
-      goto_setpoint_->update(hold_target, std::nullopt, 0.0f, 0.0f, 0.0f);
+      goto_setpoint_->update(hold_target, hold_heading_rad_, 0.0f, 0.0f, 0.0f);
     }
     return;
   }
@@ -121,21 +153,32 @@ void ReturnStrategy::on_update(float dt_s)
       float h_speed = std::sqrt(snapshot.local_velocity_ned.x() * snapshot.local_velocity_ned.x() +
                                 snapshot.local_velocity_ned.y() * snapshot.local_velocity_ned.y());
 
+      // Update course heading while in transit at sufficient horizontal speed
+      if (h_speed >= 0.3f && snapshot.local_pos_valid) {
+        hold_heading_rad_ = std::atan2(snapshot.local_velocity_ned.y(), snapshot.local_velocity_ned.x());
+        heading_locked_ = true;
+      }
+
       // Progressive velocity braking to eliminate forward overshoot:
       float approach_speed = 3.0f;
       if (std::isfinite(h_dist) && h_dist < 6.0f) {
         approach_speed = std::clamp(h_dist * 0.5f, 0.4f, 2.0f);
       }
-      goto_setpoint_->update(target, std::nullopt, approach_speed, 1.0f, 0.785f);
+      goto_setpoint_->update(target, hold_heading_rad_, approach_speed, 1.0f, 0.785f);
 
       // Strict zero-momentum hover gate (< 35cm error and < 0.20 m/s ground speed):
       if (std::isfinite(h_dist) && h_dist <= 0.35f && h_speed <= 0.20f) {
         hover_settle_timer_s_ += dt_s;
         if (hover_settle_timer_s_ >= kHoverSettleDurationS) {
+          // Lock heading permanently for the entire descent and touchdown sequence
+          if (snapshot.local_pos_valid && std::isfinite(snapshot.heading)) {
+            hold_heading_rad_ = snapshot.heading;
+          }
+          heading_locked_ = true;
           RCLCPP_INFO(
             node_.get_logger(),
-            "[RETURN_STRATEGY] Zero-momentum hover STABILIZED over Home Base (dist=%.2f m, speed=%.2f m/s). Starting 2-stage descent...",
-            h_dist, h_speed);
+            "[RETURN_STRATEGY] Zero-momentum hover STABILIZED over Home Base (dist=%.2f m, speed=%.2f m/s, heading=%.2f deg). Starting 2-stage descent...",
+            h_dist, h_speed, hold_heading_rad_ * 180.0f / static_cast<float>(M_PI));
           sub_phase_ = SubPhase::DESCEND_HOME;
         }
       } else {
@@ -162,19 +205,19 @@ void ReturnStrategy::on_update(float dt_s)
     // 2-Stage Descent: 1.0 m/s above 2.5m, 0.35 m/s soft touchdown below 2.5m
     float descent_speed = (current_alt_agl > approach_threshold_m) ? 1.0f : 0.35f;
 
-    // Closed-loop horizontal position guidance locked to exact (home_lat_, home_lon_):
+    // Closed-loop horizontal position guidance locked to exact (home_lat_, home_lon_) with locked heading:
     if (goto_setpoint_ && home_initialized_) {
       Eigen::Vector3d target{home_lat_, home_lon_, home_alt_msl_};
-      goto_setpoint_->update(target, std::nullopt, 0.5f, descent_speed);
+      goto_setpoint_->update(target, hold_heading_rad_, 0.5f, descent_speed);
     } else if (traj_setpoint_) {
       traj_setpoint_->update(
         Eigen::Vector3f{0.0f, 0.0f, descent_speed},
         std::nullopt,
-        std::nullopt);
+        hold_heading_rad_);
     }
 
     float vz = snapshot.local_velocity_ned.z();
-    if (snapshot.is_landed || (snapshot.local_position_ned.z() >= -0.3f && std::abs(vz) < 0.25f)) {
+    if (snapshot.is_landed || (snapshot.local_position_ned.z() >= -0.1f && std::abs(vz) < 0.15f)) {
       RCLCPP_INFO(node_.get_logger(), "[RETURN_STRATEGY] Touchdown at Home Base detected! Dwell verification starting...");
       sub_phase_ = SubPhase::TOUCHDOWN_DWELL;
       dwell_timer_s_ = 0.0f;
@@ -182,11 +225,15 @@ void ReturnStrategy::on_update(float dt_s)
   }
 
   if (sub_phase_ == SubPhase::TOUCHDOWN_DWELL) {
+    if (goto_setpoint_ && home_initialized_) {
+      Eigen::Vector3d target{home_lat_, home_lon_, home_alt_msl_};
+      goto_setpoint_->update(target, hold_heading_rad_, 0.0f, 0.0f, 0.0f);
+    }
     if (traj_setpoint_) {
       traj_setpoint_->update(
         Eigen::Vector3f{0.0f, 0.0f, 0.0f},
         std::nullopt,
-        std::nullopt);
+        hold_heading_rad_);
     }
     dwell_timer_s_ += dt_s;
     if (dwell_timer_s_ >= kTouchdownDwellDurationS) {

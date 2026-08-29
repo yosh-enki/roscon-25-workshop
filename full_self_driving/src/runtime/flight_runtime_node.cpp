@@ -739,19 +739,25 @@ void FlightRuntimeNode::trigger_evaluation_cycle()
       }
     }
 
-    // 3. Handle touchdown during RETURN_STRATEGY on ground
+    // 3. Handle touchdown during RETURN_STRATEGY on ground (requires PX4 landed detector confirmation)
     if (current_strat == flight::StrategyType::RETURN_STRATEGY) {
       if (state_cache_) {
         auto snapshot = state_cache_->capture_snapshot();
-        float vz = snapshot.local_velocity_ned.z();
-        if (snapshot.is_landed || (snapshot.local_position_ned.z() >= -0.3f && std::abs(vz) < 0.25f)) {
+        if (snapshot.is_landed) {
           RCLCPP_INFO(get_logger(),
-            "[RUNTIME] (Periodic) Return strategy touchdown verified at Home Base. Transitioning to RETURN_LANDED...");
+            "[RUNTIME] (Periodic) Return strategy touchdown verified at Home Base (is_landed=true). Transitioning to RETURN_LANDED and disarming...");
           was_disarmed_after_return_ = false;
           coordinator_->request_transition(flight::StrategyType::RETURN_LANDED);
           if (context_) {
             context_->clear_target();
             RCLCPP_INFO(get_logger(), "[RUNTIME] (Periodic) Target identity cleared on return touchdown.");
+          }
+          if (executor_) {
+            executor_->disarm([](px4_ros2::Result result) {
+              RCLCPP_INFO(rclcpp::get_logger("FlightRuntimeNode"),
+                "[RUNTIME] (Periodic) Mission disarm on return completed: %s",
+                px4_ros2::resultToString(result));
+            });
           }
         }
       }

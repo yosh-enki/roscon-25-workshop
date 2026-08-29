@@ -70,6 +70,8 @@ public:
 
   ReturnMode get_return_mode() const { return return_mode_; }
   SubPhase get_sub_phase() const { return sub_phase_; }
+  float get_hold_heading_rad() const { return hold_heading_rad_; }
+  bool is_heading_locked() const { return heading_locked_; }
   std::string failure_reason() const override { return failure_reason_; }
 
 private:
@@ -92,10 +94,13 @@ private:
   bool home_initialized_{false};
 
   float dwell_timer_s_{0.0f};
-  static constexpr float kTouchdownDwellDurationS = 0.5f;
+  static constexpr float kTouchdownDwellDurationS = 1.0f;
 
   float hover_settle_timer_s_{0.0f};
   static constexpr float kHoverSettleDurationS = 0.5f;
+
+  float hold_heading_rad_{0.0f};
+  bool heading_locked_{false};
 
   bool completed_{false};
   bool failed_{false};

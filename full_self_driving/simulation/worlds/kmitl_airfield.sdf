@@ -241,22 +241,22 @@
       </link>
     </model>
 
-    <!-- aruco_pad_1: at (90, 85, 0.025), PBR Albedo aruco_1.png -->
+    <!-- aruco_pad_1: at (90, 85, 0.50), Height 1.0m (Elevated Platform), PBR Albedo aruco_1.png -->
     <model name="aruco_pad_1">
       <static>true</static>
-      <pose>90 85 0.025 0 0 0</pose>
+      <pose>90 85 0.50 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
             <box>
-              <size>1.0 1.0 0.05</size>
+              <size>1.0 1.0 1.0</size>
             </box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
             <box>
-              <size>1.0 1.0 0.05</size>
+              <size>1.0 1.0 1.0</size>
             </box>
           </geometry>
           <material>
@@ -274,22 +274,22 @@
       </link>
     </model>
 
-    <!-- aruco_pad_2: at (210, 85, 0.025), PBR Albedo aruco_2.png -->
+    <!-- aruco_pad_2: at (210, 85, 1.00), Height 2.0m (Elevated Platform), PBR Albedo aruco_2.png -->
     <model name="aruco_pad_2">
       <static>true</static>
-      <pose>210 85 0.025 0 0 0</pose>
+      <pose>210 85 1.00 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
             <box>
-              <size>1.0 1.0 0.05</size>
+              <size>1.0 1.0 2.0</size>
             </box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
             <box>
-              <size>1.0 1.0 0.05</size>
+              <size>1.0 1.0 2.0</size>
             </box>
           </geometry>
           <material>
@@ -307,22 +307,22 @@
       </link>
     </model>
 
-    <!-- aruco_pad_3: at (90, 55, 0.025), PBR Albedo aruco_3.png -->
+    <!-- aruco_pad_3: at (90, 55, 2.50), Height 5.0m (Elevated Rooftop Platform), PBR Albedo aruco_3.png -->
     <model name="aruco_pad_3">
       <static>true</static>
-      <pose>90 55 0.025 0 0 0</pose>
+      <pose>90 55 2.50 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
             <box>
-              <size>1.0 1.0 0.05</size>
+              <size>1.0 1.0 5.0</size>
             </box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
             <box>
-              <size>1.0 1.0 0.05</size>
+              <size>1.0 1.0 5.0</size>
             </box>
           </geometry>
           <material>
@@ -340,22 +340,22 @@
       </link>
     </model>
 
-    <!-- aruco_pad_4: at (210, 55, 0.025), PBR Albedo aruco_4.png -->
+    <!-- aruco_pad_4: at (210, 55, 3.00), Height 6.0m (Elevated High-Structure Platform), PBR Albedo aruco_4.png -->
     <model name="aruco_pad_4">
       <static>true</static>
-      <pose>210 55 0.025 0 0 0</pose>
+      <pose>210 55 3.00 0 0 0</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
             <box>
-              <size>1.0 1.0 0.05</size>
+              <size>1.0 1.0 6.0</size>
             </box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
             <box>
-              <size>1.0 1.0 0.05</size>
+              <size>1.0 1.0 6.0</size>
             </box>
           </geometry>
           <material>
