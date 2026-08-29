@@ -338,11 +338,14 @@ void PrecisionLandStrategy::on_update(float dt_s)
         return;
       }
 
-      // Approach using position setpoints over landing target while maintaining approach altitude
+      // Approach using position setpoints over landing target while maintaining approach altitude relative to pad
+      double pad_z_ned = last_world_tag_.valid ? last_world_tag_.position.z() : 0.0;
+      float target_z_ned = static_cast<float>(pad_z_ned - approach_altitude_m_);
+
       Eigen::Vector3f target_position_ned(
         static_cast<float>(last_world_tag_.position.x()),
         static_cast<float>(last_world_tag_.position.y()),
-        static_cast<float>(-approach_altitude_m_));
+        target_z_ned);
 
       if (trajectory_setpoint_) {
         // Prototype Parity: position setpoint in local NED
@@ -353,7 +356,8 @@ void PrecisionLandStrategy::on_update(float dt_s)
         double lat_rad = home_lat * M_PI / 180.0;
         double target_lat = home_lat + (last_world_tag_.position.x() / 111132.954);
         double target_lon = home_lon + (last_world_tag_.position.y() / (111132.954 * std::cos(lat_rad)));
-        Eigen::Vector3d target_global(target_lat, target_lon, approach_altitude_amsl_m_);
+        double target_alt_amsl = home_altitude_msl_m_ - pad_z_ned + approach_altitude_m_;
+        Eigen::Vector3d target_global(target_lat, target_lon, target_alt_amsl);
 
         double siny_cosp = 2.0 * (last_world_tag_.orientation.w() * last_world_tag_.orientation.z() +
                                   last_world_tag_.orientation.x() * last_world_tag_.orientation.y());
@@ -370,8 +374,8 @@ void PrecisionLandStrategy::on_update(float dt_s)
       if (delta_pos_norm < delta_position_ && current_velocity_norm_ < delta_velocity_) {
         RCLCPP_INFO(
           node_.get_logger(),
-          "[PRECISION_LAND] Target centered at approach altitude! Switching to DESCEND (pos_err=%.3fm, vel=%.3fm/s)",
-          delta_pos_norm, current_velocity_norm_);
+          "[PRECISION_LAND] Target centered at approach altitude (%.2fm above pad)! Switching to DESCEND (pos_err=%.3fm, vel=%.3fm/s)",
+          approach_altitude_m_, delta_pos_norm, current_velocity_norm_);
         switch_to_sub_phase(PrecisionLandSubPhase::DESCEND);
       }
       break;
@@ -408,12 +412,16 @@ void PrecisionLandStrategy::on_update(float dt_s)
         double lat_rad = home_lat * M_PI / 180.0;
         double target_lat = home_lat + (last_world_tag_.position.x() / 111132.954);
         double target_lon = home_lon + (last_world_tag_.position.y() / (111132.954 * std::cos(lat_rad)));
-        Eigen::Vector3d target_global(target_lat, target_lon, home_altitude_msl_m_);
+        double pad_z = last_world_tag_.valid ? last_world_tag_.position.z() : 0.0;
+        double target_alt_amsl = home_altitude_msl_m_ - pad_z;
+        Eigen::Vector3d target_global(target_lat, target_lon, target_alt_amsl);
         goto_setpoint_->update(target_global, tag_yaw, max_velocity_);
       }
 
-      // Check touchdown / land detection
-      if (snapshot.is_landed || (snapshot.local_position_ned.z() >= -0.3f && std::abs(vz) < 0.25f)) {
+      // Check touchdown / land detection (supporting elevated pads/rooftops)
+      float height_above_pad = last_world_tag_.valid ?
+        static_cast<float>(last_world_tag_.position.z() - snapshot.local_position_ned.z()) : 100.0f;
+      if (snapshot.is_landed || (height_above_pad <= 0.20f && std::abs(vz) < 0.25f) || (snapshot.local_position_ned.z() >= -0.3f && std::abs(vz) < 0.25f)) {
         RCLCPP_INFO(node_.get_logger(), "[PRECISION_LAND] Touchdown detected! Verifying landing...");
         landed_dwell_s_ = 0.0f;
         switch_to_sub_phase(PrecisionLandSubPhase::LANDED_VERIFY);
