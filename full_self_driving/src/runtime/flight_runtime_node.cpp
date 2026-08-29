@@ -958,21 +958,37 @@ void FlightRuntimeNode::check_and_register_mode()
           coordinator_->request_transition(flight::StrategyType::RETURN_STRATEGY);
         }
       } else if (completed_type == flight::StrategyType::RETURN_STRATEGY) {
-        RCLCPP_INFO(get_logger(), "[RUNTIME] ReturnStrategy completed at Home Base. Transitioning to RETURN_LANDED and disarming...");
+        RCLCPP_INFO(get_logger(), "[RUNTIME] ReturnStrategy completed at Home Base. Triggering final landing & disarm sequence...");
         was_disarmed_after_return_ = false;
-        if (coordinator_) {
-          coordinator_->request_transition(flight::StrategyType::RETURN_LANDED);
-        }
         if (context_) {
           context_->clear_target();
           RCLCPP_INFO(get_logger(), "[RUNTIME] Sortie completed at Home Base. Target identity cleared to prevent loop.");
         }
         if (executor_) {
-          executor_->disarm([](px4_ros2::Result result) {
-            RCLCPP_INFO(rclcpp::get_logger("FlightRuntimeNode"),
-              "[RUNTIME] Final mission disarm completed with result: %s",
-              px4_ros2::resultToString(result));
-          });
+          auto snapshot = state_cache_ ? state_cache_->capture_snapshot() : adapters::Px4StateSnapshot{};
+          if (snapshot.is_landed) {
+            RCLCPP_INFO(get_logger(), "[RUNTIME] Vehicle already landed. Disarming motors...");
+            executor_->disarm([this](px4_ros2::Result result) {
+              RCLCPP_INFO(rclcpp::get_logger("FlightRuntimeNode"),
+                "[RUNTIME] Final mission disarm completed with result: %s",
+                px4_ros2::resultToString(result));
+              was_disarmed_after_return_ = true;
+              if (coordinator_) {
+                coordinator_->request_transition(flight::StrategyType::RETURN_LANDED);
+              }
+            }, /*forced=*/true);
+          } else {
+            RCLCPP_INFO(get_logger(), "[RUNTIME] Scheduling native PX4 land sequence at Home Base for smooth touchdown & auto-disarm...");
+            executor_->land([this](px4_ros2::Result result) {
+              RCLCPP_INFO(rclcpp::get_logger("FlightRuntimeNode"),
+                "[RUNTIME] Native land and auto-disarm completed with result: %s. Transitioning to RETURN_LANDED...",
+                px4_ros2::resultToString(result));
+              was_disarmed_after_return_ = true;
+              if (coordinator_) {
+                coordinator_->request_transition(flight::StrategyType::RETURN_LANDED);
+              }
+            });
+          }
         }
       }
     });
@@ -1004,6 +1020,12 @@ void FlightRuntimeNode::check_and_register_mode()
                                  current_strat == flight::StrategyType::RETURN_LANDED)) {
         RCLCPP_INFO(get_logger(),
           "[RUNTIME] Mode executor deactivated on ground during landing/payload (is_landed=true, reason=%d). Ignoring takeover latch.",
+          static_cast<int>(reason));
+        return;
+      }
+      if (current_strat == flight::StrategyType::RETURN_STRATEGY || current_strat == flight::StrategyType::RETURN_LANDED) {
+        RCLCPP_INFO(get_logger(),
+          "[RUNTIME] Mode executor deactivated during return landing phase (reason=%d). Ignoring takeover latch.",
           static_cast<int>(reason));
         return;
       }
