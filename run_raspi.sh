@@ -255,18 +255,18 @@ DAEMON_BOOTSTRAP="\
 
 # Inject executable helper commands and environment into container
 ensure_container_setup() {
-    docker exec --user root "${CONTAINER_NAME}" bash -c "
+    docker exec -i --user root "${CONTAINER_NAME}" bash << 'CONTAINER_SETUP_EOF' 2>/dev/null || true
         cat << 'EOF' > /usr/local/bin/cbuild
 #!/usr/bin/env bash
 set -e
 source /opt/ros/humble/setup.bash 2>/dev/null || true
 source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true
 source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true
-export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:\$PATH
+export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:$PATH
 cd /home/ubuntu/roscon-25-workshop_ws
 WORKERS=${PARALLEL_WORKERS:-2}
-echo -e "\033[0;32m🔨 Building full_self_driving and px4_tf (\${WORKERS} workers, symlink-install)...\033[0m"
-exec colcon build --packages-select full_self_driving px4_tf --symlink-install --parallel-workers "\${WORKERS}" --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL="\${WORKERS}" "\$@"
+echo -e "\033[0;32m🔨 Building full_self_driving and px4_tf (${WORKERS} workers, symlink-install)...\033[0m"
+exec colcon build --packages-select full_self_driving px4_tf --symlink-install --parallel-workers "${WORKERS}" --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL="${WORKERS}" "$@"
 EOF
         chmod +x /usr/local/bin/cbuild
 
@@ -276,11 +276,11 @@ set -e
 source /opt/ros/humble/setup.bash 2>/dev/null || true
 source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true
 source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true
-export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:\$PATH
+export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:$PATH
 cd /home/ubuntu/roscon-25-workshop_ws
 WORKERS=${PARALLEL_WORKERS:-2}
-echo -e "\033[0;32m🔨 Building workspace (\${WORKERS} workers, symlink-install)...\033[0m"
-exec colcon build --symlink-install --parallel-workers "\${WORKERS}" --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL="\${WORKERS}" "\$@"
+echo -e "\033[0;32m🔨 Building workspace (${WORKERS} workers, symlink-install)...\033[0m"
+exec colcon build --symlink-install --parallel-workers "${WORKERS}" --cmake-args -DCMAKE_BUILD_PARALLEL_LEVEL="${WORKERS}" "$@"
 EOF
         chmod +x /usr/local/bin/cbuild-all
 
@@ -288,8 +288,8 @@ EOF
 #!/usr/bin/env bash
 source /opt/ros/humble/setup.bash 2>/dev/null || true
 source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true
-export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:\$PATH
-exec nice -n -10 MicroXRCEAgent serial --dev \"\${PIXHAWK_DEV:-${SERIAL_DEV}}\" -b \"\${PIXHAWK_BAUD:-${BAUDRATE}}\" -v 3 \"\$@\"
+export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:$PATH
+exec nice -n -10 MicroXRCEAgent serial --dev "${PIXHAWK_DEV:-/dev/ttyAMA0}" -b "${PIXHAWK_BAUD:-921600}" -v 3 "$@"
 EOF
         chmod +x /usr/local/bin/run-agent
 
@@ -297,14 +297,14 @@ EOF
 source /opt/ros/humble/setup.bash 2>/dev/null || true
 source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null || true
 source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null || true
-export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:\$PATH
+export PATH=/home/ubuntu/px4_ros_ws/install/micro_xrce_dds_agent/bin:$PATH
 EOF
 
         for rc in /root/.bashrc /home/ubuntu/.bashrc; do
-            grep -q 'source /etc/profile.d/roscon_setup.sh' \$rc 2>/dev/null || echo 'source /etc/profile.d/roscon_setup.sh' >> \$rc
-            grep -q 'source /opt/ros/humble/setup.bash' \$rc 2>/dev/null || echo 'source /opt/ros/humble/setup.bash' >> \$rc
-            grep -q 'px4_ros_ws/install/setup.bash' \$rc 2>/dev/null || echo 'source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null' >> \$rc
-            grep -q 'roscon-25-workshop_ws/install/setup.bash' \$rc 2>/dev/null || echo 'source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null' >> \$rc
+            grep -q 'source /etc/profile.d/roscon_setup.sh' $rc 2>/dev/null || echo 'source /etc/profile.d/roscon_setup.sh' >> $rc
+            grep -q 'source /opt/ros/humble/setup.bash' $rc 2>/dev/null || echo 'source /opt/ros/humble/setup.bash' >> $rc
+            grep -q 'px4_ros_ws/install/setup.bash' $rc 2>/dev/null || echo 'source /home/ubuntu/px4_ros_ws/install/setup.bash 2>/dev/null' >> $rc
+            grep -q 'roscon-25-workshop_ws/install/setup.bash' $rc 2>/dev/null || echo 'source /home/ubuntu/roscon-25-workshop_ws/install/setup.bash 2>/dev/null' >> $rc
         done
 
         # Ensure volatile storage and camera calibration are available inside container
@@ -314,7 +314,7 @@ EOF
             cp "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/config/camera_calibrations/c270_720p.yaml" /root/.ros/camera_info/c270.yaml 2>/dev/null || true
             cp "/home/ubuntu/roscon-25-workshop_ws/src/roscon-25-workshop/full_self_driving/config/camera_calibrations/c270_720p.yaml" /home/ubuntu/.ros/camera_info/c270.yaml 2>/dev/null || true
         fi
-    " 2>/dev/null || true
+CONTAINER_SETUP_EOF
 }
 
 echo -e "${CYAN}========================================================${NC}"
