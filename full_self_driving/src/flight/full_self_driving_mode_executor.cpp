@@ -7,6 +7,7 @@ FullSelfDrivingModeExecutor::FullSelfDrivingModeExecutor(
   rclcpp::Node & node,
   FullSelfDrivingMode & owned_mode,
   std::shared_ptr<adapters::Px4StateCache> state_cache,
+  std::shared_ptr<domain::MissionContext> mission_ctx,
   const std::string & topic_namespace_prefix)
 : px4_ros2::ModeExecutorBase(
     node,
@@ -15,14 +16,22 @@ FullSelfDrivingModeExecutor::FullSelfDrivingModeExecutor(
     topic_namespace_prefix),
   node_(node),
   mode_(owned_mode),
-  state_cache_(std::move(state_cache))
+  state_cache_(std::move(state_cache)),
+  mission_ctx_(std::move(mission_ctx))
 {
 }
 
 void FullSelfDrivingModeExecutor::trigger_takeoff_sequence()
 {
   float target_amsl = takeoff_altitude_;
-  if (state_cache_) {
+  if (mission_ctx_ && mission_ctx_->has_origin_home_position()) {
+    auto origin = mission_ctx_->get_origin_home_position();
+    target_amsl = static_cast<float>(origin.altitude_msl_m) + takeoff_altitude_;
+    RCLCPP_INFO(
+      node_.get_logger(),
+      "[EXECUTOR] Starting takeoff referenced to Sortie Origin Airfield: Origin AMSL = %.2f m, Relative Target = +%.2f m -> Target AMSL = %.2f m",
+      origin.altitude_msl_m, takeoff_altitude_, target_amsl);
+  } else if (state_cache_) {
     auto snapshot = state_cache_->capture_snapshot();
     if (snapshot.home_pos_valid) {
       target_amsl = static_cast<float>(snapshot.home_global_position.z()) + takeoff_altitude_;

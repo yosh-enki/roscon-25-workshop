@@ -6,6 +6,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include <px4_ros2/components/mode_executor.hpp>
+#include "domain/mission_context.hpp"
 #include "flight/full_self_driving_mode.hpp"
 
 namespace full_self_driving::flight
@@ -21,6 +22,7 @@ public:
     rclcpp::Node & node,
     FullSelfDrivingMode & owned_mode,
     std::shared_ptr<adapters::Px4StateCache> state_cache = nullptr,
+    std::shared_ptr<domain::MissionContext> mission_ctx = nullptr,
     const std::string & topic_namespace_prefix = "");
 
   ~FullSelfDrivingModeExecutor() override = default;
@@ -30,6 +32,7 @@ public:
   void set_takeoff_altitude(float alt) { takeoff_altitude_ = alt; }
   float takeoff_altitude() const { return takeoff_altitude_; }
   void set_state_cache(std::shared_ptr<adapters::Px4StateCache> sc) { state_cache_ = std::move(sc); }
+  void set_mission_context(std::shared_ptr<domain::MissionContext> ctx) { mission_ctx_ = std::move(ctx); }
 
   void trigger_takeoff_sequence();
 
@@ -51,6 +54,7 @@ private:
   TakeoverCallback takeover_cb_;
   ExecutorActivationCallback activation_cb_;
   std::shared_ptr<adapters::Px4StateCache> state_cache_;
+  std::shared_ptr<domain::MissionContext> mission_ctx_{nullptr};
 };
 
 }  // namespace full_self_driving::flight

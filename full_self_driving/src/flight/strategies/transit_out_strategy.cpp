@@ -12,12 +12,14 @@ TransitOutStrategy::TransitOutStrategy(
   px4_ros2::Context & context,
   std::shared_ptr<adapters::Px4StateCache> state_cache,
   domain::Route route,
-  std::shared_ptr<persistence::PersistenceManager> persistence)
+  std::shared_ptr<persistence::PersistenceManager> persistence,
+  std::shared_ptr<domain::MissionContext> mission_ctx)
 : node_(node),
   goto_setpoint_(std::make_shared<px4_ros2::GotoGlobalSetpointType>(context)),
   state_cache_(std::move(state_cache)),
   route_(std::move(route)),
-  persistence_(std::move(persistence))
+  persistence_(std::move(persistence)),
+  mission_ctx_(std::move(mission_ctx))
 {
 }
 
@@ -26,12 +28,14 @@ TransitOutStrategy::TransitOutStrategy(
   std::shared_ptr<px4_ros2::GotoGlobalSetpointType> goto_setpoint,
   std::shared_ptr<adapters::Px4StateCache> state_cache,
   domain::Route route,
-  std::shared_ptr<persistence::PersistenceManager> persistence)
+  std::shared_ptr<persistence::PersistenceManager> persistence,
+  std::shared_ptr<domain::MissionContext> mission_ctx)
 : node_(node),
   goto_setpoint_(std::move(goto_setpoint)),
   state_cache_(std::move(state_cache)),
   route_(std::move(route)),
-  persistence_(std::move(persistence))
+  persistence_(std::move(persistence)),
+  mission_ctx_(std::move(mission_ctx))
 {
 }
 
@@ -144,7 +148,7 @@ void TransitOutStrategy::on_update(float dt_s)
     return;
   }
 
-  if (!snapshot.home_pos_valid) {
+  if (!snapshot.home_pos_valid && (!mission_ctx_ || !mission_ctx_->has_origin_home_position())) {
     if (data_timed_out()) {
       fail("no valid PX4 home position was received");
     } else {
@@ -155,7 +159,11 @@ void TransitOutStrategy::on_update(float dt_s)
     return;
   }
 
-  home_altitude_msl_m_ = snapshot.home_global_position.z();
+  if (mission_ctx_ && mission_ctx_->has_origin_home_position()) {
+    home_altitude_msl_m_ = mission_ctx_->get_origin_home_position().altitude_msl_m;
+  } else {
+    home_altitude_msl_m_ = snapshot.home_global_position.z();
+  }
 
   if (!snapshot.global_pos_valid || !snapshot.local_pos_valid) {
     if (setpoint_sent_for_current_waypoint_ || data_timed_out()) {
@@ -172,7 +180,7 @@ void TransitOutStrategy::on_update(float dt_s)
     target_altitude_msl_m_ = home_altitude_msl_m_ + transit_altitude_above_home_m_;
     target_altitude_set_ = true;
     RCLCPP_INFO(
-      node_.get_logger(), "[TRANSIT_OUT] Target altitude set to %.2f m AMSL (Home: %.2f m, Rel: %.2f m)",
+      node_.get_logger(), "[TRANSIT_OUT] Target altitude set to %.2f m AMSL (Origin Base: %.2f m, Rel: %.2f m)",
       target_altitude_msl_m_, home_altitude_msl_m_, transit_altitude_above_home_m_);
   }
 

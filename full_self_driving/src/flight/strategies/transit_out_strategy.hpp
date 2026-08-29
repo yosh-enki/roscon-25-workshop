@@ -14,6 +14,7 @@
 #include <px4_ros2/utils/geodesic.hpp>
 
 #include "adapters/px4_state_cache.hpp"
+#include "domain/mission_context.hpp"
 #include "domain/route.hpp"
 #include "flight/internal_strategy.hpp"
 #include "persistence/persistence_manager.hpp"
@@ -32,7 +33,8 @@ public:
     px4_ros2::Context & context,
     std::shared_ptr<adapters::Px4StateCache> state_cache,
     domain::Route route,
-    std::shared_ptr<persistence::PersistenceManager> persistence = nullptr);
+    std::shared_ptr<persistence::PersistenceManager> persistence = nullptr,
+    std::shared_ptr<domain::MissionContext> mission_ctx = nullptr);
 
   // Overload for testing with custom/injected GotoGlobalSetpointType
   TransitOutStrategy(
@@ -40,7 +42,8 @@ public:
     std::shared_ptr<px4_ros2::GotoGlobalSetpointType> goto_setpoint,
     std::shared_ptr<adapters::Px4StateCache> state_cache,
     domain::Route route,
-    std::shared_ptr<persistence::PersistenceManager> persistence = nullptr);
+    std::shared_ptr<persistence::PersistenceManager> persistence = nullptr,
+    std::shared_ptr<domain::MissionContext> mission_ctx = nullptr);
 
   ~TransitOutStrategy() override = default;
 
@@ -75,6 +78,7 @@ private:
   std::shared_ptr<adapters::Px4StateCache> state_cache_;
   domain::Route route_;
   std::shared_ptr<persistence::PersistenceManager> persistence_;
+  std::shared_ptr<domain::MissionContext> mission_ctx_{nullptr};
 
   std::vector<domain::RoutePoint> waypoints_;
   std::size_t waypoint_index_{0};

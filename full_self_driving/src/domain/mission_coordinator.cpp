@@ -813,7 +813,7 @@ bool MissionCoordinator::request_transition(flight::StrategyType next_strategy, 
     if (mode_) {
       Route route = resolve_transit_out_route();
       mode_->set_strategy(std::make_unique<flight::TransitOutStrategy>(
-        mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), route, persistence_));
+        mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(), route, persistence_, context_));
     }
     return true;
   }
