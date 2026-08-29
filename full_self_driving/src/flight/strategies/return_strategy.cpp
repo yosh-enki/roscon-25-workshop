@@ -202,18 +202,29 @@ void ReturnStrategy::on_update(float dt_s)
       approach_threshold_m = mission_ctx_->get_resolved_config()->routes.approach_altitude_m;
     }
 
-    // 2-Stage Descent: 1.0 m/s above 2.5m, 0.35 m/s soft touchdown below 2.5m
-    float descent_speed = (current_alt_agl > approach_threshold_m) ? 1.0f : 0.35f;
-
-    // Closed-loop horizontal position guidance locked to exact (home_lat_, home_lon_) with locked heading:
-    if (goto_setpoint_ && home_initialized_) {
-      Eigen::Vector3d target{home_lat_, home_lon_, home_alt_msl_};
-      goto_setpoint_->update(target, hold_heading_rad_, 0.5f, descent_speed);
-    } else if (traj_setpoint_) {
-      traj_setpoint_->update(
-        Eigen::Vector3f{0.0f, 0.0f, descent_speed},
-        std::nullopt,
-        hold_heading_rad_);
+    if (current_alt_agl > approach_threshold_m) {
+      // Stage 1 (Above 2.5m): descend at 1.0 m/s towards approach altitude
+      if (goto_setpoint_ && home_initialized_) {
+        Eigen::Vector3d target{home_lat_, home_lon_, home_alt_msl_ + approach_threshold_m};
+        goto_setpoint_->update(target, hold_heading_rad_, 0.5f, 1.0f);
+      } else if (traj_setpoint_) {
+        traj_setpoint_->update(
+          Eigen::Vector3f{0.0f, 0.0f, 1.0f},
+          std::nullopt,
+          hold_heading_rad_);
+      }
+    } else {
+      // Stage 2 (Below 2.5m): Soft touchdown at 0.35 m/s downward velocity with locked heading.
+      // Using velocity setpoint drives throttle to ground idle upon contact, triggering PX4's internal land detector (is_landed=true).
+      if (traj_setpoint_) {
+        traj_setpoint_->update(
+          Eigen::Vector3f{0.0f, 0.0f, 0.35f},
+          std::nullopt,
+          hold_heading_rad_);
+      } else if (goto_setpoint_ && home_initialized_) {
+        Eigen::Vector3d target{home_lat_, home_lon_, home_alt_msl_ - 0.5};
+        goto_setpoint_->update(target, hold_heading_rad_, 0.2f, 0.35f);
+      }
     }
 
     float vz = snapshot.local_velocity_ned.z();
