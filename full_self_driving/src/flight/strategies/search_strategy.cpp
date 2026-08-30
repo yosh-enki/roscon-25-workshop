@@ -157,6 +157,9 @@ void SearchStrategy::on_enter()
     }
     starts_with_entry_point_ = working_plan_.get_checkpoint().has_checkpoint_position;
     first_plan_waypoint_source_index_ = working_plan_.get_checkpoint().next_source_index;
+    if (route_.default_altitude_m > 0.0f) {
+      search_altitude_m_ = static_cast<double>(route_.default_altitude_m);
+    }
   } else if (route_.waypoints.empty()) {
     fail("Search route is empty and no valid working plan was provided");
     return;
@@ -164,6 +167,9 @@ void SearchStrategy::on_enter()
     total_source_waypoints_ = static_cast<uint32_t>(route_.waypoints.size());
     starts_with_entry_point_ = false;
     first_plan_waypoint_source_index_ = 0;
+    if (route_.default_altitude_m > 0.0f) {
+      search_altitude_m_ = static_cast<double>(route_.default_altitude_m);
+    }
   }
 
   if (route_.waypoints.empty()) {
@@ -171,22 +177,27 @@ void SearchStrategy::on_enter()
     return;
   }
 
+  double initial_wp_alt = search_altitude_m_;
+  if (!route_.waypoints.empty() && route_.waypoints.front().altitude_m > 0.0) {
+    initial_wp_alt = route_.waypoints.front().altitude_m;
+  }
+
   // Setup target altitude AMSL based on home position
   if (state_cache_) {
     auto snapshot = state_cache_->capture_snapshot();
     if (snapshot.home_pos_valid) {
       home_altitude_msl_m_ = snapshot.home_global_position.z();
-      target_altitude_amsl_m_ = home_altitude_msl_m_ + search_altitude_m_;
+      target_altitude_amsl_m_ = home_altitude_msl_m_ + initial_wp_alt;
       target_altitude_set_ = true;
     } else if (snapshot.global_pos_valid) {
       home_altitude_msl_m_ = snapshot.global_position.z();
-      target_altitude_amsl_m_ = home_altitude_msl_m_ + search_altitude_m_;
+      target_altitude_amsl_m_ = home_altitude_msl_m_ + initial_wp_alt;
       target_altitude_set_ = true;
     }
   }
 
   if (!target_altitude_set_) {
-    target_altitude_amsl_m_ = search_altitude_m_;
+    target_altitude_amsl_m_ = initial_wp_alt;
   }
 
   RCLCPP_INFO(
@@ -221,16 +232,29 @@ void SearchStrategy::on_update(float dt_s)
     return;
   }
 
-  if (!target_altitude_set_ && snapshot.home_pos_valid) {
+  double active_wp_alt = search_altitude_m_;
+  if (current_waypoint_index_ < route_.waypoints.size()) {
+    const auto & active_wp = route_.waypoints[current_waypoint_index_];
+    if (active_wp.altitude_m > 0.0) {
+      active_wp_alt = active_wp.altitude_m;
+    }
+  }
+
+  if (snapshot.home_pos_valid) {
     home_altitude_msl_m_ = snapshot.home_global_position.z();
-    target_altitude_amsl_m_ = home_altitude_msl_m_ + search_altitude_m_;
+    target_altitude_amsl_m_ = home_altitude_msl_m_ + active_wp_alt;
+    target_altitude_set_ = true;
+  } else if (!target_altitude_set_ && snapshot.global_pos_valid) {
+    home_altitude_msl_m_ = snapshot.global_position.z();
+    target_altitude_amsl_m_ = home_altitude_msl_m_ + active_wp_alt;
     target_altitude_set_ = true;
   }
 
   if (mode_finished_) {
     if (!route_.waypoints.empty()) {
       const auto & last_wp = route_.waypoints.back();
-      Eigen::Vector3d hold_target(last_wp.latitude_deg, last_wp.longitude_deg, target_altitude_amsl_m_);
+      double last_alt = (last_wp.altitude_m > 0.0) ? last_wp.altitude_m : search_altitude_m_;
+      Eigen::Vector3d hold_target(last_wp.latitude_deg, last_wp.longitude_deg, home_altitude_msl_m_ + last_alt);
       goto_setpoint_->update(hold_target);
     }
     return;
@@ -243,7 +267,7 @@ void SearchStrategy::on_update(float dt_s)
 
   // 1. Climb to configured search altitude from current XY position first (Prototype baseline)
   double current_alt_amsl = snapshot.global_position.z();
-  if (current_alt_amsl < target_altitude_amsl_m_ - altitude_tolerance_m_) {
+  if (current_waypoint_index_ == 0 && current_alt_amsl < target_altitude_amsl_m_ - altitude_tolerance_m_) {
     Eigen::Vector3d climb_target(
       snapshot.global_position.x(),
       snapshot.global_position.y(),
@@ -290,6 +314,8 @@ void SearchStrategy::on_update(float dt_s)
         progress = (static_cast<float>(completed_count) / static_cast<float>(total_source_waypoints_)) * 100.0f;
       }
 
+      double wp_recorded_alt = (target_wp.altitude_m > 0.0) ? target_wp.altitude_m : search_altitude_m_;
+
       domain::SearchCheckpointData cp;
       cp.working_plan_id = working_plan_.get_working_plan_id();
       cp.generation = working_plan_.get_generation();
@@ -300,7 +326,7 @@ void SearchStrategy::on_update(float dt_s)
       cp.has_checkpoint_position = false;
       cp.checkpoint_latitude_deg = target_wp.latitude_deg;
       cp.checkpoint_longitude_deg = target_wp.longitude_deg;
-      cp.checkpoint_altitude_m = search_altitude_m_;
+      cp.checkpoint_altitude_m = wp_recorded_alt;
       cp.checkpoint_reason = "WAYPOINT_SETTLED";
 
       if (plan_manager_ && !working_plan_.get_working_plan_id().empty()) {
@@ -331,13 +357,14 @@ void SearchStrategy::on_update(float dt_s)
   if (current_waypoint_index_ >= route_.waypoints.size()) {
     mode_finished_ = true;
     const auto & last_wp = route_.waypoints.back();
-    Eigen::Vector3d hold_target(last_wp.latitude_deg, last_wp.longitude_deg, target_altitude_amsl_m_);
+    double last_alt = (last_wp.altitude_m > 0.0) ? last_wp.altitude_m : search_altitude_m_;
+    Eigen::Vector3d hold_target(last_wp.latitude_deg, last_wp.longitude_deg, home_altitude_msl_m_ + last_alt);
     goto_setpoint_->update(hold_target);
 
     RCLCPP_INFO(
       node_.get_logger(),
-      "[SEARCH] All search waypoints completed. Holding over final waypoint (lat=%.7f, lon=%.7f)",
-      last_wp.latitude_deg, last_wp.longitude_deg);
+      "[SEARCH] All search waypoints completed. Holding over final waypoint (lat=%.7f, lon=%.7f, alt=%.2f m AMSL)",
+      last_wp.latitude_deg, last_wp.longitude_deg, home_altitude_msl_m_ + last_alt);
 
     if (completion_cb_) {
       completion_cb_(true);
@@ -347,7 +374,9 @@ void SearchStrategy::on_update(float dt_s)
 
   // 4. Update setpoint towards active target waypoint
   const auto & active_wp = route_.waypoints[current_waypoint_index_];
-  Eigen::Vector3d target_pos(active_wp.latitude_deg, active_wp.longitude_deg, target_altitude_amsl_m_);
+  double current_wp_alt = (active_wp.altitude_m > 0.0) ? active_wp.altitude_m : search_altitude_m_;
+  double wp_target_amsl = home_altitude_msl_m_ + current_wp_alt;
+  Eigen::Vector3d target_pos(active_wp.latitude_deg, active_wp.longitude_deg, wp_target_amsl);
   Eigen::Vector2d active_pos_2d(active_wp.latitude_deg, active_wp.longitude_deg);
   float dist_to_wp = px4_ros2::horizontalDistanceToGlobalPosition(current_pos_2d, active_pos_2d);
 

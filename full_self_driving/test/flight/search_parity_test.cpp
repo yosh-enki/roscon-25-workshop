@@ -537,3 +537,44 @@ TEST_F(SearchParityTest, CoordinatorAcquireTargetToSearchTransition)
   EXPECT_TRUE(found_acquire);
   EXPECT_TRUE(found_search_fallback);
 }
+
+// Test 8: Plan-derived default altitude and per-waypoint altitude navigation
+TEST_F(SearchParityTest, PlanDerivedDefaultAltitudeAndPerWaypointAltitude)
+{
+  domain::CanonicalSearchRoute route;
+  route.default_altitude_m = 12.0f;
+  route.cruise_speed_m_s = 4.0f;
+
+  domain::SearchWaypoint wp1{13.731000, 100.789000, 12.0, 0};
+  domain::SearchWaypoint wp2{13.732000, 100.789000, 18.0, 1}; // Different altitude for WP 2!
+  route.waypoints.push_back(wp1);
+  route.waypoints.push_back(wp2);
+
+  auto goto_sp = std::make_shared<px4_ros2::GotoGlobalSetpointType>(*context_);
+  flight::SearchStrategy search_strat(
+    *node_, goto_sp, state_cache_, route, 15.0, 4.0f, 2.0f, 0.785f);
+
+  // Set home position at 10.0m MSL
+  publish_telemetry(true, false, 13.730000, 100.789000, 10.0, 0.0f, 0.0f, 0.0f, 0.0f, 13.730000, 100.789000, 10.0f);
+  spin_some();
+
+  search_strat.on_enter();
+  EXPECT_DOUBLE_EQ(search_strat.search_altitude_m(), 12.0); // Derived from route.default_altitude_m!
+  EXPECT_NEAR(search_strat.target_altitude_amsl_m(), 22.0, 0.01); // 10.0 + 12.0 = 22.0m AMSL
+
+  // Initial climb
+  publish_telemetry(true, false, 13.730000, 100.789000, 22.0, 0.0f, 0.0f, 0.0f, 0.0f, 13.730000, 100.789000, 10.0f);
+  spin_some();
+  search_strat.on_update(0.1f);
+
+  // Reach WP 1 (12.0m altitude)
+  publish_telemetry(true, false, 13.731000, 100.789000, 22.0, 0.0f, 0.0f, 0.0f, 0.0f, 13.730000, 100.789000, 10.0f);
+  spin_some();
+  search_strat.on_update(0.1f);
+
+  EXPECT_EQ(search_strat.current_waypoint_index(), 1u);
+
+  // Now active WP is WP 2 with altitude 18.0m -> target AMSL should be 10.0 + 18.0 = 28.0m AMSL
+  search_strat.on_update(0.1f);
+  EXPECT_NEAR(search_strat.target_altitude_amsl_m(), 28.0, 0.01);
+}

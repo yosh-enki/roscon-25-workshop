@@ -492,10 +492,16 @@ void MissionCoordinator::instantiate_search_strategy()
   }
 
   if (has_custom_search_plan_) {
+    if (custom_search_plan_.get_source_route().default_altitude_m > 0.0f) {
+      search_alt = static_cast<double>(custom_search_plan_.get_source_route().default_altitude_m);
+    }
     mode_->set_strategy(std::make_unique<flight::SearchStrategy>(
       mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(),
       plan_manager_, custom_search_plan_, search_alt, max_h_speed, reach_rad, max_yaw_rate));
   } else if (has_custom_search_route_) {
+    if (custom_search_route_.default_altitude_m > 0.0f) {
+      search_alt = static_cast<double>(custom_search_route_.default_altitude_m);
+    }
     mode_->set_strategy(std::make_unique<flight::SearchStrategy>(
       mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(),
       custom_search_route_, search_alt, max_h_speed, reach_rad, max_yaw_rate));
@@ -517,6 +523,9 @@ void MissionCoordinator::instantiate_search_strategy()
       wp = plan_manager_->get_active_working_plan(map_id, scenario_id);
     }
     if (wp) {
+      if (wp->get_source_route().default_altitude_m > 0.0f) {
+        search_alt = static_cast<double>(wp->get_source_route().default_altitude_m);
+      }
       mode_->set_strategy(std::make_unique<flight::SearchStrategy>(
         mode_->node(), mode_->goto_global_setpoint(), mode_->state_cache(),
         plan_manager_, *wp, search_alt, max_h_speed, reach_rad, max_yaw_rate));
@@ -572,6 +581,22 @@ void MissionCoordinator::instantiate_precision_land_strategy()
     }
     if (safety.target_loss_timeout_s > 0.0) {
       target_timeout = static_cast<float>(safety.target_loss_timeout_s);
+    }
+  }
+
+  // Derive search hover-brake altitude from active working plan if available
+  if (has_custom_search_plan_ && custom_search_plan_.get_source_route().default_altitude_m > 0.0f) {
+    search_alt = static_cast<double>(custom_search_plan_.get_source_route().default_altitude_m);
+  } else if (has_custom_search_route_ && custom_search_route_.default_altitude_m > 0.0f) {
+    search_alt = static_cast<double>(custom_search_route_.default_altitude_m);
+  } else if (plan_manager_ && context_) {
+    const auto & sel = context_->get_selection();
+    auto wp = plan_manager_->get_working_plan(sel.working_plan_id);
+    if (!wp) {
+      wp = plan_manager_->get_active_working_plan(sel.map_id, sel.scenario_id);
+    }
+    if (wp && wp->get_source_route().default_altitude_m > 0.0f) {
+      search_alt = static_cast<double>(wp->get_source_route().default_altitude_m);
     }
   }
 
