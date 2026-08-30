@@ -26,8 +26,9 @@ TargetCoordinator::TargetCoordinator(
 void TargetCoordinator::set_selected_target(const domain::TargetIdentity & target)
 {
   std::lock_guard<std::mutex> lock(mutex_);
-  if (!selected_target_.has_value() || !selected_target_->matches(target)) {
-    selected_target_ = target;
+  selected_targets_ = {target};
+  if (!active_latched_target_.has_value() || !active_latched_target_->matches(target)) {
+    active_latched_target_.reset();
     current_lock_.identity = target;
     current_lock_.lock_state = domain::LockState::NONE;
     current_lock_.consecutive_observations = 0;
@@ -36,10 +37,55 @@ void TargetCoordinator::set_selected_target(const domain::TargetIdentity & targe
   }
 }
 
-void TargetCoordinator::clear_selected_target()
+void TargetCoordinator::set_selected_targets(const std::vector<domain::TargetIdentity> & targets)
 {
   std::lock_guard<std::mutex> lock(mutex_);
-  selected_target_.reset();
+  selected_targets_ = targets;
+  if (active_latched_target_.has_value()) {
+    bool still_allowed = false;
+    for (const auto & t : selected_targets_) {
+      if ((t.marker_id == 0 || t.marker_id == active_latched_target_->marker_id) &&
+          t.dictionary == active_latched_target_->dictionary &&
+          t.target_namespace == active_latched_target_->target_namespace)
+      {
+        still_allowed = true;
+        break;
+      }
+    }
+    if (!still_allowed) {
+      active_latched_target_.reset();
+      current_lock_.lock_state = domain::LockState::NONE;
+      current_lock_.consecutive_observations = 0;
+      last_valid_pose_.reset();
+      last_observation_monotonic_ns_ = 0;
+    }
+  } else {
+    current_lock_.lock_state = domain::LockState::NONE;
+    current_lock_.consecutive_observations = 0;
+  }
+}
+
+void TargetCoordinator::add_selected_target(const domain::TargetIdentity & target)
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  for (const auto & t : selected_targets_) {
+    if (t.matches(target)) {
+      return;
+    }
+  }
+  selected_targets_.push_back(target);
+}
+
+void TargetCoordinator::clear_selected_target()
+{
+  clear_selected_targets();
+}
+
+void TargetCoordinator::clear_selected_targets()
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  selected_targets_.clear();
+  active_latched_target_.reset();
   current_lock_.identity = domain::TargetIdentity();
   current_lock_.lock_state = domain::LockState::NONE;
   current_lock_.consecutive_observations = 0;
@@ -50,13 +96,39 @@ void TargetCoordinator::clear_selected_target()
 bool TargetCoordinator::has_selected_target() const
 {
   std::lock_guard<std::mutex> lock(mutex_);
-  return selected_target_.has_value();
+  return !selected_targets_.empty();
 }
 
 std::optional<domain::TargetIdentity> TargetCoordinator::get_selected_target() const
 {
   std::lock_guard<std::mutex> lock(mutex_);
-  return selected_target_;
+  if (active_latched_target_.has_value()) {
+    return active_latched_target_;
+  }
+  if (!selected_targets_.empty()) {
+    return selected_targets_.front();
+  }
+  return std::nullopt;
+}
+
+std::vector<domain::TargetIdentity> TargetCoordinator::get_selected_targets() const
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  return selected_targets_;
+}
+
+bool TargetCoordinator::is_target_allowed(const domain::TargetIdentity & target) const
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  for (const auto & allowed : selected_targets_) {
+    if ((allowed.marker_id == 0 || allowed.marker_id == target.marker_id) &&
+        allowed.dictionary == target.dictionary &&
+        allowed.target_namespace == target.target_namespace)
+    {
+      return true;
+    }
+  }
+  return false;
 }
 
 void TargetCoordinator::set_scope(const std::string & map_id, const std::string & scenario_id)
@@ -156,22 +228,51 @@ domain::LiveTargetLock TargetCoordinator::process_observation_batch(
 {
   std::lock_guard<std::mutex> lock(mutex_);
 
-  if (!selected_target_.has_value()) {
+  if (selected_targets_.empty()) {
     current_lock_.lock_state = domain::LockState::NONE;
     current_lock_.consecutive_observations = 0;
     return current_lock_;
   }
 
   const full_self_driving::msg::AllIdObservation * matching_obs = nullptr;
-  for (const auto & obs : batch.observations) {
-    if (obs.identity.marker_id == selected_target_->marker_id &&
-        obs.identity.dictionary == selected_target_->dictionary &&
-        obs.identity.target_namespace == selected_target_->target_namespace &&
-        obs.map_id == map_id_ &&
-        obs.scenario_id == scenario_id_)
-    {
-      matching_obs = &obs;
-      break;
+
+  if (active_latched_target_.has_value()) {
+    // Currently tracking a specific latched target candidate
+    for (const auto & obs : batch.observations) {
+      if (obs.identity.marker_id == active_latched_target_->marker_id &&
+          obs.identity.dictionary == active_latched_target_->dictionary &&
+          obs.identity.target_namespace == active_latched_target_->target_namespace &&
+          obs.map_id == map_id_ &&
+          obs.scenario_id == scenario_id_)
+      {
+        matching_obs = &obs;
+        break;
+      }
+    }
+  } else {
+    // No target currently latched: search for best valid observation matching ANY allowed target
+    float best_quality = -1.0f;
+    for (const auto & obs : batch.observations) {
+      if (obs.map_id == map_id_ &&
+          obs.scenario_id == scenario_id_ &&
+          validate_observation(obs))
+      {
+        for (const auto & allowed : selected_targets_) {
+          if ((allowed.marker_id == 0 || allowed.marker_id == obs.identity.marker_id) &&
+              allowed.dictionary == obs.identity.dictionary &&
+              allowed.target_namespace == obs.identity.target_namespace)
+          {
+            if (obs.quality > best_quality) {
+              best_quality = obs.quality;
+              matching_obs = &obs;
+            }
+            break;
+          }
+        }
+      }
+    }
+    if (matching_obs) {
+      active_latched_target_ = domain::TargetIdentity::from_msg(matching_obs->identity);
     }
   }
 
@@ -190,6 +291,9 @@ domain::LiveTargetLock TargetCoordinator::process_observation_batch(
           current_lock_.lock_state = domain::LockState::LOST;
           current_lock_.consecutive_observations = 0;
           current_lock_.lock_sequence = ++lock_sequence_;
+          // Release latch on loss timeout so we can re-acquire any allowed target
+          active_latched_target_.reset();
+          last_valid_pose_.reset();
         }
       } else if (age_s > policy_.maximum_pose_age_s) {
         if (current_lock_.lock_state == domain::LockState::QUALIFIED ||
@@ -231,7 +335,7 @@ domain::LiveTargetLock TargetCoordinator::process_observation_batch(
     current_lock_.lock_state = domain::LockState::CANDIDATE;
   }
 
-  current_lock_.identity = *selected_target_;
+  current_lock_.identity = domain::TargetIdentity::from_msg(obs.identity);
   current_lock_.map_id = map_id_;
   current_lock_.scenario_id = scenario_id_;
   current_lock_.pose_frame = obs.pose_frame;
@@ -251,7 +355,7 @@ domain::LiveTargetLock TargetCoordinator::process_observation_batch(
 domain::LiveTargetLock TargetCoordinator::check_freshness(uint64_t monotonic_ns)
 {
   std::lock_guard<std::mutex> lock(mutex_);
-  if (last_observation_monotonic_ns_ == 0 || !selected_target_.has_value()) {
+  if (last_observation_monotonic_ns_ == 0 || !active_latched_target_.has_value()) {
     return current_lock_;
   }
 
@@ -266,6 +370,8 @@ domain::LiveTargetLock TargetCoordinator::check_freshness(uint64_t monotonic_ns)
       current_lock_.lock_state = domain::LockState::LOST;
       current_lock_.consecutive_observations = 0;
       current_lock_.lock_sequence = ++lock_sequence_;
+      active_latched_target_.reset();
+      last_valid_pose_.reset();
     }
   } else if (age_s > policy_.maximum_pose_age_s) {
     if (current_lock_.lock_state == domain::LockState::QUALIFIED ||
@@ -293,8 +399,9 @@ void TargetCoordinator::reset()
   current_lock_.scenario_id = scenario_id_;
   current_lock_.lock_state = domain::LockState::NONE;
   current_lock_.consecutive_observations = 0;
-  if (selected_target_.has_value()) {
-    current_lock_.identity = *selected_target_;
+  active_latched_target_.reset();
+  if (!selected_targets_.empty()) {
+    current_lock_.identity = selected_targets_.front();
   }
   last_valid_pose_.reset();
   last_observation_monotonic_ns_ = 0;

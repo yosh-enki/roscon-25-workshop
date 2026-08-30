@@ -100,7 +100,7 @@ const customStyles = `
 `;
 
 function FsdMissionControlPanel({ context }: { context: PanelExtensionContext }): ReactElement {
-  const [markerId, setMarkerId] = useState<number>(1);
+  const [selectedMarkerIds, setSelectedMarkerIds] = useState<number[]>([1]);
   const dictionary = "DICT_4X4_50";
   const targetNamespace = "aavc2026";
 
@@ -191,19 +191,60 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
     }
   };
 
-  const handleSelectTarget = () => {
-    callRosService(
-      "/full_self_driving/select_target",
-      {
-        target: {
-          marker_id: markerId,
-          dictionary,
-          target_namespace: targetNamespace,
-        },
-        expected_selection_revision: 0,
-      },
-      `Target Assigned (ID: ${markerId})`
-    );
+  const toggleMarker = (id: number) => {
+    setSelectedMarkerIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((x) => x !== id);
+      } else {
+        return [...prev, id].sort((a, b) => a - b);
+      }
+    });
+  };
+
+  const selectAllMarkers = () => {
+    setSelectedMarkerIds([1, 2, 3, 4, 5, 6]);
+  };
+
+  const clearAllMarkers = () => {
+    setSelectedMarkerIds([]);
+  };
+
+  const handleSelectTarget = async () => {
+    if (selectedMarkerIds.length === 0) {
+      addLog("warn", "No landing pads selected! Please select at least one Pad.");
+      return;
+    }
+
+    setIsCalling(true);
+    const padListStr = selectedMarkerIds.length === 6
+      ? "ALL PADS (1-6)"
+      : selectedMarkerIds.map((id) => `Pad ${id}`).join(", ");
+    addLog("info", `Assigning multi-target selection: [${padListStr}]...`);
+
+    try {
+      const callFn = (context as unknown as { callService?: (name: string, req: unknown) => Promise<unknown> }).callService;
+      if (typeof callFn !== "function") {
+        throw new Error("Foxglove data source does not support service calls (check foxglove_bridge connection)");
+      }
+
+      for (let i = 0; i < selectedMarkerIds.length; i++) {
+        const id = selectedMarkerIds[i];
+        await callFn("/full_self_driving/select_target", {
+          target: {
+            marker_id: id,
+            dictionary,
+            target_namespace: targetNamespace,
+          },
+          expected_selection_revision: 0,
+        });
+      }
+      addLog("success", `Target(s) Assigned -> Whitelist active: [${padListStr}]`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addLog("error", `Target Assignment Failed: ${msg}`);
+    } finally {
+      setIsCalling(false);
+    }
   };
 
   const handlePreparePayload = (operation: number, opName: string) => {
@@ -408,15 +449,61 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
           <div style={{ fontSize: "12px", fontWeight: "bold", color: "#f0883e", letterSpacing: "0.5px" }}>
-            1. TARGET ARUCO SELECTION
+            1. TARGET ARUCO SELECTION (MULTI-TARGET)
           </div>
-          <span style={{ fontSize: "10px", background: "rgba(240, 136, 62, 0.15)", color: "#f0883e", padding: "2px 6px", borderRadius: "4px" }}>
-            DICT_4X4_50
-          </span>
+          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+            <button
+              type="button"
+              className="gcs-chip"
+              onClick={selectAllMarkers}
+              style={{
+                padding: "2px 8px",
+                borderRadius: "4px",
+                fontSize: "10px",
+                fontWeight: "bold",
+                background: "rgba(56, 139, 253, 0.15)",
+                border: "1px solid rgba(56, 139, 253, 0.4)",
+                color: "#58a6ff",
+                cursor: "pointer",
+              }}
+            >
+              ALL
+            </button>
+            <button
+              type="button"
+              className="gcs-chip"
+              onClick={clearAllMarkers}
+              style={{
+                padding: "2px 8px",
+                borderRadius: "4px",
+                fontSize: "10px",
+                fontWeight: "bold",
+                background: "rgba(110, 118, 129, 0.15)",
+                border: "1px solid rgba(110, 118, 129, 0.3)",
+                color: "#8b949e",
+                cursor: "pointer",
+              }}
+            >
+              CLEAR
+            </button>
+            <span style={{ fontSize: "10px", background: "rgba(240, 136, 62, 0.15)", color: "#f0883e", padding: "2px 6px", borderRadius: "4px" }}>
+              DICT_4X4_50
+            </span>
+          </div>
         </div>
 
-        {/* Quick Marker Chip Buttons */}
-        <div style={{ fontSize: "11px", color: "#8b949e", marginBottom: "6px" }}>Select Pad ID:</div>
+        {/* Quick Marker Multi-Select Chip Buttons */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+          <div style={{ fontSize: "11px", color: "#8b949e" }}>Select Allowed Landing Pads:</div>
+          <div style={{ fontSize: "10px", color: selectedMarkerIds.length > 0 ? "#58a6ff" : "#f85149", fontWeight: "bold" }}>
+            {selectedMarkerIds.length === 0
+              ? "0 Selected"
+              : selectedMarkerIds.length === 6
+              ? "All 6 Pads (Any)"
+              : `${selectedMarkerIds.length} Selected [${selectedMarkerIds.join(", ")}]`}
+          </div>
+        </div>
+
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
           {[
             { id: 1, label: "Pad 1" },
@@ -426,13 +513,13 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
             { id: 5, label: "Pad 5" },
             { id: 6, label: "Pad 6" },
           ].map((item) => {
-            const isSelected = markerId === item.id;
+            const isSelected = selectedMarkerIds.includes(item.id);
             return (
               <button
                 key={item.id}
                 type="button"
                 className="gcs-chip"
-                onClick={() => setMarkerId(item.id)}
+                onClick={() => toggleMarker(item.id)}
                 style={{
                   padding: "6px 10px",
                   borderRadius: "6px",
@@ -440,12 +527,16 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
                   fontWeight: isSelected ? "bold" : "normal",
                   background: isSelected ? "linear-gradient(135deg, #1f6feb 0%, #388bfd 100%)" : "rgba(33, 38, 45, 0.8)",
                   border: isSelected ? "1px solid #58a6ff" : "1px solid #30363d",
-                  color: isSelected ? "#fff" : "#c9d1d9",
+                  color: isSelected ? "#fff" : "#8b949e",
                   cursor: "pointer",
                   boxShadow: isSelected ? "0 0 10px rgba(31, 111, 235, 0.5)" : "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
                 }}
               >
-                {item.label}
+                <span>{isSelected ? "✓" : "○"}</span>
+                <span>{item.label}</span>
               </button>
             );
           })}
@@ -455,22 +546,31 @@ function FsdMissionControlPanel({ context }: { context: PanelExtensionContext })
           type="button"
           className="gcs-btn"
           onClick={handleSelectTarget}
-          disabled={isCalling}
+          disabled={isCalling || selectedMarkerIds.length === 0}
           style={{
             width: "100%",
             padding: "10px",
-            background: "linear-gradient(135deg, #238636 0%, #2ea043 100%)",
-            color: "#fff",
-            border: "1px solid rgba(255, 255, 255, 0.2)",
+            background:
+              selectedMarkerIds.length === 0
+                ? "rgba(110, 118, 129, 0.2)"
+                : "linear-gradient(135deg, #238636 0%, #2ea043 100%)",
+            color: selectedMarkerIds.length === 0 ? "#8b949e" : "#fff",
+            border: selectedMarkerIds.length === 0 ? "1px solid #30363d" : "1px solid rgba(255, 255, 255, 0.2)",
             borderRadius: "6px",
             fontWeight: "bold",
             fontSize: "12px",
             letterSpacing: "0.5px",
-            cursor: isCalling ? "not-allowed" : "pointer",
-            boxShadow: "0 2px 8px rgba(46, 160, 67, 0.4)",
+            cursor: isCalling || selectedMarkerIds.length === 0 ? "not-allowed" : "pointer",
+            boxShadow: selectedMarkerIds.length === 0 ? "none" : "0 2px 8px rgba(46, 160, 67, 0.4)",
           }}
         >
-          ASSIGN PAD {markerId}
+          {selectedMarkerIds.length === 0
+            ? "SELECT AT LEAST ONE PAD"
+            : selectedMarkerIds.length === 6
+            ? "ASSIGN ALL PADS (ANY 1-6)"
+            : selectedMarkerIds.length === 1
+            ? `ASSIGN PAD ${selectedMarkerIds[0]}`
+            : `ASSIGN ${selectedMarkerIds.length} PADS [${selectedMarkerIds.join(", ")}]`}
         </button>
       </div>
 

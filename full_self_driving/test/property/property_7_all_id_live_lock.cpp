@@ -273,3 +273,94 @@ TEST_F(AllIdLiveLockSeparationPropertyTest, Property7_RegistryDoesNotImplyLiveLo
   EXPECT_EQ(lock.consecutive_observations, 0u);
   EXPECT_FALSE(lock.is_qualified());
 }
+
+// Property 7.8: Multi-target selection locks onto the first detected target in the whitelist
+TEST_F(AllIdLiveLockSeparationPropertyTest, Property7_MultiTargetFirstDetectedAndLatching)
+{
+  std::vector<domain::TargetIdentity> targets = {
+    domain::TargetIdentity(1, "DICT_4X4_50", "aavc2026"),
+    domain::TargetIdentity(2, "DICT_4X4_50", "aavc2026"),
+    domain::TargetIdentity(3, "DICT_4X4_50", "aavc2026")
+  };
+  coordinator_->set_selected_targets(targets);
+
+  EXPECT_TRUE(coordinator_->has_selected_target());
+  EXPECT_EQ(coordinator_->get_selected_targets().size(), 3u);
+
+  // Batch 1: Sees Marker ID 2 (which is in the whitelist)
+  msg::AllIdObservationBatch batch1;
+  batch1.observations.push_back(create_observation(2, "DICT_4X4_50", "aavc2026", 1.0, 2.0, 5.0, 0.95f));
+  batch1.observations.push_back(create_observation(9, "DICT_4X4_50", "aavc2026", 10.0, 10.0, 5.0, 0.99f)); // Not in whitelist
+
+  uint64_t t0 = 1000000000;
+  auto lock1 = coordinator_->process_observation_batch(batch1, t0);
+  EXPECT_EQ(lock1.lock_state, domain::LockState::CANDIDATE);
+  EXPECT_EQ(lock1.identity.marker_id, 2u);
+  EXPECT_EQ(lock1.consecutive_observations, 1u);
+
+  // Batch 2: Sees Marker ID 2 again -> qualifies lock on ID 2
+  msg::AllIdObservationBatch batch2;
+  batch2.observations.push_back(create_observation(2, "DICT_4X4_50", "aavc2026", 1.05, 2.02, 5.0, 0.95f));
+  // Marker ID 3 (also in whitelist) is also in the frame
+  batch2.observations.push_back(create_observation(3, "DICT_4X4_50", "aavc2026", -5.0, -5.0, 5.0, 0.99f));
+
+  uint64_t t1 = t0 + 100000000;
+  auto lock2 = coordinator_->process_observation_batch(batch2, t1);
+  EXPECT_EQ(lock2.lock_state, domain::LockState::QUALIFIED);
+  EXPECT_TRUE(lock2.is_qualified());
+  EXPECT_EQ(lock2.identity.marker_id, 2u); // Latching maintained on ID 2, did NOT jump to ID 3!
+  EXPECT_EQ(lock2.consecutive_observations, 2u);
+}
+
+// Property 7.9: Wildcard target (marker_id = 0) locks onto ANY valid detected marker
+TEST_F(AllIdLiveLockSeparationPropertyTest, Property7_WildcardAnyTargetSelection)
+{
+  domain::TargetIdentity wildcard(0, "DICT_4X4_50", "aavc2026");
+  coordinator_->set_selected_target(wildcard);
+
+  msg::AllIdObservationBatch batch1;
+  batch1.observations.push_back(create_observation(5, "DICT_4X4_50", "aavc2026", 0.0, 0.0, 5.0, 0.92f));
+
+  uint64_t t0 = 1000000000;
+  auto lock1 = coordinator_->process_observation_batch(batch1, t0);
+  EXPECT_EQ(lock1.lock_state, domain::LockState::CANDIDATE);
+  EXPECT_EQ(lock1.identity.marker_id, 5u);
+
+  uint64_t t1 = t0 + 100000000;
+  auto lock2 = coordinator_->process_observation_batch(batch1, t1);
+  EXPECT_EQ(lock2.lock_state, domain::LockState::QUALIFIED);
+  EXPECT_EQ(lock2.identity.marker_id, 5u);
+}
+
+// Property 7.10: Multi-target loss recovery releases latch to allow acquiring other targets
+TEST_F(AllIdLiveLockSeparationPropertyTest, Property7_MultiTargetLossRecovery)
+{
+  std::vector<domain::TargetIdentity> targets = {
+    domain::TargetIdentity(1, "DICT_4X4_50", "aavc2026"),
+    domain::TargetIdentity(2, "DICT_4X4_50", "aavc2026")
+  };
+  coordinator_->set_selected_targets(targets);
+
+  // 1. Lock onto ID 1
+  msg::AllIdObservationBatch batch1;
+  batch1.observations.push_back(create_observation(1, "DICT_4X4_50", "aavc2026", 0.0, 0.0, 5.0, 0.9f));
+  uint64_t t0 = 1000000000;
+  coordinator_->process_observation_batch(batch1, t0);
+  uint64_t t1 = t0 + 100000000;
+  auto lock1 = coordinator_->process_observation_batch(batch1, t1);
+  ASSERT_EQ(lock1.lock_state, domain::LockState::QUALIFIED);
+  ASSERT_EQ(lock1.identity.marker_id, 1u);
+
+  // 2. Advance time past loss timeout (1.5s)
+  uint64_t t_lost = t1 + 2000000000ULL;
+  auto lock_lost = coordinator_->check_freshness(t_lost);
+  EXPECT_EQ(lock_lost.lock_state, domain::LockState::LOST);
+
+  // 3. Now Marker ID 2 appears -> coordinator should re-acquire on ID 2
+  msg::AllIdObservationBatch batch2;
+  batch2.observations.push_back(create_observation(2, "DICT_4X4_50", "aavc2026", 3.0, 3.0, 5.0, 0.95f));
+  uint64_t t2 = t_lost + 100000000ULL;
+  auto lock2 = coordinator_->process_observation_batch(batch2, t2);
+  EXPECT_EQ(lock2.lock_state, domain::LockState::CANDIDATE);
+  EXPECT_EQ(lock2.identity.marker_id, 2u);
+}

@@ -236,12 +236,32 @@ void PerceptionNode::target_selection_callback(const full_self_driving::msg::Tar
 {
   domain::TargetIdentity id = domain::TargetIdentity::from_msg(*msg);
   if (id.is_valid()) {
-    RCLCPP_INFO(get_logger(), "Selected target updated via topic: marker_id=%u, dict=%s, ns=%s",
-      id.marker_id, id.dictionary.c_str(), id.target_namespace.c_str());
-    target_coordinator_.set_selected_target(id);
+    uint64_t now_ns = static_cast<uint64_t>(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count());
+
+    bool is_batch_continuation = (last_target_selection_steady_ns_ > 0 &&
+                                  now_ns >= last_target_selection_steady_ns_ &&
+                                  (now_ns - last_target_selection_steady_ns_) < 600000000ULL); // 600ms window
+
+    if (id.marker_id == 0) {
+      RCLCPP_INFO(get_logger(), "Selected ALL targets wildcard via topic: dict=%s, ns=%s",
+        id.dictionary.c_str(), id.target_namespace.c_str());
+      target_coordinator_.set_selected_target(id);
+    } else if (is_batch_continuation) {
+      target_coordinator_.add_selected_target(id);
+      RCLCPP_INFO(get_logger(), "Added target to multi-target whitelist: marker_id=%u (total: %zu)",
+        id.marker_id, target_coordinator_.get_selected_targets().size());
+    } else {
+      target_coordinator_.set_selected_target(id);
+      RCLCPP_INFO(get_logger(), "Selected target updated via topic: marker_id=%u, dict=%s, ns=%s",
+        id.marker_id, id.dictionary.c_str(), id.target_namespace.c_str());
+    }
+    last_target_selection_steady_ns_ = now_ns;
   } else {
     RCLCPP_WARN(get_logger(), "Received invalid target selection; clearing target");
     target_coordinator_.clear_selected_target();
+    last_target_selection_steady_ns_ = 0;
   }
 }
 

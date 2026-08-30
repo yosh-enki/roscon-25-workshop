@@ -86,6 +86,7 @@ private:
 
   uint64_t sequence_{0};
   uint32_t queue_drops_{0};
+  uint64_t last_target_selection_steady_ns_{0};
 };
 
 }  // namespace full_self_driving::perception

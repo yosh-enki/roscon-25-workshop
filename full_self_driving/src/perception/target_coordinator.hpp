@@ -25,9 +25,14 @@ public:
     const std::string & scenario_id = "default_scenario");
 
   void set_selected_target(const domain::TargetIdentity & target);
+  void set_selected_targets(const std::vector<domain::TargetIdentity> & targets);
+  void add_selected_target(const domain::TargetIdentity & target);
   void clear_selected_target();
+  void clear_selected_targets();
   bool has_selected_target() const;
   std::optional<domain::TargetIdentity> get_selected_target() const;
+  std::vector<domain::TargetIdentity> get_selected_targets() const;
+  bool is_target_allowed(const domain::TargetIdentity & target) const;
 
   void set_scope(const std::string & map_id, const std::string & scenario_id);
   std::string get_map_id() const;
@@ -54,7 +59,8 @@ private:
   domain::TargetLockPolicy policy_;
   std::string map_id_;
   std::string scenario_id_;
-  std::optional<domain::TargetIdentity> selected_target_;
+  std::vector<domain::TargetIdentity> selected_targets_;
+  std::optional<domain::TargetIdentity> active_latched_target_;
 
   domain::LiveTargetLock current_lock_;
   std::optional<geometry_msgs::msg::Pose> last_valid_pose_;
